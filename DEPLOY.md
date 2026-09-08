@@ -1,58 +1,102 @@
-# Publicação do Diário de Aula
+# Publicação do estuda.
 
-O projeto está pronto para ser conectado a três serviços:
+Este documento registra a operação das quatro entregas: PWA, API, banco PostgreSQL e aplicativo Expo.
 
-1. **GitHub** — hospeda o código e permite atualizações automáticas.
-2. **Render** — publica o site e a API por meio do arquivo `render.yaml`.
-3. **Expo** — gera o APK Android a partir da pasta `Mobile`.
+## Endereços de produção
 
-## 1. GitHub
+| Entrega | Endereço |
+| --- | --- |
+| Site e PWA | https://diario-de-aula-web.onrender.com/ |
+| API | https://diario-de-aula-api.onrender.com/ |
+| Swagger | https://diario-de-aula-api.onrender.com/docs/ |
+| Projeto Expo | https://expo.dev/accounts/docvia-app/projects/diario-de-aula |
 
-Crie um repositório vazio no GitHub chamado `diario-de-aula`, sem README ou `.gitignore`. Depois, na pasta do projeto, conecte e envie o código:
+## Render
 
-```powershell
-git remote add origin https://github.com/SEU_USUARIO/diario-de-aula.git
-git branch -M main
-git add .
-git commit -m "feat: plataforma Diário de Aula"
-git push -u origin main
+O `render.yaml` declara:
+
+- site estático React/Vite;
+- API Node.js;
+- PostgreSQL;
+- conexão automática da `DATABASE_URL`;
+- configuração do provedor e modelo Gemini.
+
+Variáveis marcadas como `sync: false` devem permanecer configuradas no painel:
+
+```env
+VITE_API_URL=https://diario-de-aula-api.onrender.com/api/v1
+CORS_ORIGINS=https://diario-de-aula-web.onrender.com
+GEMINI_API_KEY=definida-no-painel
 ```
 
-## 2. Render
+Nunca copie o valor real de `GEMINI_API_KEY` para Git, README, logs ou imagens.
 
-No painel do Render, selecione **New > Blueprint**, escolha o repositório e confirme o arquivo `render.yaml`.
+## Instalação da PWA
 
-Ele criará dois serviços:
+### iPhone e iPad
 
-- `diario-de-aula-api`: API e documentação Swagger em `/docs`.
-- `diario-de-aula-web`: site estático.
+1. Abra a URL pública no Safari.
+2. Toque no ícone de compartilhar.
+3. Escolha **Adicionar à Tela de Início**.
+4. Confirme **Adicionar**.
 
-Após a criação, copie a URL da API e configure no serviço web:
+O ícone abre em modo independente e não possui o limite de sete dias de um IPA assinado gratuitamente.
 
-```
-VITE_API_URL=https://SUA_API.onrender.com/api/v1
-```
+### Android
 
-Depois, copie a URL do site e configure no serviço da API:
+1. Abra a URL pública no Chrome.
+2. Use o aviso **Instalar estuda.** ou o menu do navegador.
+3. Confirme a instalação.
 
-```
-CORS_ORIGINS=https://SEU_SITE.onrender.com
-```
+### Computador
 
-Faça um novo deploy de ambos os serviços. O Swagger ficará disponível em:
+Chrome e Edge exibem o botão de instalação na barra de endereço quando os critérios da PWA são atendidos.
 
-```
-https://SUA_API.onrender.com/docs
-```
+## APK Android
 
-## 3. APK Android
-
-Instale o Expo Go no celular para testes ou entre na conta Expo e execute:
+O perfil `preview` produz um APK assinado para instalação direta:
 
 ```powershell
 cd Mobile
-npx eas-cli@latest login
 npx eas-cli@latest build --platform android --profile preview
 ```
 
-O perfil `preview` em `Mobile/eas.json` produz um APK instalável. Ao finalizar, a Expo mostrará o link de download.
+O arquivo pode ser hospedado em uma GitHub Release para obter um link estável. O perfil `production` produz um AAB destinado à Google Play.
+
+## iOS
+
+O código e o perfil de simulador podem ser validados sem assinatura de loja:
+
+```powershell
+cd Mobile
+npx eas-cli@latest build --platform ios --profile ios-simulator
+```
+
+TestFlight, App Store e um IPA distribuído profissionalmente exigem Apple Developer. Até essa assinatura existir, a PWA é a entrega gratuita, estável e instalável para iPhone.
+
+## Verificações antes de publicar
+
+```powershell
+npm test
+npm run build
+cd Mobile
+npx expo-doctor
+npx expo export --platform android
+npx expo export --platform ios
+```
+
+Depois do deploy:
+
+1. verifique `/health/ready` e confirme `persistence: postgresql`;
+2. crie uma conta;
+3. recarregue e confirme a sessão;
+4. adicione e conclua um planejamento;
+5. salve um diário e recarregue;
+6. gere questões e confirme `source: gemini`;
+7. abra a playlist Spotify;
+8. teste 390 px, 768 px e 1440 px;
+9. confirme manifesto, service worker e ícones.
+
+## Limite do plano gratuito
+
+A PWA não expira. O serviço gratuito do Render pode adormecer e levar alguns segundos para responder no primeiro acesso. O PostgreSQL gratuito possui regras próprias de retenção; antes de uso comercial, migre a `DATABASE_URL` para um banco persistente de longo prazo.
