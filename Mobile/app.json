@@ -1,1 +1,19 @@
-{"expo":{"name":"Diário de Aula","slug":"diario-de-aula","version":"1.0.0","orientation":"portrait","userInterfaceStyle":"light","android":{"package":"com.estuda.diariodeaula"},"plugins":[]}}
+{
+  "expo": {
+    "owner": "docvia-app",
+    "name": "Diário de Aula",
+    "slug": "diario-de-aula",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "com.estuda.diariodeaula"
+    },
+    "plugins": [],
+    "extra": {
+      "eas": {
+        "projectId": "d641c4b3-1631-4e10-b03a-765ef6a916e3"
+      }
+    }
+  }
+}
