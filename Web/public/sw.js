@@ -1,7 +1,7 @@
-const CACHE = 'estuda-shell-v2';
+const CACHE = 'estuda-shell-v3';
 const SHELL = [
   '/',
-  '/manifest.webmanifest',
+  '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/apple-touch-icon.png'

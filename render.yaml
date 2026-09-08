@@ -8,6 +8,10 @@ services:
     buildFilter:
       paths:
         - Web/**
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
     envVars:
       - key: VITE_API_URL
         sync: false
