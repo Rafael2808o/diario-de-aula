@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 
-const APP_URL = 'https://diario-de-aula-web.onrender.com/';
+const APP_URL = 'https://diario-de-aula-web.vercel.app/';
 
 export default function App() {
   const webView = useRef(null);

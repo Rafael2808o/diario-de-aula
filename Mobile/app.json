@@ -3,14 +3,14 @@
     "owner": "docvia-app",
     "name": "Diário de Aula",
     "slug": "diario-de-aula",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "icon": "./assets/icon.png",
     "orientation": "default",
     "scheme": "estuda",
     "userInterfaceStyle": "light",
     "android": {
       "package": "com.estuda.diariodeaula",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#171A3A"
@@ -18,7 +18,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.estuda.diariodeaula",
-      "buildNumber": "3",
+      "buildNumber": "4",
       "supportsTablet": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false

@@ -6,7 +6,7 @@ Este documento registra a operação das quatro entregas: PWA, API, banco Postgr
 
 | Entrega | Endereço |
 | --- | --- |
-| Site e PWA | https://diario-de-aula-web.onrender.com/ |
+| Site e PWA | https://diario-de-aula-web.vercel.app/ |
 | API | https://diario-de-aula-api.onrender.com/ |
 | Swagger | https://diario-de-aula-api.onrender.com/docs/ |
 | Projeto Expo | https://expo.dev/accounts/docvia-app/projects/diario-de-aula |

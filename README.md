@@ -10,7 +10,7 @@ O estuda. é uma plataforma acadêmica completa para organizar o semestre. O pro
 
 ## Teste o projeto
 
-**[Abrir o estuda. no navegador](https://diario-de-aula-web.onrender.com/)**
+**[Abrir o estuda. no navegador](https://diario-de-aula-web.vercel.app/)**
 
 - **iPhone e iPad:** abra o site no Safari, toque em **Compartilhar** e selecione **Adicionar à Tela de Início**.
 - **Android:** instale a PWA pelo navegador ou use o [APK Android](https://expo.dev/accounts/docvia-app/projects/diario-de-aula/builds/73e519fa-f3a4-4d3e-aa48-ca0a5da1a299).
