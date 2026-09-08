@@ -1,0 +1,11 @@
+{
+  "name": "diario-de-aula",
+  "private": true,
+  "workspaces": ["Web", "Api", "Mobile"],
+  "scripts": {
+    "dev:web": "npm --workspace Web run dev",
+    "dev:api": "npm --workspace Api run dev",
+    "build": "npm --workspace Web run build",
+    "test": "npm --workspace Api test"
+  }
+}

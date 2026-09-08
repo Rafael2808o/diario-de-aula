@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: diario-de-aula-web
+    runtime: static
+    rootDir: Web
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    buildFilter:
+      paths:
+        - Web/**
+    envVars:
+      - key: VITE_API_URL
+        sync: false
+  - type: web
+    name: diario-de-aula-api
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    rootDir: Api
+    healthCheckPath: /health/ready
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CORS_ORIGINS
+        sync: false
