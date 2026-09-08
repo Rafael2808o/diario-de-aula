@@ -9,6 +9,10 @@
     "android": {
       "package": "com.estuda.diariodeaula"
     },
+    "ios": {
+      "bundleIdentifier": "com.estuda.diariodeaula",
+      "supportsTablet": true
+    },
     "plugins": [],
     "extra": {
       "eas": {

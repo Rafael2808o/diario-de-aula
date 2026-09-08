@@ -2,7 +2,18 @@
   "name": "diario-de-aula-api",
   "version": "1.0.0",
   "type": "module",
-  "scripts": { "start": "node app.js", "dev": "node --watch app.js", "test": "node --test" },
-  "dependencies": { "cors": "^2.8.5", "express": "^5.1.0", "swagger-ui-express": "^5.0.1" },
-  "devDependencies": { "supertest": "^7.1.4" }
+  "scripts": {
+    "start": "node app.js",
+    "dev": "node --watch app.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
+    "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "supertest": "^7.1.4"
+  }
 }
