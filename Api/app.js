@@ -21,6 +21,15 @@ const materials = [
 const questionSchema = { type: 'OBJECT', properties: { title: { type: 'STRING' }, questions: { type: 'ARRAY', items: { type: 'OBJECT', properties: { question: { type: 'STRING' }, options: { type: 'ARRAY', items: { type: 'STRING' } }, correctIndex: { type: 'INTEGER' }, explanation: { type: 'STRING' }, difficulty: { type: 'STRING' } }, required: ['question', 'options', 'correctIndex', 'explanation', 'difficulty'] } } }, required: ['title', 'questions'] };
 const cleanText = (value, max) => typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, max) : '';
 const spotifyConfigured = () => Boolean(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET && process.env.SPOTIFY_REDIRECT_URI);
+function fallbackQuestions(subject, topic, quantity) {
+  const templates = [
+    { question: `Qual é a melhor estratégia para revisar “${topic}” em ${subject}?`, options: ['Memorizar frases isoladas', 'Relacionar conceitos, exemplos e consequências', 'Pular o conteúdo mais difícil', 'Estudar apenas na véspera'], correctIndex: 1, explanation: 'Uma revisão ativa conecta conceito, contexto e aplicação — não apenas palavras-chave.', difficulty: 'Fácil' },
+    { question: `Ao explicar ${topic} a outra pessoa, qual evidência demonstra compreensão real?`, options: ['Repetir o título da aula', 'Usar um exemplo e justificar a relação com o conceito', 'Listar nomes sem contexto', 'Afirmar que é intuitivo'], correctIndex: 1, explanation: 'Explicar com um exemplo e uma justificativa mostra que o conceito foi elaborado.', difficulty: 'Média' },
+    { question: `Em uma situação nova, como você aplicaria os princípios de ${topic}?`, options: ['Ignorando o contexto', 'Identificando elementos do caso e comparando-os com a teoria', 'Escolhendo a primeira resposta possível', 'Usando apenas uma definição decorada'], correctIndex: 1, explanation: 'A transferência de conhecimento exige analisar o caso antes de aplicar a teoria.', difficulty: 'Avançada' },
+    { question: `Qual registro torna sua próxima revisão de ${topic} mais eficiente?`, options: ['Somente a data da aula', 'Uma dúvida, um exemplo e uma conexão com outro conteúdo', 'Uma lista sem explicação', 'Nenhum registro'], correctIndex: 1, explanation: 'Registros conectados dão contexto para retomar o assunto e identificar lacunas.', difficulty: 'Média' }
+  ];
+  return { title: `Revisão guiada — ${topic}`, questions: Array.from({ length: quantity }, (_, index) => templates[index % templates.length]) };
+}
 
 const swagger = { openapi: '3.0.3', info: { title: 'Diário de Aula API', version: '1.1.0', description: 'API para planejamento, materiais e revisão acadêmica com IA.' }, servers: [{ url: '/api/v1' }], paths: {
   '/subjects': { get: { summary: 'Lista disciplinas', responses: { 200: { description: 'OK' } } } },
@@ -54,11 +63,11 @@ app.post('/api/v1/ai/questions', async (req, res) => {
   try {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(process.env.GEMINI_MODEL || 'gemini-flash-latest')}:generateContent?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`;
     const response = await fetch(endpoint, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', responseSchema: questionSchema } }) });
-    if (!response.ok) return res.status(502).json({ error: 'Não foi possível gerar a revisão agora. Tente novamente em alguns instantes.' });
+    if (!response.ok) return res.json({ ...fallbackQuestions(subject, topic, quantity), source: 'guided-fallback', generatedAt: new Date().toISOString(), notice: 'A IA está temporariamente indisponível; esta revisão guiada mantém seu estudo em andamento.' });
     const payload = await response.json(); const text = payload?.candidates?.[0]?.content?.parts?.map(part => part.text || '').join('') || ''; const generated = JSON.parse(text);
     if (!Array.isArray(generated.questions) || !generated.questions.length) throw new Error('Resposta inválida');
     return res.json({ ...generated, source: 'gemini', generatedAt: new Date().toISOString() });
-  } catch { return res.status(502).json({ error: 'A resposta da IA não pôde ser processada. Tente novamente.' }); }
+  } catch { return res.json({ ...fallbackQuestions(subject, topic, quantity), source: 'guided-fallback', generatedAt: new Date().toISOString(), notice: 'A IA está temporariamente indisponível; esta revisão guiada mantém seu estudo em andamento.' }); }
 });
 app.get('/api/v1/integrations/spotify/status', (_, res) => res.json({ configured: spotifyConfigured(), provider: 'spotify' }));
 app.get('/api/v1/integrations/spotify/authorize', (_, res) => {
