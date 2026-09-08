@@ -3,16 +3,16 @@
   "build": {
     "preview": {
       "distribution": "internal",
-      "android": { "buildType": "apk", "image": "latest" },
-      "ios": { "image": "latest" }
+      "android": { "buildType": "apk", "image": "sdk-52" },
+      "ios": { "image": "sdk-52" }
     },
     "ios-simulator": {
       "distribution": "internal",
-      "ios": { "simulator": true, "image": "latest" }
+      "ios": { "simulator": true, "image": "sdk-52" }
     },
     "production": {
-      "android": { "buildType": "app-bundle", "image": "latest" },
-      "ios": { "image": "latest" }
+      "android": { "buildType": "app-bundle", "image": "sdk-52" },
+      "ios": { "image": "sdk-52" }
     }
   }
 }
