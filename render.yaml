@@ -25,3 +25,20 @@ services:
         value: production
       - key: CORS_ORIGINS
         sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: diario-de-aula-db
+          property: connectionString
+      - key: AI_PROVIDER
+        value: gemini
+      - key: GEMINI_MODEL
+        value: gemini-3-flash-preview
+      - key: GEMINI_API_KEY
+        sync: false
+
+databases:
+  - name: diario-de-aula-db
+    databaseName: diario_de_aula
+    user: diario_de_aula
+    region: oregon
+    plan: free

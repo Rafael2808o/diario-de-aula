@@ -2,5 +2,78 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import app from '../app.js';
-test('expõe disciplinas', async () => { const response = await request(app).get('/api/v1/subjects'); assert.equal(response.status, 200); assert.equal(response.body.length, 6); });
-test('cria plano de estudo', async () => { const response = await request(app).post('/api/v1/study-plans').send({ subject: 'Tipografia', topic: 'Grid' }); assert.equal(response.status, 201); });
+
+test('expõe informações públicas e documentação', async () => {
+  const subjects = await request(app).get('/api/v1/subjects');
+  const health = await request(app).get('/health/ready');
+  const docs = await request(app).get('/docs/');
+  assert.equal(subjects.status, 200);
+  assert.equal(subjects.body.length, 6);
+  assert.equal(health.status, 200);
+  assert.equal(docs.status, 200);
+});
+
+test('protege dados pessoais sem autenticação', async () => {
+  const response = await request(app).get('/api/v1/study-plans');
+  assert.equal(response.status, 401);
+});
+
+test('completa o fluxo de conta, perfil, planejamento e diário', async () => {
+  const email = `teste-${Date.now()}@estuda.local`;
+  const register = await request(app).post('/api/v1/auth/register').send({
+    name: 'Pessoa Teste',
+    email,
+    password: 'senha-segura-123',
+    course: 'Design',
+    institution: 'Universidade Teste',
+    semester: '2º semestre'
+  });
+  assert.equal(register.status, 201);
+  assert.ok(register.body.token);
+
+  const auth = { Authorization: `Bearer ${register.body.token}` };
+  const me = await request(app).get('/api/v1/me').set(auth);
+  assert.equal(me.status, 200);
+  assert.equal(me.body.email, email);
+
+  const profile = await request(app).patch('/api/v1/me').set(auth).send({
+    name: 'Pessoa Atualizada',
+    course: 'Design Digital',
+    institution: 'Universidade Teste',
+    semester: '3º semestre'
+  });
+  assert.equal(profile.status, 200);
+  assert.equal(profile.body.course, 'Design Digital');
+
+  const plan = await request(app).post('/api/v1/study-plans').set(auth).send({
+    subject: 'Tipografia',
+    topic: 'Grid editorial',
+    date: '2026-09-10',
+    priority: 'Alta'
+  });
+  assert.equal(plan.status, 201);
+
+  const plans = await request(app).get('/api/v1/study-plans').set(auth);
+  assert.equal(plans.status, 200);
+  assert.equal(plans.body[0].topic, 'Grid editorial');
+
+  const diary = await request(app).put('/api/v1/diaries').set(auth).send({
+    subject: 'Tipografia',
+    date: '2026-09-08',
+    actual: 'Grid e hierarquia visual',
+    understood: 'Entendi a relação entre ritmo e espaçamento.',
+    doubts: 'Como adaptar o grid a telas pequenas?'
+  });
+  assert.equal(diary.status, 200);
+
+  const diaries = await request(app).get('/api/v1/diaries').set(auth);
+  assert.equal(diaries.status, 200);
+  assert.equal(diaries.body[0].subject, 'Tipografia');
+
+  const removed = await request(app).delete(`/api/v1/study-plans/${plan.body.id}`).set(auth);
+  assert.equal(removed.status, 204);
+
+  const login = await request(app).post('/api/v1/auth/login').send({ email, password: 'senha-segura-123' });
+  assert.equal(login.status, 200);
+  assert.ok(login.body.token);
+});
