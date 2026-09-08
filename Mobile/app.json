@@ -11,7 +11,10 @@
     },
     "ios": {
       "bundleIdentifier": "com.estuda.diariodeaula",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "plugins": [],
     "extra": {
