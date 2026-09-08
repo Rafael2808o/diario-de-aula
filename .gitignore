@@ -4,6 +4,7 @@ dist/
 .expo/
 .expo-export-check/
 .expo-export-check*/
+.expo-export-*/
 .vite-cache/
 *.apk
 *.aab

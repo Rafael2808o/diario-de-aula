@@ -1,18 +1,18 @@
 {
-  "cli": { "version": ">= 14.0.0" },
+  "cli": { "version": ">= 14.0.0", "appVersionSource": "local" },
   "build": {
     "preview": {
       "distribution": "internal",
-      "android": { "buildType": "apk", "image": "sdk-52" },
-      "ios": { "image": "sdk-52" }
+      "android": { "buildType": "apk" },
+      "ios": {}
     },
     "ios-simulator": {
       "distribution": "internal",
-      "ios": { "simulator": true, "image": "sdk-52" }
+      "ios": { "simulator": true }
     },
     "production": {
-      "android": { "buildType": "app-bundle", "image": "sdk-52" },
-      "ios": { "image": "sdk-52" }
+      "android": { "buildType": "app-bundle" },
+      "ios": {}
     }
   }
 }

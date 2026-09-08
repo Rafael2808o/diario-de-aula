@@ -7,5 +7,17 @@
     "dev:api": "npm --workspace Api run dev",
     "build": "npm --workspace Web run build",
     "test": "npm --workspace Api test"
+  },
+  "dependencies": {
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "uuid": "11.1.1"
+  },
+  "overrides": {
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "xcode": {
+      "uuid": "11.1.1"
+    }
   }
 }
