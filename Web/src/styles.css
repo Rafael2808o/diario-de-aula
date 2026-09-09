@@ -1845,8 +1845,11 @@ nav button.active {
   .install-card {
     left: 12px;
     right: 12px;
-    bottom: 82px;
+    bottom: calc(150px + env(safe-area-inset-bottom));
     width: auto;
+  }
+  body:has(.spotify-dock.expanded) .install-card {
+    display: none;
   }
   .reminder {
     display: none;
