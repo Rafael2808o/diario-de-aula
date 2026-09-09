@@ -4,12 +4,9 @@ import request from 'supertest';
 import app from '../app.js';
 
 test('expõe informações públicas e documentação', async () => {
-  const subjects = await request(app).get('/api/v1/subjects');
   const health = await request(app).get('/health/ready');
   const docs = await request(app).get('/docs/');
   const openapi = await request(app).get('/api/v1/openapi.json');
-  assert.equal(subjects.status, 200);
-  assert.equal(subjects.body.length, 6);
   assert.equal(health.status, 200);
   assert.equal(docs.status, 200);
   assert.equal(openapi.status, 200);

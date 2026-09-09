@@ -2,7 +2,6 @@ import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
 import swaggerUi from 'swagger-ui-express';
-import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import {
   addMaterial,
@@ -25,14 +24,6 @@ const app = express();
 app.use(cors({ origin: process.env.CORS_ORIGINS?.split(',').map(value => value.trim()) || true }));
 app.use(express.json({ limit: '120kb' }));
 
-const subjects = [
-  { id: 'matematica', name: 'Matemática' },
-  { id: 'portugues', name: 'Língua Portuguesa' },
-  { id: 'historia', name: 'História' },
-  { id: 'biologia', name: 'Biologia' },
-  { id: 'programacao', name: 'Programação' },
-  { id: 'direito', name: 'Direito' }
-];
 const materialTypes = new Set(['Link', 'PDF', 'Slides', 'Artigo', 'Livro', 'Anotação']);
 
 const questionSchema = {
@@ -61,8 +52,7 @@ const cleanText = (value, max) =>
   typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, max) : '';
 const cleanMultiline = (value, max) =>
   typeof value === 'string' ? value.trim().slice(0, max) : '';
-const spotifyConfigured = () =>
-  Boolean(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET && process.env.SPOTIFY_REDIRECT_URI);
+const spotifyConfigured = () => Boolean(process.env.SPOTIFY_CLIENT_ID);
 
 async function requireAuth(req, res, next) {
   try {
@@ -87,43 +77,6 @@ function aiRateLimit(req, res, next) {
   requests.push(now);
   aiWindows.set(key, requests);
   return next();
-}
-
-function fallbackQuestions(subject, topic, quantity) {
-  const templates = [
-    {
-      question: `Qual é a melhor estratégia para revisar “${topic}” em ${subject}?`,
-      options: ['Memorizar frases isoladas', 'Relacionar conceitos, exemplos e consequências', 'Pular o conteúdo mais difícil', 'Estudar apenas na véspera'],
-      correctIndex: 1,
-      explanation: 'Uma revisão ativa conecta conceito, contexto e aplicação — não apenas palavras-chave.',
-      difficulty: 'Fácil'
-    },
-    {
-      question: `Ao explicar ${topic} a outra pessoa, qual evidência demonstra compreensão real?`,
-      options: ['Repetir o título da aula', 'Usar um exemplo e justificar a relação com o conceito', 'Listar nomes sem contexto', 'Afirmar que é intuitivo'],
-      correctIndex: 1,
-      explanation: 'Explicar com um exemplo e uma justificativa mostra que o conceito foi elaborado.',
-      difficulty: 'Média'
-    },
-    {
-      question: `Em uma situação nova, como você aplicaria os princípios de ${topic}?`,
-      options: ['Ignorando o contexto', 'Identificando elementos do caso e comparando-os com a teoria', 'Escolhendo a primeira resposta possível', 'Usando apenas uma definição decorada'],
-      correctIndex: 1,
-      explanation: 'A transferência de conhecimento exige analisar o caso antes de aplicar a teoria.',
-      difficulty: 'Avançada'
-    },
-    {
-      question: `Qual registro torna sua próxima revisão de ${topic} mais eficiente?`,
-      options: ['Somente a data da aula', 'Uma dúvida, um exemplo e uma conexão com outro conteúdo', 'Uma lista sem explicação', 'Nenhum registro'],
-      correctIndex: 1,
-      explanation: 'Registros conectados dão contexto para retomar o assunto e identificar lacunas.',
-      difficulty: 'Média'
-    }
-  ];
-  return {
-    title: `Revisão guiada — ${topic}`,
-    questions: Array.from({ length: quantity }, (_, index) => ({ ...templates[index % templates.length] }))
-  };
 }
 
 function validQuestionSet(value) {
@@ -275,7 +228,6 @@ const swagger = {
       get: { summary: 'Obtém o perfil', security: [{ bearerAuth: [] }], responses: { 200: jsonResponse('Perfil', 'User') } },
       patch: { summary: 'Atualiza o perfil', security: [{ bearerAuth: [] }], requestBody: requestBody('User'), responses: { 200: jsonResponse('Atualizado', 'User') } }
     },
-    '/subjects': { get: { summary: 'Lista disciplinas', responses: { 200: { description: 'OK' } } } },
     '/materials': {
       get: { summary: 'Lista materiais da conta', security: [{ bearerAuth: [] }], responses: { 200: { description: 'OK' } } },
       post: { summary: 'Adiciona material à biblioteca', security: [{ bearerAuth: [] }], requestBody: requestBody('Material'), responses: { 201: jsonResponse('Criado', 'Material') } }
@@ -317,16 +269,6 @@ app.get('/health/ready', async (_req, res, next) => {
 });
 
 app.get('/api/v1/openapi.json', (_req, res) => res.json(swagger));
-app.get('/api/v1/subjects', (_req, res) => res.json(subjects));
-app.get('/api/v1/recommendations', (_req, res) =>
-  res.json({
-    headline: 'Revise o que ficou menos claro na última aula',
-    reason: 'Registros de dúvidas e avaliações próximas orientam a próxima sessão.',
-    estimatedMinutes: 35,
-    nextAction: 'Gerar questões de revisão'
-  })
-);
-
 app.post('/api/v1/auth/register', async (req, res, next) => {
   try {
     const name = cleanText(req.body.name, 80);
@@ -500,11 +442,8 @@ app.post('/api/v1/ai/questions', requireAuth, aiRateLimit, async (req, res) => {
     const generated = await generateWithGemini({ subject, topic, context, quantity });
     return res.json({ ...generated, source: 'gemini' });
   } catch (_error) {
-    const fallback = fallbackQuestions(subject, topic, quantity);
-    return res.json({
-      ...fallback,
-      source: 'guided-fallback',
-      notice: 'A IA ficou temporariamente indisponível; criamos uma revisão guiada para você não interromper o estudo.'
+    return res.status(502).json({
+      error: 'A IA não conseguiu gerar questões agora. Nenhuma questão genérica foi usada; tente novamente em instantes.'
     });
   }
 });
@@ -512,26 +451,14 @@ app.post('/api/v1/ai/questions', requireAuth, aiRateLimit, async (req, res) => {
 app.get('/api/v1/integrations/spotify/status', (_req, res) =>
   res.json({
     configured: spotifyConfigured(),
+    clientId: process.env.SPOTIFY_CLIENT_ID || null,
     embedAvailable: true,
+    premiumPlaybackAvailable: Boolean(process.env.SPOTIFY_CLIENT_ID),
     message: spotifyConfigured()
-      ? 'OAuth disponível.'
-      : 'Playlists incorporadas estão disponíveis sem conectar uma conta.'
+      ? 'OAuth e player Premium disponíveis.'
+      : 'O embed está disponível; configure o Client ID para habilitar o player Premium.'
   })
 );
-
-app.get('/api/v1/integrations/spotify/authorize', (_req, res) => {
-  if (!spotifyConfigured()) {
-    return res.status(503).json({ error: 'OAuth do Spotify ainda não foi configurado. Use a playlist incorporada sem login.' });
-  }
-  const query = new URLSearchParams({
-    response_type: 'code',
-    client_id: process.env.SPOTIFY_CLIENT_ID,
-    scope: 'user-read-private playlist-read-private user-read-playback-state',
-    redirect_uri: process.env.SPOTIFY_REDIRECT_URI,
-    state: randomUUID()
-  });
-  return res.redirect(`https://accounts.spotify.com/authorize?${query}`);
-});
 
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swagger, { customSiteTitle: 'Diário de Aula API' }));
 app.use((error, _req, res, _next) => {

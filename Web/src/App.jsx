@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Bell,
   BookOpen,
   CalendarDays,
   ChevronRight,
@@ -9,24 +8,23 @@ import {
   FileText,
   FolderOpen,
   GraduationCap,
-  Headphones,
   Home,
   Library,
   Menu,
   Plus,
   Search,
-  Settings,
   Target,
   Trophy,
   UserRound,
   X,
 } from "lucide-react";
+import SpotifyPlayer from "./SpotifyPlayer.jsx";
 
 const nav = [
   { id: "central", label: "Central", icon: Home },
   { id: "estudos", label: "Estudos", icon: BookOpen },
   { id: "diario", label: "Diário de Aula", icon: ClipboardList },
-  { id: "prova", label: "Modo Prova", icon: Target },
+  { id: "prova", label: "Revisão com IA", icon: Target },
   { id: "biblioteca", label: "Biblioteca", icon: Library },
   { id: "desempenho", label: "Desempenho", icon: Trophy },
   { id: "perfil", label: "Perfil", icon: UserRound },
@@ -36,14 +34,6 @@ const pageTitles = Object.fromEntries(
 );
 const validPages = new Set(nav.map((item) => item.id));
 const contactEmail = "rafael.o.silva30@aluno.senai.br";
-const suggestedSubjects = [
-  "Matemática",
-  "Língua Portuguesa",
-  "História",
-  "Biologia",
-  "Programação",
-  "Direito",
-];
 const subjectColors = [
   "#5e8df7",
   "#aa76eb",
@@ -52,20 +42,23 @@ const subjectColors = [
   "#51aa9a",
   "#728fa3",
 ];
-const subjectsFromPlans = (plans) =>
-  [...new Set(plans.map((plan) => plan.subject).filter(Boolean))].map(
+const subjectsFromRecords = (plans, diaries = []) =>
+  [
+    ...new Set(
+      [...plans, ...diaries].map((record) => record.subject).filter(Boolean),
+    ),
+  ].map(
     (name, index) => ({
       name,
       color: subjectColors[index % subjectColors.length],
       pending: plans.filter((plan) => plan.subject === name).length,
+      entries: diaries.filter((entry) => entry.subject === name).length,
       progress: 0,
     }),
   );
 const apiBase = import.meta.env.VITE_API_URL || "http://localhost:3333/api/v1";
 const sessionKey = "estuda.session";
 const spotifyKey = "estuda.spotify.playlist";
-const defaultSpotify =
-  "https://open.spotify.com/embed/playlist/37i9dQZF1DWZeKCadgRdKQ?utm_source=generator&theme=0";
 const readSession = () => {
   try {
     return JSON.parse(localStorage.getItem(sessionKey) || "null");
@@ -111,6 +104,7 @@ function SubjectCard({ s, onClick }) {
         <small>
           {s.pending}{" "}
           {s.pending === 1 ? "sessão planejada" : "sessões planejadas"}
+          {s.entries > 0 && ` · ${s.entries} ${s.entries === 1 ? "aula" : "aulas"}`}
         </small>
         {s.progress > 0 && <Progress value={s.progress} color={s.color} />}
       </div>
@@ -148,14 +142,14 @@ export default function App() {
     validPages.has(requestedPage) ? requestedPage : "central",
   );
   const [menu, setMenu] = useState(false);
-  const [showReminder, setShowReminder] = useState(true);
   const [plans, setPlans] = useState([]);
+  const [diaries, setDiaries] = useState([]);
   const [library, setLibrary] = useState([]);
   const [planOpen, setPlanOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [feedback, setFeedback] = useState("");
   const [playlist, setPlaylist] = useState(
-    () => localStorage.getItem(spotifyKey) || defaultSpotify,
+    () => localStorage.getItem(spotifyKey) || "",
   );
   const unknownPath = window.location.pathname !== "/";
   useEffect(() => {
@@ -179,17 +173,32 @@ export default function App() {
     Promise.all([
       fetch(`${apiBase}/study-plans`, { headers }),
       fetch(`${apiBase}/materials`, { headers }),
+      fetch(`${apiBase}/diaries`, { headers }),
     ])
-      .then(async ([plansResponse, materialsResponse]) => {
-        if (plansResponse.status === 401 || materialsResponse.status === 401) {
+      .then(async ([plansResponse, materialsResponse, diariesResponse]) => {
+        if (
+          plansResponse.status === 401 ||
+          materialsResponse.status === 401 ||
+          diariesResponse.status === 401
+        ) {
           throw new Error("SESSION_EXPIRED");
         }
-        if (!plansResponse.ok || !materialsResponse.ok) throw new Error();
-        return Promise.all([plansResponse.json(), materialsResponse.json()]);
+        if (
+          !plansResponse.ok ||
+          !materialsResponse.ok ||
+          !diariesResponse.ok
+        )
+          throw new Error();
+        return Promise.all([
+          plansResponse.json(),
+          materialsResponse.json(),
+          diariesResponse.json(),
+        ]);
       })
-      .then(([nextPlans, nextMaterials]) => {
+      .then(([nextPlans, nextMaterials, nextDiaries]) => {
         setPlans(nextPlans);
         setLibrary(nextMaterials);
+        setDiaries(nextDiaries);
       })
       .catch((error) => {
         if (error.message === "SESSION_EXPIRED") {
@@ -283,6 +292,8 @@ export default function App() {
   const pageProps = {
     go,
     plans,
+    diaries,
+    setDiaries,
     setPlans,
     completePlan,
     setPlanOpen,
@@ -377,7 +388,7 @@ export default function App() {
         )}
         <Footer go={go} />
       </main>
-      <SpotifyDock playlist={playlist} go={go} />
+      <SpotifyPlayer playlist={playlist} go={go} apiBase={apiBase} />
       <nav className="bottom-nav" aria-label="Navegação principal">
         {nav.slice(0, 5).map(({ id, label, icon: Icon }) => (
           <button
@@ -389,35 +400,11 @@ export default function App() {
             <span>
               {label
                 .replace("Diário de Aula", "Diário")
-                .replace("Modo Prova", "Prova")}
+                .replace("Revisão com IA", "Revisão")}
             </span>
           </button>
         ))}
       </nav>
-      {showReminder && (
-        <div className="reminder">
-          <button
-            aria-label="Fechar lembrete"
-            onClick={() => setShowReminder(false)}
-          >
-            <X size={15} />
-          </button>
-          <Bell size={20} />
-          <div>
-            <strong>Diário de Aula</strong>
-            <p>Registre a aula enquanto as ideias ainda estão frescas.</p>
-            <button
-              className="reminder-action"
-              onClick={() => {
-                setShowReminder(false);
-                go("diario");
-              }}
-            >
-              Registrar agora
-            </button>
-          </div>
-        </div>
-      )}
       <PwaPrompt />
       {planOpen && (
         <Modal title="Planejar estudo" close={() => setPlanOpen(false)}>
@@ -430,11 +417,6 @@ export default function App() {
                 required
                 placeholder="Digite o nome da disciplina"
               />
-              <datalist id="subject-suggestions">
-                {suggestedSubjects.map((subject) => (
-                  <option key={subject} value={subject} />
-                ))}
-              </datalist>
             </label>
             <label>
               Conteúdo
@@ -469,12 +451,13 @@ export default function App() {
     </div>
   );
 }
-function Central({ go, session, plans }) {
+function Central({ go, session, plans, diaries }) {
   const hour = new Date().getHours();
   const greeting =
     hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
-  const personalSubjects = subjectsFromPlans(plans);
+  const personalSubjects = subjectsFromRecords(plans, diaries);
   const next = plans[0];
+  const lastDiary = diaries[0];
   const today = new Date();
   const calendarTitle = new Intl.DateTimeFormat("pt-BR", {
     month: "long",
@@ -576,7 +559,7 @@ function Central({ go, session, plans }) {
         </Card>
         <Card
           title="Continue de onde parou"
-          action="Modo prova"
+          action="Revisão com IA"
           onAction={() => go("prova")}
           className="continue"
         >
@@ -595,17 +578,27 @@ function Central({ go, session, plans }) {
           <em>{next ? "Em foco" : "Novo"}</em>
         </Card>
         <Card
-          title="Recomendação de hoje"
-          action="Registrar dúvida"
-          onAction={() => go("diario")}
+          title="Próxima revisão"
+          action={lastDiary ? "Revisar com IA" : "Registrar aula"}
+          onAction={() => go(lastDiary ? "prova" : "diario")}
         >
-          <div className="recommendation">
-            <span>35 min</span>
-            <strong>Revise a dúvida mais importante da última aula.</strong>
-            <p>
-              Use suas próprias anotações para gerar uma revisão com contexto.
-            </p>
-          </div>
+          {lastDiary ? (
+            <div className="recommendation">
+              <span>BASEADO NO SEU DIÁRIO</span>
+              <strong>Retome {lastDiary.subject}.</strong>
+              <p>
+                {lastDiary.doubts ||
+                  lastDiary.understood ||
+                  lastDiary.actual ||
+                  "Use o registro mais recente como ponto de partida."}
+              </p>
+            </div>
+          ) : (
+            <div className="empty">
+              <strong>Nenhuma recomendação ainda</strong>
+              <p>Registre uma aula para receber um próximo passo contextual.</p>
+            </div>
+          )}
         </Card>
         <Card
           title="Minhas disciplinas"
@@ -642,8 +635,8 @@ function Item({ dot, text, sub }) {
     </div>
   );
 }
-function Studies({ go, plans, completePlan, setPlanOpen }) {
-  const personalSubjects = subjectsFromPlans(plans);
+function Studies({ go, plans, diaries, completePlan, setPlanOpen }) {
+  const personalSubjects = subjectsFromRecords(plans, diaries);
   return (
     <div className="page narrow">
       <div className="page-title">
@@ -679,7 +672,7 @@ function Studies({ go, plans, completePlan, setPlanOpen }) {
             {plans.length ? (
               plans.map((p) => (
                 <div className="plan" key={p.id}>
-                  <span>{p.date || "Hoje"}</span>
+                  <span>{p.date || "Sem data"}</span>
                   <div>
                     <strong>{p.topic}</strong>
                     <small>
@@ -710,7 +703,7 @@ function Studies({ go, plans, completePlan, setPlanOpen }) {
               <strong>Uma disciplina, um conteúdo e um horário.</strong>
               <p>
                 Ao concluir uma sessão, marque o item. Use o Diário para
-                registrar dúvidas e o Modo Prova para transformar o tema em
+                registrar dúvidas e a Revisão com IA para transformar o tema em
                 questões.
               </p>
             </div>
@@ -720,7 +713,7 @@ function Studies({ go, plans, completePlan, setPlanOpen }) {
     </div>
   );
 }
-function Diary({ go, authenticatedFetch }) {
+function Diary({ go, authenticatedFetch, setDiaries }) {
   const today = new Date().toISOString().slice(0, 10);
   const emptyEntry = {
     subject: "",
@@ -763,7 +756,15 @@ function Diary({ go, authenticatedFetch }) {
         const data = await response.json();
         throw new Error(data.error || "Não foi possível salvar.");
       }
-      setEntry(await response.json());
+      const savedEntry = await response.json();
+      setEntry(savedEntry);
+      setDiaries((current) => [
+        savedEntry,
+        ...current.filter(
+          (item) =>
+            !(item.subject === savedEntry.subject && item.date === savedEntry.date),
+        ),
+      ]);
       setSaved(true);
       if (continueToReview) setTimeout(() => go("prova"), 450);
     } catch (failure) {
@@ -798,16 +799,10 @@ function Diary({ go, authenticatedFetch }) {
         <label>
           Disciplina
           <input
-            list="diary-subject-suggestions"
             value={entry.subject}
             onChange={(event) => change("subject", event.target.value)}
             placeholder="Digite o nome da disciplina"
           />
-          <datalist id="diary-subject-suggestions">
-            {suggestedSubjects.map((subject) => (
-              <option key={subject} value={subject} />
-            ))}
-          </datalist>
         </label>
         <label>
           Data
@@ -945,7 +940,7 @@ function Exam({ go, session, plans, library }) {
         body: JSON.stringify({
           subject: review.subject,
           topic: review.topic,
-          context: context || "Revisão acadêmica com conceitos e aplicações.",
+          context,
           quantity: 4,
         }),
       });
@@ -1328,8 +1323,8 @@ function LibraryPage({
     </div>
   );
 }
-function Performance({ plans }) {
-  const personalSubjects = subjectsFromPlans(plans);
+function Performance({ plans, diaries }) {
+  const personalSubjects = subjectsFromRecords(plans, diaries);
   return (
     <div className="page narrow">
       <div className="page-title">
@@ -1337,7 +1332,7 @@ function Performance({ plans }) {
           <p>Acompanhe sua evolução ao longo do semestre.</p>
           <h1>Desempenho</h1>
         </div>
-        <span className="performance-period">Semestre atual</span>
+        <span className="performance-period">Dados registrados</span>
       </div>
       <div className="performance-top">
         <Card title="Visão geral">
@@ -1347,7 +1342,7 @@ function Performance({ plans }) {
           </div>
           <div className="metrics">
             <p>◉ {personalSubjects.length} disciplinas</p>
-            <p>✓ Dados da sua conta</p>
+            <p>✓ {diaries.length} registros no diário</p>
             <p>◷ {plans.length} sessões planejadas</p>
           </div>
         </Card>
@@ -1374,8 +1369,9 @@ function Performance({ plans }) {
                   aria-hidden="true"
                 />
                 <b>
-                  {subject.pending}{" "}
-                  {subject.pending === 1 ? "sessão" : "sessões"}
+                  {subject.pending} planejada{subject.pending === 1 ? "" : "s"}
+                  {" · "}
+                  {subject.entries} aula{subject.entries === 1 ? "" : "s"}
                 </b>
               </div>
             ))
@@ -1414,7 +1410,7 @@ function Profile({
   plans,
   setPlaylist,
 }) {
-  const personalSubjects = subjectsFromPlans(plans);
+  const personalSubjects = subjectsFromRecords(plans);
   const [editing, setEditing] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
@@ -1582,47 +1578,6 @@ function Profile({
   );
 }
 
-function SpotifyDock({ playlist, go }) {
-  const [expanded, setExpanded] = useState(false);
-  const [activated, setActivated] = useState(false);
-  return (
-    <aside
-      className={`spotify-dock ${expanded ? "expanded" : "collapsed"}`}
-      aria-label="Player de foco do Spotify"
-    >
-      <div className="spotify-dock-head">
-        <button
-          className="spotify-dock-title"
-          onClick={() => {
-            if (!expanded) setActivated(true);
-            setExpanded((current) => !current);
-          }}
-          aria-expanded={expanded}
-        >
-          <Headphones size={17} />
-          <span>
-            <strong>Foco com Spotify</strong>
-            <small>Continua tocando durante a navegação</small>
-          </span>
-          <ChevronRight size={16} aria-hidden="true" />
-        </button>
-        <button className="spotify-settings" onClick={() => go("perfil")}>
-          Configurar
-        </button>
-      </div>
-      {activated && (
-        <iframe
-          title="Player persistente do Spotify"
-          src={playlist}
-          width="100%"
-          height="152"
-          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-          loading="eager"
-        />
-      )}
-    </aside>
-  );
-}
 
 function AuthScreen({ onAuthenticated }) {
   const [mode, setMode] = useState("register");

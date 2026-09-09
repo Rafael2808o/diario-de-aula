@@ -27,13 +27,14 @@ O APK publicado possui SHA-256 `2876412A2FAD3350656EB1FC5656C032A65DAF2A07A2C975
 - perfil editável com curso, instituição e semestre;
 - planejamento de estudos sincronizado e conclusão de tarefas;
 - diário persistente com planejado, realizado, aprendizados, dúvidas, avisos e referências;
-- modo prova com questões originais geradas pelo Gemini;
+- revisão com IA e questões originais geradas pelo Gemini;
 - alternativas corrigidas na hora e explicações didáticas;
-- revisão guiada de contingência quando o provedor de IA estiver indisponível;
+- falha honesta e opção de nova tentativa quando o provedor de IA estiver indisponível;
 - biblioteca pessoal pesquisável, com criação, abertura e remoção de materiais;
 - painel de desempenho baseado somente nos registros reais da conta;
 - player Spotify persistente durante a navegação;
 - suporte a qualquer link público de playlist, álbum, episódio ou faixa do Spotify;
+- modo Spotify Premium preparado com PKCE, reprodução completa, controles e volume onde a plataforma permite;
 - PWA com manifesto, service worker, cache da interface e atalhos;
 - navegação inferior própria para celular;
 - layouts de uma, duas e três colunas para celular, tablet e computador;
@@ -73,7 +74,7 @@ Diario de Aula/
 | API | Node.js, Express e Swagger/OpenAPI |
 | Banco | PostgreSQL com fallback local em memória |
 | IA | Google Gemini com saída estruturada |
-| Música | Spotify Embed e preparação para OAuth |
+| Música | Spotify Embed e Web Playback SDK com OAuth PKCE |
 | Produção | Render, Expo EAS e GitHub |
 
 ## Desenvolvimento local
@@ -121,7 +122,7 @@ npx eas-cli@latest build --platform ios --profile ios-simulator
 | Perfil | `GET /api/v1/me`, `PATCH /api/v1/me` |
 | Estudos | `GET/POST /api/v1/study-plans`, `DELETE /api/v1/study-plans/:id` |
 | Diário | `GET/PUT /api/v1/diaries` |
-| Conteúdo | `GET /api/v1/subjects`, `GET/POST /api/v1/materials`, `DELETE /api/v1/materials/:id` |
+| Conteúdo | `GET/POST /api/v1/materials`, `DELETE /api/v1/materials/:id` |
 | OpenAPI | `GET /api/v1/openapi.json`, interface em `/docs/` |
 | IA | `GET /api/v1/ai/status`, `POST /api/v1/ai/questions` |
 | Spotify | `GET /api/v1/integrations/spotify/status` |
