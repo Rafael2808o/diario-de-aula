@@ -6,6 +6,7 @@ dist/
 .expo-export-check*/
 .expo-export-*/
 Mobile/export-audit-*/
+Builds/
 .vite-cache/
 *.apk
 *.aab

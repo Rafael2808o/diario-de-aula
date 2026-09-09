@@ -13,11 +13,13 @@ O estuda. é uma plataforma acadêmica completa para organizar o semestre. O pro
 **[Abrir o estuda. no navegador](https://diario-de-aula-web.vercel.app/)**
 
 - **iPhone e iPad:** abra o site no Safari, toque em **Compartilhar** e selecione **Adicionar à Tela de Início**.
-- **Android:** instale a PWA pelo navegador ou use o [APK Android](https://expo.dev/accounts/docvia-app/projects/diario-de-aula/builds/73e519fa-f3a4-4d3e-aa48-ca0a5da1a299).
+- **Android:** instale a PWA pelo navegador ou baixe o [APK Android v1.2.2](https://github.com/Rafael2808o/diario-de-aula/releases/download/v1.2.2/estuda-v1.2.2.apk).
 - **Computador e tablet:** use diretamente no navegador ou escolha **Instalar aplicativo** quando essa opção aparecer.
 - **API e Swagger:** consulte a [documentação interativa](https://diario-de-aula-api.onrender.com/docs/).
 
-A PWA instalada não expira e abre em uma janela própria, como um aplicativo. O projeto iOS nativo está preparado para simulador; a distribuição via TestFlight ou App Store depende apenas de uma assinatura Apple Developer.
+A PWA instalada não expira e abre em uma janela própria, como um aplicativo. O projeto iOS nativo também possui um [build de simulador v1.2.2](https://github.com/Rafael2808o/diario-de-aula/releases/download/v1.2.2/estuda-ios-simulator-v1.2.2.tar.gz); a distribuição nativa via TestFlight ou App Store depende apenas de uma assinatura Apple Developer.
+
+O APK publicado possui SHA-256 `2876412A2FAD3350656EB1FC5656C032A65DAF2A07A2C9752D546F6A0125D97C`. Todos os arquivos permanentes da versão estão na [release v1.2.2](https://github.com/Rafael2808o/diario-de-aula/releases/tag/v1.2.2).
 
 ## O que está implementado
 
