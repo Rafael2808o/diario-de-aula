@@ -56,7 +56,9 @@ const subjectsFromRecords = (plans, diaries = []) =>
       progress: 0,
     }),
   );
-const apiBase = import.meta.env.VITE_API_URL || "http://localhost:3333/api/v1";
+const apiBase =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.DEV ? "http://localhost:3333/api/v1" : "/api/v1");
 const sessionKey = "estuda.session";
 const spotifyKey = "estuda.spotify.playlist";
 const readSession = () => {
