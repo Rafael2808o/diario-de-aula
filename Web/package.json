@@ -13,5 +13,8 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "vite": "latest"
+  },
+  "optionalDependencies": {
+    "@rolldown/binding-linux-x64-gnu": "^1.2.7"
   }
 }
