@@ -79,8 +79,9 @@ async function generateWithGemini({ subject, topic, context, quantity }) {
   const prompt = `Você é um educador brasileiro. Crie ${quantity} questões originais de múltipla escolha, em português, para revisar ${topic} na disciplina ${subject}. Use quatro alternativas plausíveis por questão, apenas uma correta, uma explicação didática e dificuldade Fácil, Média ou Avançada. Contexto fornecido pelo estudante: ${context || 'não informado'}. Evite perguntas genéricas e não invente fatos fora do contexto. Responda exclusivamente como JSON válido neste formato exato: {"title":"Título da revisão","questions":[{"question":"Enunciado","options":["Alternativa A","Alternativa B","Alternativa C","Alternativa D"],"correctIndex":0,"explanation":"Explicação didática","difficulty":"Fácil"}]}. Use exatamente quatro opções e correctIndex entre 0 e 3.`;
   const models = [...new Set([
     process.env.GEMINI_MODEL || 'gemini-flash-latest',
+    'gemini-flash-lite-latest',
+    'gemini-3.5-flash-lite',
     'gemini-3.1-flash-lite',
-    'gemini-3.6-flash'
   ])];
   let lastError;
 
@@ -100,7 +101,6 @@ async function generateWithGemini({ subject, topic, context, quantity }) {
             generationConfig: {
               responseMimeType: 'application/json',
               maxOutputTokens: 2400,
-              thinkingConfig: { thinkingBudget: 0 },
               temperature: 0.45
             }
           })
@@ -166,8 +166,8 @@ const swagger = {
       RegisterInput: {
         type: 'object', required: ['name', 'email', 'password'],
         properties: {
-          name: { type: 'string', example: 'Ana Souza' },
-          email: { type: 'string', format: 'email', example: 'ana@exemplo.com' },
+          name: { type: 'string' },
+          email: { type: 'string', format: 'email' },
           password: { type: 'string', format: 'password', minLength: 8 },
           course: { type: 'string' }, institution: { type: 'string' }, semester: { type: 'string' }
         }
@@ -181,14 +181,14 @@ const swagger = {
         properties: { token: { type: 'string' }, user: { $ref: '#/components/schemas/User' } }
       },
       StudyPlan: {
-        type: 'object', required: ['subject', 'topic'],
+        type: 'object', required: ['subject', 'topic', 'priority'],
         properties: {
           id: { type: 'string', format: 'uuid', readOnly: true }, subject: { type: 'string' }, topic: { type: 'string' },
-          date: { type: 'string', format: 'date' }, time: { type: 'string', example: '19:30' }, priority: { type: 'string', enum: ['Alta', 'Média', 'Baixa'] }
+          date: { type: 'string', format: 'date' }, time: { type: 'string' }, priority: { type: 'string', enum: ['Alta', 'Média', 'Baixa'] }
         }
       },
       Material: {
-        type: 'object', required: ['title'],
+        type: 'object', required: ['title', 'type'],
         properties: {
           id: { type: 'string', format: 'uuid', readOnly: true }, title: { type: 'string' },
           type: { type: 'string', enum: [...materialTypes] }, subject: { type: 'string' },
@@ -317,10 +317,10 @@ app.get('/api/v1/materials', requireAuth, async (req, res, next) => {
 app.post('/api/v1/materials', requireAuth, async (req, res, next) => {
   try {
     const title = cleanText(req.body.title, 180);
-    const type = cleanText(req.body.type, 30) || 'Link';
+    const type = cleanText(req.body.type, 30);
     const url = cleanText(req.body.url, 1000);
     if (!title) return res.status(400).json({ error: 'Informe um título para o material.' });
-    if (!materialTypes.has(type)) return res.status(400).json({ error: 'Selecione um tipo de material válido.' });
+    if (!materialTypes.has(type)) return res.status(400).json({ error: 'Escolha um tipo de material válido.' });
     if (url && !/^https?:\/\//i.test(url)) return res.status(400).json({ error: 'O link precisa começar com http:// ou https://.' });
     const material = await addMaterial(req.user.id, {
       title,
@@ -356,13 +356,17 @@ app.post('/api/v1/study-plans', requireAuth, async (req, res, next) => {
   try {
     const subject = cleanText(req.body.subject, 100);
     const topic = cleanText(req.body.topic, 180);
+    const priority = cleanText(req.body.priority, 20);
     if (!subject || !topic) return res.status(400).json({ error: 'Disciplina e conteúdo são obrigatórios.' });
+    if (!['Alta', 'Média', 'Baixa'].includes(priority)) {
+      return res.status(400).json({ error: 'Escolha a prioridade do estudo.' });
+    }
     const item = await addPlan(req.user.id, {
       subject,
       topic,
       date: cleanText(req.body.date, 20),
       time: cleanText(req.body.time, 10),
-      priority: cleanText(req.body.priority, 20) || 'Média',
+      priority,
       status: 'planejado'
     });
     return res.status(201).json(item);

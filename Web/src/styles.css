@@ -270,7 +270,7 @@ main {
 .exam-small small {
   display: block;
   margin-top: 3px;
-  color: #929dab;
+  color: #626577;
 }
 .exam-small.lavender {
   background: #f5f1ff;
@@ -287,6 +287,10 @@ main {
 }
 .calendar .dates {
   margin-top: 13px;
+}
+.calendar .week,
+.calendar .dates {
+  color: #626577;
 }
 .calendar .dates span {
   height: 19px;
@@ -1161,10 +1165,14 @@ td:last-child {
 @media (max-width: 940px) {
   .sidebar {
     transform: translateX(-100%);
+    visibility: hidden;
+    pointer-events: none;
     transition: 0.2s;
   }
   .sidebar.open {
     transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
     box-shadow: 10px 0 30px #26364b1e;
   }
   .mobile-menu {
@@ -2056,6 +2064,7 @@ select:focus-visible {
 .item small,
 .subject-copy small,
 .continue small,
+.continue em,
 .plan small,
 .material small,
 .material em,
@@ -2274,6 +2283,11 @@ textarea::placeholder {
   .spotify-controls .spotify-text-action {
     flex: 1;
     border-radius: 8px;
+  }
+  .tabs,
+  .filter-tabs {
+    flex-wrap: wrap;
+    overflow: visible;
   }
   .continue {
     grid-template-columns: 58px minmax(0, 1fr) auto;

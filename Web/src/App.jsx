@@ -317,7 +317,10 @@ export default function App() {
           onClick={() => setMenu(false)}
         />
       )}
-      <aside className={menu ? "sidebar open" : "sidebar"}>
+      <aside
+        className={menu ? "sidebar open" : "sidebar"}
+        aria-label="Menu lateral"
+      >
         <button
           className="brand"
           aria-label="Ir para a Central"
@@ -415,7 +418,6 @@ export default function App() {
               Disciplina
               <input
                 name="subject"
-                list="subject-suggestions"
                 required
                 placeholder="Digite o nome da disciplina"
               />
@@ -425,7 +427,7 @@ export default function App() {
               <input
                 name="topic"
                 required
-                placeholder="Ex.: Revisar teoria X"
+                placeholder="Digite o assunto ou conteúdo"
               />
             </label>
             <div className="form-row">
@@ -440,7 +442,10 @@ export default function App() {
             </div>
             <label>
               Prioridade
-              <select name="priority">
+              <select name="priority" defaultValue="" required>
+                <option value="" disabled>
+                  Escolha a prioridade
+                </option>
                 <option>Alta</option>
                 <option>Média</option>
                 <option>Baixa</option>
@@ -537,7 +542,7 @@ function Central({ go, session, plans, diaries }) {
           title={calendarTitle[0].toUpperCase() + calendarTitle.slice(1)}
           className="calendar"
         >
-          <div className="week" aria-label="Dias da semana">
+          <div className="week" role="group" aria-label="Dias da semana">
             {["D", "S", "T", "Q", "Q", "S", "S"].map((day, index) => (
               <span key={`${day}-${index}`}>{day}</span>
             ))}
@@ -716,10 +721,9 @@ function Studies({ go, plans, diaries, completePlan, setPlanOpen }) {
   );
 }
 function Diary({ go, authenticatedFetch, setDiaries }) {
-  const today = new Date().toISOString().slice(0, 10);
   const emptyEntry = {
     subject: "",
-    date: today,
+    date: "",
     planned: "",
     actual: "",
     reached: "",
@@ -732,19 +736,15 @@ function Diary({ go, authenticatedFetch, setDiaries }) {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  useEffect(() => {
-    authenticatedFetch("/diaries")
-      .then((response) => (response.ok ? response.json() : []))
-      .then((items) => {
-        if (items[0]) setEntry(items[0]);
-      })
-      .catch(() => {});
-  }, []);
   const change = (field, value) =>
     setEntry((current) => ({ ...current, [field]: value }));
   const save = async (continueToReview) => {
     if (!entry.subject.trim()) {
       setError("Informe a disciplina antes de salvar o diário.");
+      return;
+    }
+    if (!entry.date) {
+      setError("Escolha a data da aula antes de salvar o diário.");
       return;
     }
     setSaving(true);
@@ -812,6 +812,7 @@ function Diary({ go, authenticatedFetch, setDiaries }) {
             type="date"
             value={entry.date}
             onChange={(event) => change("date", event.target.value)}
+            required
           />
         </label>
       </div>
@@ -837,7 +838,7 @@ function Diary({ go, authenticatedFetch, setDiaries }) {
             title="Até onde o professor chegou?"
             value={entry.reached}
             onChange={(value) => change("reached", value)}
-            placeholder="Ex.: até os princípios de composição."
+            placeholder="Registre até onde o conteúdo avançou."
           />
           <DiaryBlock
             title="O que você entendeu"
@@ -894,11 +895,11 @@ function Exam({ go, session, plans, library }) {
   const [notice, setNotice] = useState("");
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
-  const [review, setReview] = useState(() => ({
-    subject: plans[0]?.subject || "",
-    topic: plans[0]?.topic || "",
+  const [review, setReview] = useState({
+    subject: "",
+    topic: "",
     context: "",
-  }));
+  });
   const generate = async () => {
     if (!review.subject.trim() || !review.topic.trim()) {
       setError("Informe a disciplina e o conteúdo que deseja revisar.");
@@ -980,7 +981,7 @@ function Exam({ go, session, plans, library }) {
                     subject: event.target.value,
                   }))
                 }
-                placeholder="Ex.: Biologia"
+                placeholder="Digite o nome da disciplina"
               />
             </label>
             <label>
@@ -993,7 +994,7 @@ function Exam({ go, session, plans, library }) {
                     topic: event.target.value,
                   }))
                 }
-                placeholder="Ex.: Fotossíntese e respiração celular"
+                placeholder="Digite o assunto ou conteúdo"
               />
             </label>
             <label>
@@ -1289,7 +1290,10 @@ function LibraryPage({
             </label>
             <label>
               Tipo
-              <select name="type">
+              <select name="type" defaultValue="" required>
+                <option value="" disabled>
+                  Escolha o tipo de material
+                </option>
                 <option>Link</option>
                 <option>PDF</option>
                 <option>Slides</option>
@@ -1549,7 +1553,7 @@ function Profile({
               <input
                 name="course"
                 defaultValue={session.user.course}
-                placeholder="Ex.: Publicidade e Propaganda"
+                placeholder="Digite o nome do seu curso"
               />
             </label>
             <label>
@@ -1564,7 +1568,7 @@ function Profile({
               <input
                 name="semester"
                 defaultValue={session.user.semester}
-                placeholder="Ex.: 4º semestre"
+                placeholder="Digite seu semestre ou período"
               />
             </label>
             {error && (
@@ -1674,7 +1678,7 @@ function AuthScreen({ onAuthenticated }) {
                   Curso
                   <input
                     name="course"
-                    placeholder="Ex.: Publicidade e Propaganda"
+                    placeholder="Digite o nome do seu curso"
                   />
                 </label>
               </>

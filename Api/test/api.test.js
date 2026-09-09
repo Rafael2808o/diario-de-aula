@@ -21,6 +21,35 @@ test('protege dados pessoais sem autenticação', async () => {
   assert.equal(materials.status, 401);
 });
 
+test('mantém contas novas vazias e exige escolhas explícitas', async () => {
+  const register = await request(app).post('/api/v1/auth/register').send({
+    name: 'Conta Vazia',
+    email: `vazia-${Date.now()}@estuda.local`,
+    password: 'senha-segura-123'
+  });
+  const auth = { Authorization: `Bearer ${register.body.token}` };
+
+  const [plans, diaries, materials] = await Promise.all([
+    request(app).get('/api/v1/study-plans').set(auth),
+    request(app).get('/api/v1/diaries').set(auth),
+    request(app).get('/api/v1/materials').set(auth)
+  ]);
+  assert.deepEqual(plans.body, []);
+  assert.deepEqual(diaries.body, []);
+  assert.deepEqual(materials.body, []);
+
+  const planWithoutPriority = await request(app)
+    .post('/api/v1/study-plans')
+    .set(auth)
+    .send({ subject: 'Disciplina escolhida', topic: 'Conteúdo escolhido' });
+  const materialWithoutType = await request(app)
+    .post('/api/v1/materials')
+    .set(auth)
+    .send({ title: 'Material escolhido' });
+  assert.equal(planWithoutPriority.status, 400);
+  assert.equal(materialWithoutType.status, 400);
+});
+
 test('completa o fluxo de conta, perfil, planejamento e diário', async () => {
   const email = `teste-${Date.now()}@estuda.local`;
   const register = await request(app).post('/api/v1/auth/register').send({
