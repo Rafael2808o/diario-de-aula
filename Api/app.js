@@ -26,28 +26,6 @@ app.use(express.json({ limit: '120kb' }));
 
 const materialTypes = new Set(['Link', 'PDF', 'Slides', 'Artigo', 'Livro', 'Anotação']);
 
-const questionSchema = {
-  type: 'OBJECT',
-  properties: {
-    title: { type: 'STRING' },
-    questions: {
-      type: 'ARRAY',
-      items: {
-        type: 'OBJECT',
-        properties: {
-          question: { type: 'STRING' },
-          options: { type: 'ARRAY', items: { type: 'STRING' } },
-          correctIndex: { type: 'INTEGER' },
-          explanation: { type: 'STRING' },
-          difficulty: { type: 'STRING' }
-        },
-        required: ['question', 'options', 'correctIndex', 'explanation', 'difficulty']
-      }
-    }
-  },
-  required: ['title', 'questions']
-};
-
 const cleanText = (value, max) =>
   typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, max) : '';
 const cleanMultiline = (value, max) =>
@@ -79,12 +57,12 @@ function aiRateLimit(req, res, next) {
   return next();
 }
 
-function validQuestionSet(value) {
+function validQuestionSet(value, quantity) {
   return Boolean(
     value &&
     typeof value.title === 'string' &&
     Array.isArray(value.questions) &&
-    value.questions.length > 0 &&
+    value.questions.length >= quantity &&
     value.questions.every(question =>
       typeof question.question === 'string' &&
       Array.isArray(question.options) &&
@@ -98,43 +76,55 @@ function validQuestionSet(value) {
 }
 
 async function generateWithGemini({ subject, topic, context, quantity }) {
-  const prompt = `Você é um educador brasileiro. Crie ${quantity} questões originais de múltipla escolha, em português, para revisar ${topic} na disciplina ${subject}. Use quatro alternativas plausíveis por questão, apenas uma correta, uma explicação didática e dificuldade Fácil, Média ou Avançada. Contexto fornecido pelo estudante: ${context || 'não informado'}. Evite perguntas genéricas e não invente fatos fora do contexto.`;
-  const models = [...new Set([process.env.GEMINI_MODEL || 'gemini-3-flash-preview', 'gemini-3.6-flash', 'gemini-flash-latest'])];
+  const prompt = `Você é um educador brasileiro. Crie ${quantity} questões originais de múltipla escolha, em português, para revisar ${topic} na disciplina ${subject}. Use quatro alternativas plausíveis por questão, apenas uma correta, uma explicação didática e dificuldade Fácil, Média ou Avançada. Contexto fornecido pelo estudante: ${context || 'não informado'}. Evite perguntas genéricas e não invente fatos fora do contexto. Responda exclusivamente como JSON válido neste formato exato: {"title":"Título da revisão","questions":[{"question":"Enunciado","options":["Alternativa A","Alternativa B","Alternativa C","Alternativa D"],"correctIndex":0,"explanation":"Explicação didática","difficulty":"Fácil"}]}. Use exatamente quatro opções e correctIndex entre 0 e 3.`;
+  const models = [...new Set([
+    process.env.GEMINI_MODEL || 'gemini-flash-latest',
+    'gemini-3.1-flash-lite',
+    'gemini-3.6-flash'
+  ])];
   let lastError;
 
   for (const model of models) {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-      {
-        method: 'POST',
-        signal: AbortSignal.timeout(22_000),
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': process.env.GEMINI_API_KEY
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            responseSchema: questionSchema,
-            temperature: 0.65
-          }
-        })
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+        {
+          method: 'POST',
+          signal: AbortSignal.timeout(model === models[0] ? 10_000 : 20_000),
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': process.env.GEMINI_API_KEY
+          },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              maxOutputTokens: 2400,
+              thinkingConfig: { thinkingBudget: 0 },
+              temperature: 0.45
+            }
+          })
+        }
+      );
+
+      if (!response.ok) {
+        console.warn(`[ai] ${model} respondeu HTTP ${response.status}.`);
+        lastError = new Error(`Gemini respondeu ${response.status}`);
+        continue;
       }
-    );
 
-    if (!response.ok) {
-      lastError = new Error(`Gemini respondeu ${response.status}`);
-      continue;
+      const payload = await response.json();
+      const text = payload.candidates?.[0]?.content?.parts?.[0]?.text;
+      const parsed = text ? JSON.parse(text) : null;
+      if (validQuestionSet(parsed, quantity)) {
+        return { ...parsed, questions: parsed.questions.slice(0, quantity), model };
+      }
+      console.warn(`[ai] ${model} retornou um conjunto de questões inválido.`);
+      lastError = new Error('A IA retornou um formato inválido.');
+    } catch (error) {
+      console.warn(`[ai] ${model} falhou: ${error?.name || 'erro de comunicação'}.`);
+      lastError = error;
     }
-
-    const payload = await response.json();
-    const text = payload.candidates?.[0]?.content?.parts?.[0]?.text;
-    const parsed = text ? JSON.parse(text) : null;
-    if (validQuestionSet(parsed)) {
-      return { ...parsed, questions: parsed.questions.slice(0, quantity), model };
-    }
-    lastError = new Error('A IA retornou um formato inválido.');
   }
 
   throw lastError || new Error('Não foi possível consultar a IA.');
@@ -425,7 +415,7 @@ app.put('/api/v1/diaries', requireAuth, async (req, res, next) => {
 app.get('/api/v1/ai/status', (_req, res) =>
   res.json({
     provider: 'gemini',
-    model: process.env.GEMINI_MODEL || 'gemini-3-flash-preview',
+    model: process.env.GEMINI_MODEL || 'gemini-flash-latest',
     configured: Boolean(process.env.GEMINI_API_KEY)
   })
 );
