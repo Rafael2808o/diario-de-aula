@@ -5,14 +5,17 @@ import swaggerUi from 'swagger-ui-express';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import {
+  addMaterial,
   addPlan,
   createUser,
   hasDatabase,
   initStore,
   listDiaries,
+  listMaterials,
   listPlans,
   loginUser,
   removePlan,
+  removeMaterial,
   saveDiary,
   updateUser,
   userFromToken
@@ -23,20 +26,14 @@ app.use(cors({ origin: process.env.CORS_ORIGINS?.split(',').map(value => value.t
 app.use(express.json({ limit: '120kb' }));
 
 const subjects = [
-  { id: 'direcao', name: 'Direção de Arte', progress: 80, color: '#6d8ffc' },
-  { id: 'teorias', name: 'Teorias da Comunicação', progress: 68, color: '#a779f5' },
-  { id: 'tipografia', name: 'Tipografia', progress: 74, color: '#ee8f70' },
-  { id: 'redacao', name: 'Redação Publicitária', progress: 56, color: '#df6f9a' },
-  { id: 'planejamento', name: 'Planejamento', progress: 62, color: '#48a99c' },
-  { id: 'fotografia', name: 'Fotografia', progress: 85, color: '#6a91a5' }
+  { id: 'matematica', name: 'Matemática' },
+  { id: 'portugues', name: 'Língua Portuguesa' },
+  { id: 'historia', name: 'História' },
+  { id: 'biologia', name: 'Biologia' },
+  { id: 'programacao', name: 'Programação' },
+  { id: 'direito', name: 'Direito' }
 ];
-
-const materials = [
-  { id: 'm1', title: 'Slides — Direção de Arte', type: 'Slides', subject: 'Direção de Arte', lesson: 'Aula 04' },
-  { id: 'm2', title: 'Teorias da Comunicação: resumo', type: 'PDF', subject: 'Teorias da Comunicação', lesson: 'Aula 03' },
-  { id: 'm3', title: 'Branding e cultura digital', type: 'Artigo', subject: 'Planejamento', lesson: 'Aula 02' },
-  { id: 'm4', title: 'O design das coisas', type: 'Livro', subject: 'Direção de Arte', lesson: 'Referência' }
-];
+const materialTypes = new Set(['Link', 'PDF', 'Slides', 'Artigo', 'Livro', 'Anotação']);
 
 const questionSchema = {
   type: 'OBJECT',
@@ -190,6 +187,15 @@ async function generateWithGemini({ subject, topic, context, quantity }) {
   throw lastError || new Error('Não foi possível consultar a IA.');
 }
 
+const requestBody = schema => ({
+  required: true,
+  content: { 'application/json': { schema: { $ref: `#/components/schemas/${schema}` } } }
+});
+const jsonResponse = (description, schema) => ({
+  description,
+  content: { 'application/json': { schema: { $ref: `#/components/schemas/${schema}` } } }
+});
+
 const swagger = {
   openapi: '3.0.3',
   info: {
@@ -201,20 +207,85 @@ const swagger = {
   components: {
     securitySchemes: {
       bearerAuth: { type: 'http', scheme: 'bearer' }
+    },
+    schemas: {
+      User: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          name: { type: 'string' },
+          email: { type: 'string', format: 'email' },
+          course: { type: 'string' },
+          institution: { type: 'string' },
+          semester: { type: 'string' }
+        }
+      },
+      RegisterInput: {
+        type: 'object', required: ['name', 'email', 'password'],
+        properties: {
+          name: { type: 'string', example: 'Ana Souza' },
+          email: { type: 'string', format: 'email', example: 'ana@exemplo.com' },
+          password: { type: 'string', format: 'password', minLength: 8 },
+          course: { type: 'string' }, institution: { type: 'string' }, semester: { type: 'string' }
+        }
+      },
+      LoginInput: {
+        type: 'object', required: ['email', 'password'],
+        properties: { email: { type: 'string', format: 'email' }, password: { type: 'string', format: 'password' } }
+      },
+      Session: {
+        type: 'object',
+        properties: { token: { type: 'string' }, user: { $ref: '#/components/schemas/User' } }
+      },
+      StudyPlan: {
+        type: 'object', required: ['subject', 'topic'],
+        properties: {
+          id: { type: 'string', format: 'uuid', readOnly: true }, subject: { type: 'string' }, topic: { type: 'string' },
+          date: { type: 'string', format: 'date' }, time: { type: 'string', example: '19:30' }, priority: { type: 'string', enum: ['Alta', 'Média', 'Baixa'] }
+        }
+      },
+      Material: {
+        type: 'object', required: ['title'],
+        properties: {
+          id: { type: 'string', format: 'uuid', readOnly: true }, title: { type: 'string' },
+          type: { type: 'string', enum: [...materialTypes] }, subject: { type: 'string' },
+          url: { type: 'string', format: 'uri' }, notes: { type: 'string' }
+        }
+      },
+      Diary: {
+        type: 'object', required: ['subject', 'date'],
+        properties: {
+          id: { type: 'string', format: 'uuid', readOnly: true }, subject: { type: 'string' }, date: { type: 'string', format: 'date' },
+          planned: { type: 'string' }, actual: { type: 'string' }, reached: { type: 'string' }, understood: { type: 'string' },
+          doubts: { type: 'string' }, notes: { type: 'string' }, references: { type: 'string' }
+        }
+      },
+      QuestionRequest: {
+        type: 'object', required: ['subject', 'topic'],
+        properties: { subject: { type: 'string' }, topic: { type: 'string' }, context: { type: 'string', maxLength: 3000 }, quantity: { type: 'integer', minimum: 1, maximum: 10 } }
+      },
+      Error: { type: 'object', properties: { error: { type: 'string' } } }
     }
   },
   paths: {
-    '/auth/register': { post: { summary: 'Cria uma conta', responses: { 201: { description: 'Conta criada' } } } },
-    '/auth/login': { post: { summary: 'Autentica uma conta', responses: { 200: { description: 'Autenticado' } } } },
+    '/openapi.json': { get: { summary: 'Contrato OpenAPI em JSON', responses: { 200: { description: 'Documento OpenAPI' } } } },
+    '/auth/register': { post: { summary: 'Cria uma conta', requestBody: requestBody('RegisterInput'), responses: { 201: jsonResponse('Conta criada', 'Session'), 409: jsonResponse('E-mail já cadastrado', 'Error') } } },
+    '/auth/login': { post: { summary: 'Autentica uma conta', requestBody: requestBody('LoginInput'), responses: { 200: jsonResponse('Autenticado', 'Session'), 401: jsonResponse('Credenciais inválidas', 'Error') } } },
     '/me': {
-      get: { summary: 'Obtém o perfil', security: [{ bearerAuth: [] }], responses: { 200: { description: 'OK' } } },
-      patch: { summary: 'Atualiza o perfil', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Atualizado' } } }
+      get: { summary: 'Obtém o perfil', security: [{ bearerAuth: [] }], responses: { 200: jsonResponse('Perfil', 'User') } },
+      patch: { summary: 'Atualiza o perfil', security: [{ bearerAuth: [] }], requestBody: requestBody('User'), responses: { 200: jsonResponse('Atualizado', 'User') } }
     },
     '/subjects': { get: { summary: 'Lista disciplinas', responses: { 200: { description: 'OK' } } } },
-    '/materials': { get: { summary: 'Lista materiais', responses: { 200: { description: 'OK' } } } },
+    '/materials': {
+      get: { summary: 'Lista materiais da conta', security: [{ bearerAuth: [] }], responses: { 200: { description: 'OK' } } },
+      post: { summary: 'Adiciona material à biblioteca', security: [{ bearerAuth: [] }], requestBody: requestBody('Material'), responses: { 201: jsonResponse('Criado', 'Material') } }
+    },
+    '/materials/{id}': {
+      delete: { summary: 'Remove material da biblioteca', security: [{ bearerAuth: [] }], parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }], responses: { 204: { description: 'Removido' } } }
+    },
     '/study-plans': {
       get: { summary: 'Lista o planejamento', security: [{ bearerAuth: [] }], responses: { 200: { description: 'OK' } } },
-      post: { summary: 'Cria item de estudo', security: [{ bearerAuth: [] }], responses: { 201: { description: 'Criado' } } }
+      post: { summary: 'Cria item de estudo', security: [{ bearerAuth: [] }], requestBody: requestBody('StudyPlan'), responses: { 201: jsonResponse('Criado', 'StudyPlan') } }
     },
     '/study-plans/{id}': {
       delete: {
@@ -226,11 +297,11 @@ const swagger = {
     },
     '/diaries': {
       get: { summary: 'Lista registros do diário', security: [{ bearerAuth: [] }], responses: { 200: { description: 'OK' } } },
-      put: { summary: 'Cria ou atualiza um registro', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Salvo' } } }
+      put: { summary: 'Cria ou atualiza um registro', security: [{ bearerAuth: [] }], requestBody: requestBody('Diary'), responses: { 200: jsonResponse('Salvo', 'Diary') } }
     },
     '/ai/status': { get: { summary: 'Informa se a IA está configurada', responses: { 200: { description: 'OK' } } } },
     '/ai/questions': {
-      post: { summary: 'Gera questões com Gemini', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Questões geradas' } } }
+      post: { summary: 'Gera questões com Gemini', security: [{ bearerAuth: [] }], requestBody: requestBody('QuestionRequest'), responses: { 200: { description: 'Questões geradas' }, 429: jsonResponse('Limite temporário atingido', 'Error') } }
     },
     '/integrations/spotify/status': { get: { summary: 'Consulta a integração Spotify', responses: { 200: { description: 'OK' } } } }
   }
@@ -245,8 +316,8 @@ app.get('/health/ready', async (_req, res, next) => {
   }
 });
 
+app.get('/api/v1/openapi.json', (_req, res) => res.json(swagger));
 app.get('/api/v1/subjects', (_req, res) => res.json(subjects));
-app.get('/api/v1/materials', (_req, res) => res.json(materials));
 app.get('/api/v1/recommendations', (_req, res) =>
   res.json({
     headline: 'Revise o que ficou menos claro na última aula',
@@ -298,6 +369,44 @@ app.patch('/api/v1/me', requireAuth, async (req, res, next) => {
       semester: cleanText(req.body.semester, 40)
     });
     return res.json(user);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.get('/api/v1/materials', requireAuth, async (req, res, next) => {
+  try {
+    return res.json(await listMaterials(req.user.id));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.post('/api/v1/materials', requireAuth, async (req, res, next) => {
+  try {
+    const title = cleanText(req.body.title, 180);
+    const type = cleanText(req.body.type, 30) || 'Link';
+    const url = cleanText(req.body.url, 1000);
+    if (!title) return res.status(400).json({ error: 'Informe um título para o material.' });
+    if (!materialTypes.has(type)) return res.status(400).json({ error: 'Selecione um tipo de material válido.' });
+    if (url && !/^https?:\/\//i.test(url)) return res.status(400).json({ error: 'O link precisa começar com http:// ou https://.' });
+    const material = await addMaterial(req.user.id, {
+      title,
+      type,
+      subject: cleanText(req.body.subject, 100),
+      url,
+      notes: cleanMultiline(req.body.notes, 2000)
+    });
+    return res.status(201).json(material);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.delete('/api/v1/materials/:id', requireAuth, async (req, res, next) => {
+  try {
+    const removed = await removeMaterial(req.user.id, req.params.id);
+    return removed ? res.status(204).end() : res.status(404).json({ error: 'Material não encontrado.' });
   } catch (error) {
     return next(error);
   }

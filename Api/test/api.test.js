@@ -7,15 +7,21 @@ test('expõe informações públicas e documentação', async () => {
   const subjects = await request(app).get('/api/v1/subjects');
   const health = await request(app).get('/health/ready');
   const docs = await request(app).get('/docs/');
+  const openapi = await request(app).get('/api/v1/openapi.json');
   assert.equal(subjects.status, 200);
   assert.equal(subjects.body.length, 6);
   assert.equal(health.status, 200);
   assert.equal(docs.status, 200);
+  assert.equal(openapi.status, 200);
+  assert.equal(openapi.body.openapi, '3.0.3');
+  assert.ok(openapi.body.components.schemas.Material);
 });
 
 test('protege dados pessoais sem autenticação', async () => {
-  const response = await request(app).get('/api/v1/study-plans');
-  assert.equal(response.status, 401);
+  const plans = await request(app).get('/api/v1/study-plans');
+  const materials = await request(app).get('/api/v1/materials');
+  assert.equal(plans.status, 401);
+  assert.equal(materials.status, 401);
 });
 
 test('completa o fluxo de conta, perfil, planejamento e diário', async () => {
@@ -69,6 +75,21 @@ test('completa o fluxo de conta, perfil, planejamento e diário', async () => {
   const diaries = await request(app).get('/api/v1/diaries').set(auth);
   assert.equal(diaries.status, 200);
   assert.equal(diaries.body[0].subject, 'Tipografia');
+
+  const material = await request(app).post('/api/v1/materials').set(auth).send({
+    title: 'Referência sobre grid',
+    type: 'Link',
+    subject: 'Tipografia',
+    url: 'https://example.com/grid'
+  });
+  assert.equal(material.status, 201);
+
+  const library = await request(app).get('/api/v1/materials').set(auth);
+  assert.equal(library.status, 200);
+  assert.equal(library.body[0].title, 'Referência sobre grid');
+
+  const removedMaterial = await request(app).delete(`/api/v1/materials/${material.body.id}`).set(auth);
+  assert.equal(removedMaterial.status, 204);
 
   const removed = await request(app).delete(`/api/v1/study-plans/${plan.body.id}`).set(auth);
   assert.equal(removed.status, 204);

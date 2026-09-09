@@ -1,105 +1,1875 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Bell, BookOpen, CalendarDays, ChevronRight, CircleHelp, ClipboardList, FileText, FolderOpen, GraduationCap, Home, Library, Menu, Plus, Search, Settings, Target, Trophy, UserRound, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from "react";
+import {
+  Bell,
+  BookOpen,
+  CalendarDays,
+  ChevronRight,
+  CircleHelp,
+  ClipboardList,
+  FileText,
+  FolderOpen,
+  GraduationCap,
+  Headphones,
+  Home,
+  Library,
+  Menu,
+  Plus,
+  Search,
+  Settings,
+  Target,
+  Trophy,
+  UserRound,
+  X,
+} from "lucide-react";
 
-const nav = [{ id: 'central', label: 'Central', icon: Home }, { id: 'estudos', label: 'Estudos', icon: BookOpen }, { id: 'diario', label: 'Diário de Aula', icon: ClipboardList }, { id: 'prova', label: 'Modo Prova', icon: Target }, { id: 'biblioteca', label: 'Biblioteca', icon: Library }, { id: 'desempenho', label: 'Desempenho', icon: Trophy }, { id: 'perfil', label: 'Perfil', icon: UserRound }];
-const pageTitles = Object.fromEntries(nav.map(item => [item.id, `${item.label} — estuda.`]));
-const validPages = new Set(nav.map(item => item.id));
-const contactEmail = 'rafael.o.silva30@aluno.senai.br';
-const subjects = [{ name: 'Direção de Arte', progress: 80, color: '#5e8df7', pending: 2 }, { name: 'Teorias da Comunicação', progress: 68, color: '#aa76eb', pending: 1 }, { name: 'Tipografia', progress: 74, color: '#e59675', pending: 2 }, { name: 'Redação Publicitária', progress: 56, color: '#df7398', pending: 1 }, { name: 'Planejamento', progress: 62, color: '#51aa9a', pending: 0 }, { name: 'Fotografia', progress: 85, color: '#728fa3', pending: 0 }];
-const materials = [{ icon: '▤', title: 'Slides — Direção de Arte', type: 'Slides', sub: 'Aula 04 · Direção de Arte' }, { icon: '▣', title: 'Teorias da Comunicação: resumo', type: 'PDF', sub: 'Aula 03 · Teorias da Comunicação' }, { icon: '⌁', title: 'Branding e cultura digital', type: 'Artigo', sub: 'Planejamento · leitura' }, { icon: '◫', title: 'O design das coisas', type: 'Livro', sub: 'Referência · Direção de Arte' }, { icon: '↗', title: 'Behance — inspirações', type: 'Link', sub: 'Direção de Arte · link' }, { icon: '◈', title: 'Marketing Digital', type: 'Slides', sub: 'Aula 02 · Planejamento' }];
-const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3333/api/v1';
-const sessionKey = 'estuda.session';
-const spotifyKey = 'estuda.spotify.playlist';
-const defaultSpotify = 'https://open.spotify.com/embed/playlist/37i9dQZF1DWZeKCadgRdKQ?utm_source=generator&theme=0';
+const nav = [
+  { id: "central", label: "Central", icon: Home },
+  { id: "estudos", label: "Estudos", icon: BookOpen },
+  { id: "diario", label: "Diário de Aula", icon: ClipboardList },
+  { id: "prova", label: "Modo Prova", icon: Target },
+  { id: "biblioteca", label: "Biblioteca", icon: Library },
+  { id: "desempenho", label: "Desempenho", icon: Trophy },
+  { id: "perfil", label: "Perfil", icon: UserRound },
+];
+const pageTitles = Object.fromEntries(
+  nav.map((item) => [item.id, `${item.label} — estuda.`]),
+);
+const validPages = new Set(nav.map((item) => item.id));
+const contactEmail = "rafael.o.silva30@aluno.senai.br";
+const suggestedSubjects = [
+  "Matemática",
+  "Língua Portuguesa",
+  "História",
+  "Biologia",
+  "Programação",
+  "Direito",
+];
+const subjectColors = [
+  "#5e8df7",
+  "#aa76eb",
+  "#e59675",
+  "#df7398",
+  "#51aa9a",
+  "#728fa3",
+];
+const subjectsFromPlans = (plans) =>
+  [...new Set(plans.map((plan) => plan.subject).filter(Boolean))].map(
+    (name, index) => ({
+      name,
+      color: subjectColors[index % subjectColors.length],
+      pending: plans.filter((plan) => plan.subject === name).length,
+      progress: 0,
+    }),
+  );
+const apiBase = import.meta.env.VITE_API_URL || "http://localhost:3333/api/v1";
+const sessionKey = "estuda.session";
+const spotifyKey = "estuda.spotify.playlist";
+const defaultSpotify =
+  "https://open.spotify.com/embed/playlist/37i9dQZF1DWZeKCadgRdKQ?utm_source=generator&theme=0";
 const readSession = () => {
-  try { return JSON.parse(localStorage.getItem(sessionKey) || 'null'); } catch { return null; }
+  try {
+    return JSON.parse(localStorage.getItem(sessionKey) || "null");
+  } catch {
+    return null;
+  }
 };
-const initials = name => (name || 'E').split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase();
-const spotifyEmbed = value => {
-  const match = String(value || '').match(/open\.spotify\.com\/(?:embed\/)?(playlist|album|episode|show|track)\/([A-Za-z0-9]+)/);
-  return match ? `https://open.spotify.com/embed/${match[1]}/${match[2]}?utm_source=generator&theme=0` : null;
+const initials = (name) =>
+  (name || "E")
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+const spotifyEmbed = (value) => {
+  const match = String(value || "").match(
+    /open\.spotify\.com\/(?:embed\/)?(playlist|album|episode|show|track)\/([A-Za-z0-9]+)/,
+  );
+  return match
+    ? `https://open.spotify.com/embed/${match[1]}/${match[2]}?utm_source=generator&theme=0`
+    : null;
 };
-function Progress({ value, color = '#377cf6' }) { return <div className="progress"><span style={{ width: `${value}%`, background: color }} /></div>; }
-function SubjectCard({ s, onClick }) { return <button className="subject-card" onClick={onClick}><div className="subject-art" style={{ background: `linear-gradient(135deg, ${s.color}, #e8e3df)` }} /><div className="subject-copy"><strong>{s.name}</strong><small>4 aulas · {s.pending} pendências</small><Progress value={s.progress} color={s.color} /></div><ChevronRight size={16} /></button>; }
-function Card({ title, action, onAction, children, className = '' }) { return <section className={`card ${className}`}><div className="card-head"><h2>{title}</h2>{action && (onAction ? <button className="text-btn" onClick={onAction}>{action} <ChevronRight size={14} /></button> : <span className="text-btn">{action}</span>)}</div>{children}</section>; }
+function Progress({ value, color = "#377cf6" }) {
+  return (
+    <div className="progress">
+      <span style={{ width: `${value}%`, background: color }} />
+    </div>
+  );
+}
+function SubjectCard({ s, onClick }) {
+  return (
+    <button className="subject-card" onClick={onClick}>
+      <div
+        className="subject-art"
+        style={{ background: `linear-gradient(135deg, ${s.color}, #e8e3df)` }}
+      />
+      <div className="subject-copy">
+        <strong>{s.name}</strong>
+        <small>
+          {s.pending}{" "}
+          {s.pending === 1 ? "sessão planejada" : "sessões planejadas"}
+        </small>
+        {s.progress > 0 && <Progress value={s.progress} color={s.color} />}
+      </div>
+      <ChevronRight size={16} />
+    </button>
+  );
+}
+function Card({ title, action, onAction, children, className = "" }) {
+  return (
+    <section className={`card ${className}`}>
+      {(title || action) && (
+        <div className="card-head">
+          {title && <h2>{title}</h2>}
+          {action &&
+            (onAction ? (
+              <button className="text-btn" onClick={onAction}>
+                {action} <ChevronRight size={14} />
+              </button>
+            ) : (
+              <span className="text-btn">{action}</span>
+            ))}
+        </div>
+      )}
+      {children}
+    </section>
+  );
+}
 
 export default function App() {
   const [session, setSession] = useState(readSession);
-  const requestedPage = new URLSearchParams(window.location.search).get('abrir');
-  const [page, setPage] = useState(validPages.has(requestedPage) ? requestedPage : 'central'); const [menu, setMenu] = useState(false); const [showReminder, setShowReminder] = useState(true); const [plans, setPlans] = useState([]); const [planOpen, setPlanOpen] = useState(false); const [query, setQuery] = useState(''); const [feedback, setFeedback] = useState('');
-  const unknownPath = window.location.pathname !== '/';
-  useEffect(() => { document.title = unknownPath ? 'Página não encontrada — estuda.' : session ? pageTitles[page] : 'Entrar — estuda.'; }, [page, session, unknownPath]);
-  useEffect(() => { const syncPage = () => { const next = new URLSearchParams(window.location.search).get('abrir'); setPage(validPages.has(next) ? next : 'central'); }; window.addEventListener('popstate', syncPage); return () => window.removeEventListener('popstate', syncPage); }, []);
+  const requestedPage = new URLSearchParams(window.location.search).get(
+    "abrir",
+  );
+  const [page, setPage] = useState(
+    validPages.has(requestedPage) ? requestedPage : "central",
+  );
+  const [menu, setMenu] = useState(false);
+  const [showReminder, setShowReminder] = useState(true);
+  const [plans, setPlans] = useState([]);
+  const [library, setLibrary] = useState([]);
+  const [planOpen, setPlanOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [playlist, setPlaylist] = useState(
+    () => localStorage.getItem(spotifyKey) || defaultSpotify,
+  );
+  const unknownPath = window.location.pathname !== "/";
+  useEffect(() => {
+    document.title = unknownPath
+      ? "Página não encontrada — estuda."
+      : session
+        ? pageTitles[page]
+        : "Entrar — estuda.";
+  }, [page, session, unknownPath]);
+  useEffect(() => {
+    const syncPage = () => {
+      const next = new URLSearchParams(window.location.search).get("abrir");
+      setPage(validPages.has(next) ? next : "central");
+    };
+    window.addEventListener("popstate", syncPage);
+    return () => window.removeEventListener("popstate", syncPage);
+  }, []);
   useEffect(() => {
     if (!session?.token) return;
-    fetch(`${apiBase}/study-plans`, { headers: { Authorization: `Bearer ${session.token}` } })
-      .then(response => response.ok ? response.json() : Promise.reject())
-      .then(setPlans)
-      .catch(() => {});
+    const headers = { Authorization: `Bearer ${session.token}` };
+    Promise.all([
+      fetch(`${apiBase}/study-plans`, { headers }),
+      fetch(`${apiBase}/materials`, { headers }),
+    ])
+      .then(async ([plansResponse, materialsResponse]) => {
+        if (!plansResponse.ok || !materialsResponse.ok) throw new Error();
+        return Promise.all([plansResponse.json(), materialsResponse.json()]);
+      })
+      .then(([nextPlans, nextMaterials]) => {
+        setPlans(nextPlans);
+        setLibrary(nextMaterials);
+      })
+      .catch(() =>
+        setFeedback(
+          "Não foi possível sincronizar seus dados agora. Verifique a conexão e tente novamente.",
+        ),
+      );
   }, [session?.token]);
-  const go = (id) => { if (!validPages.has(id)) return; setPage(id); setMenu(false); history.pushState({}, '', id === 'central' ? '/' : `/?abrir=${id}`); window.scrollTo(0, 0); };
-  const authenticatedFetch = (path, options = {}) => fetch(`${apiBase}${path}`, { ...options, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.token}`, ...options.headers } });
-  const addPlan = async event => {
+  useEffect(() => {
+    if (!feedback) return undefined;
+    const timeout = window.setTimeout(() => setFeedback(""), 4500);
+    return () => window.clearTimeout(timeout);
+  }, [feedback]);
+  const go = (id) => {
+    if (!validPages.has(id)) return;
+    setPage(id);
+    setMenu(false);
+    history.pushState({}, "", id === "central" ? "/" : `/?abrir=${id}`);
+    window.scrollTo(0, 0);
+  };
+  const authenticatedFetch = (path, options = {}) =>
+    fetch(`${apiBase}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.token}`,
+        ...options.headers,
+      },
+    });
+  const addPlan = async (event) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const response = await authenticatedFetch('/study-plans', { method: 'POST', body: JSON.stringify({ subject: form.get('subject'), topic: form.get('topic'), date: form.get('date'), time: form.get('time'), priority: form.get('priority') }) });
-    if (response.ok) { const created = await response.json(); setPlans(current => [created, ...current]); setFeedback('Estudo adicionado ao planejamento.'); } else setFeedback('Não foi possível adicionar o estudo. Tente novamente.');
-    setPlanOpen(false);
+    try {
+      const form = new FormData(event.currentTarget);
+      const response = await authenticatedFetch("/study-plans", {
+        method: "POST",
+        body: JSON.stringify({
+          subject: form.get("subject"),
+          topic: form.get("topic"),
+          date: form.get("date"),
+          time: form.get("time"),
+          priority: form.get("priority"),
+        }),
+      });
+      if (!response.ok) throw new Error();
+      const created = await response.json();
+      setPlans((current) => [created, ...current]);
+      setFeedback("Estudo adicionado ao planejamento.");
+      setPlanOpen(false);
+    } catch {
+      setFeedback("Não foi possível adicionar o estudo. Tente novamente.");
+    }
   };
-  const completePlan = async id => {
-    const response = await authenticatedFetch(`/study-plans/${id}`, { method: 'DELETE' });
-    if (response.ok) { setPlans(current => current.filter(plan => plan.id !== id)); setFeedback('Estudo concluído. Progresso atualizado.'); } else setFeedback('Não foi possível concluir este estudo.');
+  const completePlan = async (id) => {
+    try {
+      const response = await authenticatedFetch(`/study-plans/${id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error();
+      setPlans((current) => current.filter((plan) => plan.id !== id));
+      setFeedback("Estudo concluído. Progresso atualizado.");
+    } catch {
+      setFeedback("Não foi possível concluir este estudo.");
+    }
   };
-  const authenticated = next => { localStorage.setItem(sessionKey, JSON.stringify(next)); setSession(next); };
-  const signOut = () => { localStorage.removeItem(sessionKey); setSession(null); setPage('central'); };
-  const filtered = useMemo(() => materials.filter(m => m.title.toLowerCase().includes(query.toLowerCase()) || m.type.toLowerCase().includes(query.toLowerCase())), [query]);
+  const authenticated = (next) => {
+    localStorage.setItem(sessionKey, JSON.stringify(next));
+    setSession(next);
+  };
+  const signOut = () => {
+    localStorage.removeItem(sessionKey);
+    setSession(null);
+    setPage("central");
+  };
+  const filtered = useMemo(
+    () =>
+      library.filter(
+        (m) =>
+          m.title.toLowerCase().includes(query.toLowerCase()) ||
+          m.type.toLowerCase().includes(query.toLowerCase()) ||
+          (m.subject || "").toLowerCase().includes(query.toLowerCase()) ||
+          (m.notes || "").toLowerCase().includes(query.toLowerCase()),
+      ),
+    [library, query],
+  );
   if (unknownPath) return <NotFound />;
   if (!session) return <AuthScreen onAuthenticated={authenticated} />;
-  const pageProps = { go, plans, setPlans, completePlan, setPlanOpen, query, setQuery, filtered, session, authenticatedFetch };
-  return <div className="shell">{menu && <button className="menu-backdrop" aria-label="Fechar menu" onClick={() => setMenu(false)} />}<aside className={menu ? 'sidebar open' : 'sidebar'}><button className="brand" aria-label="Ir para a Central" onClick={() => go('central')}><img src="/icons/favicon-32.png" alt="" /> estuda.</button><nav aria-label="Navegação lateral">{nav.map(({ id, label, icon: Icon }) => <button key={id} className={page === id ? 'active' : ''} onClick={() => go(id)}><Icon size={18} />{label}</button>)}</nav><p className="side-note">Grandes conquistas também são feitas de pequenos registros.</p></aside><main><header className="topbar"><button aria-label={menu ? 'Fechar menu' : 'Abrir menu'} className="mobile-menu" onClick={() => setMenu(!menu)}><Menu size={21} /></button><div className="search"><Search size={16} /><input aria-label="Buscar na plataforma" value={query} onChange={event => setQuery(event.target.value)} onFocus={() => query && go('biblioteca')} placeholder="Buscar na plataforma..." /></div><button aria-label="Abrir perfil" className="avatar" onClick={() => go('perfil')}>{initials(session.user.name)}</button></header>{feedback && <div className="global-feedback" role="status">{feedback}<button aria-label="Fechar mensagem" onClick={() => setFeedback('')}><X size={14}/></button></div>}{page === 'central' && <Central {...pageProps} />}{page === 'estudos' && <Studies {...pageProps} />}{page === 'diario' && <Diary {...pageProps} />}{page === 'prova' && <Exam {...pageProps} />}{page === 'biblioteca' && <LibraryPage {...pageProps} />}{page === 'desempenho' && <Performance {...pageProps} />}{page === 'perfil' && <Profile {...pageProps} onSession={authenticated} signOut={signOut} />}<Footer go={go}/></main><nav className="bottom-nav" aria-label="Navegação principal">{nav.slice(0, 5).map(({ id, label, icon: Icon }) => <button key={id} className={page === id ? 'active' : ''} onClick={() => go(id)}><Icon size={19} /><span>{label.replace('Diário de Aula', 'Diário').replace('Modo Prova', 'Prova')}</span></button>)}</nav>{showReminder && <div className="reminder"><button aria-label="Fechar lembrete" onClick={() => setShowReminder(false)}><X size={15} /></button><Bell size={20} /><div><strong>Diário de Aula</strong><p>Registre a aula enquanto as ideias ainda estão frescas.</p><button className="reminder-action" onClick={() => { setShowReminder(false); go('diario'); }}>Registrar agora</button></div></div>}<PwaPrompt />{planOpen && <Modal title="Planejar estudo" close={() => setPlanOpen(false)}><form className="form" onSubmit={addPlan}><label>Disciplina<select name="subject">{subjects.map(s => <option key={s.name}>{s.name}</option>)}</select></label><label>Conteúdo<input name="topic" required placeholder="Ex.: Revisar teoria X" /></label><div className="form-row"><label>Data<input name="date" type="date" /></label><label>Horário<input name="time" type="time" /></label></div><label>Prioridade<select name="priority"><option>Alta</option><option>Média</option><option>Baixa</option></select></label><button className="primary">Adicionar ao planejamento</button></form></Modal>}</div>;
+  const pageProps = {
+    go,
+    plans,
+    setPlans,
+    completePlan,
+    setPlanOpen,
+    query,
+    setQuery,
+    filtered,
+    library,
+    setLibrary,
+    setPlaylist,
+    session,
+    authenticatedFetch,
+  };
+  return (
+    <div className="shell">
+      {menu && (
+        <button
+          className="menu-backdrop"
+          aria-label="Fechar menu"
+          onClick={() => setMenu(false)}
+        />
+      )}
+      <aside className={menu ? "sidebar open" : "sidebar"}>
+        <button
+          className="brand"
+          aria-label="Ir para a Central"
+          onClick={() => go("central")}
+        >
+          <img src="/icons/favicon-32.png" alt="" /> estuda.
+        </button>
+        <nav aria-label="Navegação lateral">
+          {nav.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              className={page === id ? "active" : ""}
+              onClick={() => go(id)}
+            >
+              <Icon size={18} />
+              {label}
+            </button>
+          ))}
+        </nav>
+        <p className="side-note">
+          Grandes conquistas também são feitas de pequenos registros.
+        </p>
+      </aside>
+      <main>
+        <header className="topbar">
+          <button
+            aria-label={menu ? "Fechar menu" : "Abrir menu"}
+            className="mobile-menu"
+            onClick={() => setMenu(!menu)}
+          >
+            <Menu size={21} />
+          </button>
+          <div className="search">
+            <Search size={16} />
+            <input
+              aria-label="Buscar na biblioteca"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onFocus={() => go("biblioteca")}
+              placeholder="Buscar na biblioteca..."
+            />
+          </div>
+          <button
+            aria-label="Abrir perfil"
+            className="avatar"
+            onClick={() => go("perfil")}
+          >
+            {initials(session.user.name)}
+          </button>
+        </header>
+        {feedback && (
+          <div className="global-feedback" role="status">
+            {feedback}
+            <button
+              aria-label="Fechar mensagem"
+              onClick={() => setFeedback("")}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+        {page === "central" && <Central {...pageProps} />}
+        {page === "estudos" && <Studies {...pageProps} />}
+        {page === "diario" && <Diary {...pageProps} />}
+        {page === "prova" && <Exam {...pageProps} />}
+        {page === "biblioteca" && <LibraryPage {...pageProps} />}
+        {page === "desempenho" && <Performance {...pageProps} />}
+        {page === "perfil" && (
+          <Profile {...pageProps} onSession={authenticated} signOut={signOut} />
+        )}
+        <Footer go={go} />
+      </main>
+      <SpotifyDock playlist={playlist} go={go} />
+      <nav className="bottom-nav" aria-label="Navegação principal">
+        {nav.slice(0, 5).map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            className={page === id ? "active" : ""}
+            onClick={() => go(id)}
+          >
+            <Icon size={19} />
+            <span>
+              {label
+                .replace("Diário de Aula", "Diário")
+                .replace("Modo Prova", "Prova")}
+            </span>
+          </button>
+        ))}
+      </nav>
+      {showReminder && (
+        <div className="reminder">
+          <button
+            aria-label="Fechar lembrete"
+            onClick={() => setShowReminder(false)}
+          >
+            <X size={15} />
+          </button>
+          <Bell size={20} />
+          <div>
+            <strong>Diário de Aula</strong>
+            <p>Registre a aula enquanto as ideias ainda estão frescas.</p>
+            <button
+              className="reminder-action"
+              onClick={() => {
+                setShowReminder(false);
+                go("diario");
+              }}
+            >
+              Registrar agora
+            </button>
+          </div>
+        </div>
+      )}
+      <PwaPrompt />
+      {planOpen && (
+        <Modal title="Planejar estudo" close={() => setPlanOpen(false)}>
+          <form className="form" onSubmit={addPlan}>
+            <label>
+              Disciplina
+              <input
+                name="subject"
+                list="subject-suggestions"
+                required
+                placeholder="Digite o nome da disciplina"
+              />
+              <datalist id="subject-suggestions">
+                {suggestedSubjects.map((subject) => (
+                  <option key={subject} value={subject} />
+                ))}
+              </datalist>
+            </label>
+            <label>
+              Conteúdo
+              <input
+                name="topic"
+                required
+                placeholder="Ex.: Revisar teoria X"
+              />
+            </label>
+            <div className="form-row">
+              <label>
+                Data
+                <input name="date" type="date" />
+              </label>
+              <label>
+                Horário
+                <input name="time" type="time" />
+              </label>
+            </div>
+            <label>
+              Prioridade
+              <select name="priority">
+                <option>Alta</option>
+                <option>Média</option>
+                <option>Baixa</option>
+              </select>
+            </label>
+            <button className="primary">Adicionar ao planejamento</button>
+          </form>
+        </Modal>
+      )}
+    </div>
+  );
 }
-function Central({ go, session, plans }) { const hour = new Date().getHours(); const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'; return <div className="page"><div className="hero"><span className="hero-kicker">SEU ESPAÇO DE APRENDIZADO</span><p>{greeting}, {session.user.name.split(' ')[0]}.</p><h1>Transforme cada aula em progresso real.</h1><button onClick={() => go('diario')}>Registrar no diário <ChevronRight size={16} /></button></div><div className="central-grid"><Card title="Seu próximo passo" action="Abrir estudos" onAction={() => go('estudos')}><div className="timeline">{plans.length ? plans.slice(0, 4).map((plan, index) => <Item key={plan.id} dot={['#5e9df8','#875cf1','#4dbc7b','#f5ac62'][index]} text={plan.topic} sub={`${plan.subject} · ${plan.date || 'Sem data'}`} />) : <div className="empty"><strong>Planeje sua primeira sessão</strong><p>Escolha um conteúdo e transforme intenção em rotina.</p><button className="secondary" onClick={() => go('estudos')}>Começar agora</button></div>}</div></Card><Card title="Próximas avaliações"><button className="exam-small" onClick={() => go('prova')}>▧ <span>Teorias da Comunicação<small>Revisão inteligente</small></span><ChevronRight size={16} /></button><button className="exam-small lavender" onClick={() => go('prova')}>♙ <span>Direção de Arte<small>Checklist de conteúdo</small></span><ChevronRight size={16} /></button></Card><Card title="Setembro 2026" className="calendar"><div className="week">D S T Q Q S S</div><div className="dates">{Array.from({ length: 30 }, (_, i) => <span className={i === 7 ? 'today' : ''} key={i}>{i + 1}</span>)}</div></Card><Card title="Continue de onde parou" action="Modo prova" onAction={() => go('prova')} className="continue"><div className="lesson-thumb" /><div><strong>Revisão ativa — Teorias da Comunicação</strong><small>Questões personalizadas com IA</small><Progress value={45} /></div><em>45%</em></Card><Card title="Recomendação de hoje" action="Registrar dúvida" onAction={() => go('diario')}><div className="recommendation"><span>35 min</span><strong>Revise a dúvida mais importante da última aula.</strong><p>Use suas próprias anotações para gerar uma revisão com contexto.</p></div></Card><Card title="Minhas disciplinas" action="Ver todas" onAction={() => go('estudos')} className="subject-grid">{subjects.map(s => <SubjectCard key={s.name} s={s} onClick={() => go('estudos')} />)}</Card></div></div>; }
-function Item({ dot, text, sub }) { return <div className="item"><i style={{ background: dot }} /><div><strong>{text}</strong><small>{sub}</small></div></div>; }
-function Studies({ go, plans, completePlan, setPlanOpen }) { const [active, setActive] = useState('Todos'); const [checks, setChecks] = useState([true, true, false, false]); return <div className="page narrow"><div className="page-title"><div><p>Seu caminho de aprendizado</p><h1>Estudos</h1></div><button className="primary" onClick={() => setPlanOpen(true)}><Plus size={17} /> Planejar estudo</button></div><div className="tabs">{['Todos', 'Em andamento', 'Concluídos'].map(x => <button onClick={() => setActive(x)} className={active === x ? 'selected' : ''} key={x}>{x}</button>)}</div><div className="study-layout"><div>{subjects.map(s => <SubjectCard key={s.name} s={s} onClick={() => go('prova')} />)}<button className="add-subject" onClick={() => setPlanOpen(true)}><Plus size={17} /> Adicionar disciplina ao plano</button></div><div><Card title="Checklist de conteúdos" className="check-card"><p className="eyebrow">TEORIAS DA COMUNICAÇÃO</p>{['Comunicação de massa', 'Teoria X', 'Teoria Y', 'Semiótica — não entendi'].map((x, i) => <label className={i === 3 ? 'danger' : ''} key={x}><input type="checkbox" checked={checks[i]} onChange={() => setChecks(checks.map((c, index) => index === i ? !c : c))} /> {x}<span>{checks[i] ? 'Estudado' : i === 3 ? 'Não entendi' : 'Estudando'}</span></label>)}</Card><Card title="Planejamento desta semana">{plans.length ? plans.map(p => <div className="plan" key={p.id}><span>{p.date || 'Hoje'}</span><div><strong>{p.topic}</strong><small>{p.subject} · Prioridade {p.priority || p.status}</small></div><button aria-label={`Concluir ${p.topic}`} onClick={() => completePlan(p.id)}>✓</button></div>) : <div className="empty"><strong>Nenhum estudo planejado</strong><p>Adicione sua próxima sessão para vê-la em todos os dispositivos.</p></div>}</Card></div></div></div>; }
+function Central({ go, session, plans }) {
+  const hour = new Date().getHours();
+  const greeting =
+    hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
+  const personalSubjects = subjectsFromPlans(plans);
+  const next = plans[0];
+  const today = new Date();
+  const calendarTitle = new Intl.DateTimeFormat("pt-BR", {
+    month: "long",
+    year: "numeric",
+  }).format(today);
+  const daysInMonth = new Date(
+    today.getFullYear(),
+    today.getMonth() + 1,
+    0,
+  ).getDate();
+  const firstWeekday = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    1,
+  ).getDay();
+  return (
+    <div className="page">
+      <div className="hero">
+        <span className="hero-kicker">SEU ESPAÇO DE APRENDIZADO</span>
+        <p>
+          {greeting}, {session.user.name.split(" ")[0]}.
+        </p>
+        <h1>Transforme cada aula em progresso real.</h1>
+        <button onClick={() => go("diario")}>
+          Registrar no diário <ChevronRight size={16} />
+        </button>
+      </div>
+      <div className="central-grid">
+        <Card
+          title="Seu próximo passo"
+          action="Abrir estudos"
+          onAction={() => go("estudos")}
+        >
+          <div className="timeline">
+            {plans.length ? (
+              plans
+                .slice(0, 4)
+                .map((plan, index) => (
+                  <Item
+                    key={plan.id}
+                    dot={subjectColors[index % subjectColors.length]}
+                    text={plan.topic}
+                    sub={`${plan.subject} · ${plan.date || "Sem data"}`}
+                  />
+                ))
+            ) : (
+              <div className="empty">
+                <strong>Planeje sua primeira sessão</strong>
+                <p>Escolha uma disciplina e transforme intenção em rotina.</p>
+                <button className="secondary" onClick={() => go("estudos")}>
+                  Começar agora
+                </button>
+              </div>
+            )}
+          </div>
+        </Card>
+        <Card title="Revisão inteligente">
+          <button className="exam-small" onClick={() => go("prova")}>
+            ▧{" "}
+            <span>
+              Gerar questões com IA
+              <small>A partir do conteúdo que você informar</small>
+            </span>
+            <ChevronRight size={16} />
+          </button>
+          <button className="exam-small lavender" onClick={() => go("diario")}>
+            ♙{" "}
+            <span>
+              Registrar uma dúvida<small>Use seu diário como contexto</small>
+            </span>
+            <ChevronRight size={16} />
+          </button>
+        </Card>
+        <Card
+          title={calendarTitle[0].toUpperCase() + calendarTitle.slice(1)}
+          className="calendar"
+        >
+          <div className="week" aria-label="Dias da semana">
+            {["D", "S", "T", "Q", "Q", "S", "S"].map((day, index) => (
+              <span key={`${day}-${index}`}>{day}</span>
+            ))}
+          </div>
+          <div className="dates">
+            {Array.from({ length: firstWeekday }, (_, index) => (
+              <span aria-hidden="true" key={`empty-${index}`} />
+            ))}
+            {Array.from({ length: daysInMonth }, (_, index) => {
+              const day = index + 1;
+              return (
+                <span
+                  className={day === today.getDate() ? "today" : ""}
+                  key={day}
+                >
+                  {day}
+                </span>
+              );
+            })}
+          </div>
+        </Card>
+        <Card
+          title="Continue de onde parou"
+          action="Modo prova"
+          onAction={() => go("prova")}
+          className="continue"
+        >
+          <div className="lesson-thumb" />
+          <div>
+            <strong>
+              {next ? next.topic : "Crie sua primeira revisão ativa"}
+            </strong>
+            <small>
+              {next ? next.subject : "Questões personalizadas com IA"}
+            </small>
+            <span className="plan-status">
+              {next ? "Pronto para começar" : "Crie seu próprio conteúdo"}
+            </span>
+          </div>
+          <em>{next ? "Em foco" : "Novo"}</em>
+        </Card>
+        <Card
+          title="Recomendação de hoje"
+          action="Registrar dúvida"
+          onAction={() => go("diario")}
+        >
+          <div className="recommendation">
+            <span>35 min</span>
+            <strong>Revise a dúvida mais importante da última aula.</strong>
+            <p>
+              Use suas próprias anotações para gerar uma revisão com contexto.
+            </p>
+          </div>
+        </Card>
+        <Card
+          title="Minhas disciplinas"
+          action="Ver todas"
+          onAction={() => go("estudos")}
+          className="subject-grid"
+        >
+          {personalSubjects.length ? (
+            personalSubjects.map((s) => (
+              <SubjectCard key={s.name} s={s} onClick={() => go("estudos")} />
+            ))
+          ) : (
+            <div className="empty subject-empty">
+              <strong>Seu espaço ainda está limpo</strong>
+              <p>Adicione uma disciplina ao planejar seu primeiro estudo.</p>
+              <button className="secondary" onClick={() => go("estudos")}>
+                Adicionar disciplina
+              </button>
+            </div>
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}
+function Item({ dot, text, sub }) {
+  return (
+    <div className="item">
+      <i style={{ background: dot }} />
+      <div>
+        <strong>{text}</strong>
+        <small>{sub}</small>
+      </div>
+    </div>
+  );
+}
+function Studies({ go, plans, completePlan, setPlanOpen }) {
+  const personalSubjects = subjectsFromPlans(plans);
+  return (
+    <div className="page narrow">
+      <div className="page-title">
+        <div>
+          <p>Seu caminho de aprendizado</p>
+          <h1>Estudos</h1>
+        </div>
+        <button className="primary" onClick={() => setPlanOpen(true)}>
+          <Plus size={17} /> Planejar estudo
+        </button>
+      </div>
+      <div className="study-layout">
+        <div>
+          {personalSubjects.length ? (
+            personalSubjects.map((s) => (
+              <SubjectCard key={s.name} s={s} onClick={() => go("prova")} />
+            ))
+          ) : (
+            <div className="empty">
+              <strong>Nenhuma disciplina adicionada</strong>
+              <p>
+                Crie um planejamento com o nome da sua disciplina. Ela aparecerá
+                aqui automaticamente.
+              </p>
+            </div>
+          )}
+          <button className="add-subject" onClick={() => setPlanOpen(true)}>
+            <Plus size={17} /> Adicionar disciplina ao plano
+          </button>
+        </div>
+        <div>
+          <Card title="Planejamento desta semana">
+            {plans.length ? (
+              plans.map((p) => (
+                <div className="plan" key={p.id}>
+                  <span>{p.date || "Hoje"}</span>
+                  <div>
+                    <strong>{p.topic}</strong>
+                    <small>
+                      {p.subject} · Prioridade {p.priority || p.status}
+                    </small>
+                  </div>
+                  <button
+                    aria-label={`Concluir ${p.topic}`}
+                    onClick={() => completePlan(p.id)}
+                  >
+                    ✓
+                  </button>
+                </div>
+              ))
+            ) : (
+              <div className="empty">
+                <strong>Nenhum estudo planejado</strong>
+                <p>
+                  Adicione sua próxima sessão para vê-la em todos os
+                  dispositivos.
+                </p>
+              </div>
+            )}
+          </Card>
+          <Card title="Como organizar">
+            <div className="recommendation">
+              <span>PASSO A PASSO</span>
+              <strong>Uma disciplina, um conteúdo e um horário.</strong>
+              <p>
+                Ao concluir uma sessão, marque o item. Use o Diário para
+                registrar dúvidas e o Modo Prova para transformar o tema em
+                questões.
+              </p>
+            </div>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
 function Diary({ go, authenticatedFetch }) {
   const today = new Date().toISOString().slice(0, 10);
-  const emptyEntry = { subject: 'Direção de Arte', date: today, planned: '', actual: '', reached: '', understood: '', doubts: '', notes: '', references: '' };
-  const [entry, setEntry] = useState(emptyEntry); const [saved, setSaved] = useState(false); const [saving, setSaving] = useState(false); const [error, setError] = useState('');
-  useEffect(() => { authenticatedFetch('/diaries').then(response => response.ok ? response.json() : []).then(items => { if (items[0]) setEntry(items[0]); }).catch(() => {}); }, []);
-  const change = (field, value) => setEntry(current => ({ ...current, [field]: value }));
-  const save = async continueToReview => { setSaving(true); setError(''); const response = await authenticatedFetch('/diaries', { method: 'PUT', body: JSON.stringify(entry) }); if (response.ok) { setEntry(await response.json()); setSaved(true); if (continueToReview) setTimeout(() => go('prova'), 450); } else { const data = await response.json(); setError(data.error || 'Não foi possível salvar.'); } setSaving(false); };
-  return <div className="page diary"><div className="page-title"><div><p>Registro conectado à sua conta</p><h1>Como foi a aula de hoje?</h1><small>O que você escrever aqui alimenta suas revisões.</small></div><button className="primary" disabled={saving} onClick={() => save(true)}>{saving ? 'Salvando...' : 'Salvar e revisar'}</button></div>{saved && <div className="toast">Diário salvo. Ele estará disponível em seus outros dispositivos.</div>}{error && <div className="ai-error">{error}</div>}<div className="diary-meta"><label>Disciplina<select value={entry.subject} onChange={event => change('subject', event.target.value)}>{subjects.map(subject => <option key={subject.name}>{subject.name}</option>)}</select></label><label>Data<input type="date" value={entry.date} onChange={event => change('date', event.target.value)} /></label></div><div className="diary-line"><span>Aula</span><div className="line-dot" /><section><h2>{entry.subject}</h2><small>Registro pessoal · salvo com segurança</small><DiaryBlock title="O que estava previsto" value={entry.planned} onChange={value => change('planned', value)} placeholder="Conteúdos previstos para a aula..." /><DiaryBlock title="O que realmente foi dado" value={entry.actual} onChange={value => change('actual', value)} placeholder="Conte o que aconteceu durante a aula..." /><DiaryBlock title="Até onde o professor chegou?" value={entry.reached} onChange={value => change('reached', value)} placeholder="Ex.: até os princípios de composição." /><DiaryBlock title="O que você entendeu" value={entry.understood} onChange={value => change('understood', value)} placeholder="Registre suas percepções e aprendizados." /><DiaryBlock title="O que você não entendeu" value={entry.doubts} onChange={value => change('doubts', value)} placeholder="Dúvidas que devem virar revisão." danger /><DiaryBlock title="Informações importantes" value={entry.notes} onChange={value => change('notes', value)} placeholder="Prazos, provas, pesos e avisos." /><DiaryBlock title="Referências" value={entry.references} onChange={value => change('references', value)} placeholder="Livros, vídeos, sites e campanhas." /><button className="secondary" disabled={saving} onClick={() => save(false)}>Salvar diário</button></section></div></div>;
+  const emptyEntry = {
+    subject: "",
+    date: today,
+    planned: "",
+    actual: "",
+    reached: "",
+    understood: "",
+    doubts: "",
+    notes: "",
+    references: "",
+  };
+  const [entry, setEntry] = useState(emptyEntry);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    authenticatedFetch("/diaries")
+      .then((response) => (response.ok ? response.json() : []))
+      .then((items) => {
+        if (items[0]) setEntry(items[0]);
+      })
+      .catch(() => {});
+  }, []);
+  const change = (field, value) =>
+    setEntry((current) => ({ ...current, [field]: value }));
+  const save = async (continueToReview) => {
+    if (!entry.subject.trim()) {
+      setError("Informe a disciplina antes de salvar o diário.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const response = await authenticatedFetch("/diaries", {
+        method: "PUT",
+        body: JSON.stringify(entry),
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Não foi possível salvar.");
+      }
+      setEntry(await response.json());
+      setSaved(true);
+      if (continueToReview) setTimeout(() => go("prova"), 450);
+    } catch (failure) {
+      setError(failure.message || "Não foi possível salvar.");
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <div className="page diary">
+      <div className="page-title">
+        <div>
+          <p>Registro conectado à sua conta</p>
+          <h1>Como foi a aula de hoje?</h1>
+          <small>O que você escrever aqui alimenta suas revisões.</small>
+        </div>
+        <button
+          className="primary"
+          disabled={saving}
+          onClick={() => save(true)}
+        >
+          {saving ? "Salvando..." : "Salvar e revisar"}
+        </button>
+      </div>
+      {saved && (
+        <div className="toast">
+          Diário salvo. Ele estará disponível em seus outros dispositivos.
+        </div>
+      )}
+      {error && <div className="ai-error">{error}</div>}
+      <div className="diary-meta">
+        <label>
+          Disciplina
+          <input
+            list="diary-subject-suggestions"
+            value={entry.subject}
+            onChange={(event) => change("subject", event.target.value)}
+            placeholder="Digite o nome da disciplina"
+          />
+          <datalist id="diary-subject-suggestions">
+            {suggestedSubjects.map((subject) => (
+              <option key={subject} value={subject} />
+            ))}
+          </datalist>
+        </label>
+        <label>
+          Data
+          <input
+            type="date"
+            value={entry.date}
+            onChange={(event) => change("date", event.target.value)}
+          />
+        </label>
+      </div>
+      <div className="diary-line">
+        <span>Aula</span>
+        <div className="line-dot" />
+        <section>
+          <h2>{entry.subject}</h2>
+          <small>Registro pessoal · salvo com segurança</small>
+          <DiaryBlock
+            title="O que estava previsto"
+            value={entry.planned}
+            onChange={(value) => change("planned", value)}
+            placeholder="Conteúdos previstos para a aula..."
+          />
+          <DiaryBlock
+            title="O que realmente foi dado"
+            value={entry.actual}
+            onChange={(value) => change("actual", value)}
+            placeholder="Conte o que aconteceu durante a aula..."
+          />
+          <DiaryBlock
+            title="Até onde o professor chegou?"
+            value={entry.reached}
+            onChange={(value) => change("reached", value)}
+            placeholder="Ex.: até os princípios de composição."
+          />
+          <DiaryBlock
+            title="O que você entendeu"
+            value={entry.understood}
+            onChange={(value) => change("understood", value)}
+            placeholder="Registre suas percepções e aprendizados."
+          />
+          <DiaryBlock
+            title="O que você não entendeu"
+            value={entry.doubts}
+            onChange={(value) => change("doubts", value)}
+            placeholder="Dúvidas que devem virar revisão."
+            danger
+          />
+          <DiaryBlock
+            title="Informações importantes"
+            value={entry.notes}
+            onChange={(value) => change("notes", value)}
+            placeholder="Prazos, provas, pesos e avisos."
+          />
+          <DiaryBlock
+            title="Referências"
+            value={entry.references}
+            onChange={(value) => change("references", value)}
+            placeholder="Livros, vídeos, sites e campanhas."
+          />
+          <button
+            className="secondary"
+            disabled={saving}
+            onClick={() => save(false)}
+          >
+            Salvar diário
+          </button>
+        </section>
+      </div>
+    </div>
+  );
 }
-function DiaryBlock({ title, value, onChange, placeholder, danger }) { return <label className={`diary-block ${danger ? 'danger' : ''}`}><h3>{title}</h3><textarea value={value || ''} onChange={event => onChange(event.target.value)} placeholder={placeholder} /></label>; }
-function Exam({ go, session }) {
-  const [done, setDone] = useState([true, true, false, false, false]); const [loading, setLoading] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState(''); const [questions, setQuestions] = useState([]); const [answers, setAnswers] = useState({}); const [selectedMaterial, setSelectedMaterial] = useState(null);
-  const generate = async () => { setLoading(true); setError(''); setNotice(''); setQuestions([]); try { const response = await fetch(`${apiBase}/ai/questions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.token}` }, body: JSON.stringify({ subject: 'Teorias da Comunicação', topic: 'Semiótica e cultura de massa', context: 'Revisão para avaliação do semestre; priorize conceitos, leitura crítica e aplicações.', quantity: 4 }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Não foi possível criar as questões.'); setQuestions(data.questions || []); setNotice(data.notice || ''); } catch (err) { setError(err.message); } finally { setLoading(false); } };
-  return <div className="page narrow"><button className="back" onClick={() => go('central')}>‹ Voltar</button><div className="exam-head"><p>TEORIAS DA COMUNICAÇÃO · ESPAÇO DE REVISÃO</p><h1>Prova — 18 de setembro</h1><span>Faltam 11 dias para sua avaliação</span></div><div className="exam-layout"><div><Card title="Conteúdos da prova"><div className="lesson-list"><Item dot="#a779f5" text="Aula 01 — Comunicação de massa" sub="Registrado no diário" /><Item dot="#a779f5" text="Aula 02 — Teorias clássicas" sub="Registrado no diário" /><Item dot="#a779f5" text="Aula 03 — Semiótica" sub="Em revisão" /></div></Card><Card title="O que eu não entendi" className="warning"><p>Você marcou como “não entendi”:</p><strong>Semiótica · Teoria Y · Aplicação de Z</strong><button onClick={() => go('estudos')}>Revisar conteúdos <ChevronRight size={15} /></button></Card><Card title="Resumos relacionados"><button className="material-row" onClick={() => setSelectedMaterial('Resumo — Aula 03')}><FileText /> Resumo — Aula 03 <ChevronRight /></button><button className="material-row" onClick={() => setSelectedMaterial('Mapa mental de Semiótica')}><FileText /> Mapa mental de Semiótica <ChevronRight /></button></Card></div><div><Card title="Checklist de revisão"><p className="muted">Marque o que já está pronto.</p>{['Aula 01', 'Aula 02', 'Aula 03', 'Revisar Teoria X', 'Revisar Semiótica'].map((x, i) => <label className="review-check" key={x}><input type="checkbox" checked={done[i]} onChange={() => setDone(done.map((v, n) => n === i ? !v : v))} /> {x}</label>)}</Card><Card title="O que ficou de fora"><p className="muted">2 conteúdos previstos ainda não foram registrados como dados em aula.</p><button className="text-btn" onClick={() => go('diario')}>Ver planejado x realizado <ChevronRight size={14} /></button></Card></div></div><section className="ai-lab"><div><span className="ai-kicker">ESTUDA IA</span><h2>Transforme suas anotações em uma revisão ativa.</h2><p>Questões inéditas, feitas a partir do tema que você está estudando — com explicação para cada resposta.</p></div><button className="primary ai-button" onClick={generate} disabled={loading}>{loading ? 'Criando revisão...' : 'Gerar questões com IA'} <CircleHelp size={16} /></button></section>{notice && <div className="ai-notice">{notice}</div>}{error && <div className="ai-error">{error}</div>}{questions.length > 0 && <section className="question-set"><div className="question-set-head"><div><span className="ai-kicker">REVISÃO GERADA</span><h2>Teste sua compreensão</h2></div><span>{questions.length} questões</span></div>{questions.map((item, index) => <article className="question" key={`${item.question}-${index}`}><div className="question-number">{String(index + 1).padStart(2, '0')}</div><div><span className="difficulty">{item.difficulty}</span><h3>{item.question}</h3><div className="options">{item.options.map((option, optionIndex) => { const selected = answers[index] === optionIndex; const checked = answers[index] !== undefined; const right = optionIndex === item.correctIndex; return <button key={option} onClick={() => setAnswers({ ...answers, [index]: optionIndex })} className={`${selected ? 'selected' : ''} ${checked && right ? 'right' : ''} ${checked && selected && !right ? 'wrong' : ''}`}><b>{String.fromCharCode(65 + optionIndex)}</b>{option}</button>; })}</div>{answers[index] !== undefined && <p className="explanation"><strong>{answers[index] === item.correctIndex ? 'Boa!' : 'Revise este ponto:'}</strong> {item.explanation}</p>}</div></article>)}</section>}{selectedMaterial && <Modal title={selectedMaterial} close={() => setSelectedMaterial(null)}><div className="material-detail"><span className="material-icon"><FileText/></span><p className="eyebrow">MATERIAL DE REVISÃO</p><h3>Teorias da Comunicação</h3><p>Este material está organizado na Biblioteca. Use-o como contexto antes de gerar sua próxima revisão com IA.</p><button className="primary" onClick={() => { setSelectedMaterial(null); go('biblioteca'); }}>Abrir Biblioteca</button></div></Modal>}</div>;
+function DiaryBlock({ title, value, onChange, placeholder, danger }) {
+  return (
+    <label className={`diary-block ${danger ? "danger" : ""}`}>
+      <h3>{title}</h3>
+      <textarea
+        value={value || ""}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+      />
+    </label>
+  );
 }
-function LibraryPage({ query, setQuery, filtered }) { const [filter, setFilter] = useState('Todos'); const [selected, setSelected] = useState(null); const list = filter === 'Todos' ? filtered : filtered.filter(m => m.type === filter); return <div className="page narrow"><div className="page-title"><div><p>Seu acervo de estudo, organizado e pesquisável.</p><h1>Biblioteca</h1></div></div><div className="library-search"><Search size={17} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar por título ou formato..." /></div><div className="filter-tabs">{['Todos', 'Slides', 'PDF', 'Artigo', 'Livro', 'Link'].map(x => <button onClick={() => setFilter(x)} className={filter === x ? 'selected' : ''} key={x}>{x}</button>)}</div><div className="materials">{list.map(m => <button className="material" key={m.title} onClick={() => setSelected(m)}><span>{m.icon}</span><strong>{m.title}</strong><small>{m.sub}</small><em>{m.type}</em></button>)}</div>{!list.length && <div className="empty library-empty"><strong>Nenhum material encontrado</strong><p>Tente outro termo ou filtro.</p></div>}{selected && <Modal title={selected.title} close={() => setSelected(null)}><div className="material-detail"><span className="material-icon">{selected.icon}</span><p className="eyebrow">{selected.type}</p><h3>{selected.sub}</h3><p>Este espaço está pronto para receber o arquivo, link e suas anotações relacionadas.</p><button className="primary" onClick={() => setSelected(null)}>Entendi</button></div></Modal>}</div>; }
-function Performance() { return <div className="page narrow"><div className="page-title"><div><p>Acompanhe sua evolução ao longo do semestre.</p><h1>Desempenho</h1></div><select><option>Semestre atual</option></select></div><div className="performance-top"><Card title="Visão geral"><div className="score"><b>78%</b><span>Média geral</span></div><div className="metrics"><p>◉ 6 disciplinas</p><p>✓ 42 aulas</p><p>◷ 12 pendências</p></div></Card><Card title="Evolução"><div className="chart"><svg viewBox="0 0 360 150"><path d="M0 125 C30 110,40 110,68 90 S115 104,145 65 S190 76,220 42 S276 80,315 31 S340 20,360 5" fill="none" stroke="#8c70ef" strokeWidth="4" /><path d="M0 145H360M0 100H360M0 55H360" stroke="#edf0f4" /></svg><small>Ago　 Set　 Out　 Nov　 Dez</small></div></Card></div><div className="performance-grid"><Card title="Desempenho por disciplina">{subjects.map(s => <div className="score-row" key={s.name}><span>{s.name}</span><Progress value={s.progress} color={s.color} /><b>{s.progress}%</b></div>)}</Card><Card title="Últimas notas"><table><tbody><tr><td>Direção de Arte</td><td>9,0</td></tr><tr><td>Teorias da Comunicação</td><td>8,5</td></tr><tr><td>Marketing</td><td>8,0</td></tr><tr><td>Redação Publicitária</td><td>9,2</td></tr></tbody></table></Card></div></div>; }
-function Profile({ session, authenticatedFetch, onSession, signOut }) {
-  const [editing, setEditing] = useState(false); const [playlist, setPlaylist] = useState(() => localStorage.getItem(spotifyKey) || defaultSpotify); const [feedback, setFeedback] = useState(''); const [error, setError] = useState('');
-  const saveProfile = async event => { event.preventDefault(); setError(''); try { const form = new FormData(event.currentTarget); const response = await authenticatedFetch('/me', { method: 'PATCH', body: JSON.stringify(Object.fromEntries(form)) }); if (!response.ok) throw new Error('Não foi possível atualizar o perfil.'); const user = await response.json(); onSession({ ...session, user }); setEditing(false); setFeedback('Perfil atualizado com sucesso.'); } catch (failure) { setError(failure.message); } };
-  const savePlaylist = event => { event.preventDefault(); setError(''); const url = spotifyEmbed(new FormData(event.currentTarget).get('playlist')); if (!url) { setError('Cole um link público válido do Spotify.'); return; } localStorage.setItem(spotifyKey, url); setPlaylist(url); event.currentTarget.reset(); setFeedback('Playlist atualizada com sucesso.'); };
-  return <div className="page narrow"><div className="page-title"><div><p>Seu espaço acadêmico</p><h1>Perfil</h1></div></div>{feedback && <div className="toast" role="status">{feedback}</div>}{error && <div className="ai-error" role="alert">{error}</div>}<div className="profile-grid"><Card title=""><div className="profile-person"><div className="avatar large">{initials(session.user.name)}</div><div><h2>{session.user.name}</h2><p>{session.user.course || 'Defina seu curso para personalizar a experiência'}</p><button className="secondary" onClick={() => setEditing(true)}>Editar perfil</button></div></div><hr/><p className="eyebrow">INFORMAÇÕES</p><dl><dt>Instituição</dt><dd>{session.user.institution || 'Não informada'}</dd><dt>Semestre</dt><dd>{session.user.semester || 'Não informado'}</dd><dt>E-mail</dt><dd><a href={`mailto:${session.user.email}`}>{session.user.email}</a></dd></dl></Card><Card title="Meu curso"><h2>{session.user.course || 'Seu curso'}</h2><p className="muted">Progresso estimado do semestre</p><Progress value={68}/><p className="eyebrow">DISCIPLINAS</p>{subjects.slice(0, 5).map(s => <p className="profile-sub" key={s.name}><i style={{ background: s.color }}/>{s.name}</p>)}</Card><Card title="Configurações"><label className="setting">Notificações <input type="checkbox" defaultChecked /></label><label className="setting">Instalável <span>PWA</span></label><label className="setting">Dados sincronizados <span>Conta</span></label><button className="signout" onClick={signOut}>Sair da conta</button></Card><Card title="Foco com Spotify" className="spotify-card"><p className="muted">Ouça uma playlist dentro do seu espaço de estudo. Cole qualquer link público do Spotify para personalizar.</p><iframe title="Playlist de foco no Spotify" src={playlist} width="100%" height="352" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" /><form className="spotify-form" onSubmit={savePlaylist}><input name="playlist" required placeholder="Cole o link de uma playlist do Spotify" /><button className="secondary">Usar playlist</button></form></Card></div>{editing && <Modal title="Editar perfil" close={() => setEditing(false)}><form className="form" onSubmit={saveProfile}><label>Nome<input name="name" defaultValue={session.user.name} required /></label><label>Curso<input name="course" defaultValue={session.user.course} placeholder="Ex.: Publicidade e Propaganda" /></label><label>Instituição<input name="institution" defaultValue={session.user.institution} /></label><label>Semestre<input name="semester" defaultValue={session.user.semester} placeholder="Ex.: 4º semestre" /></label>{error && <div className="ai-error" role="alert">{error}</div>}<button className="primary">Salvar perfil</button></form></Modal>}</div>;
+function Exam({ go, session, plans, library }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [questions, setQuestions] = useState([]);
+  const [answers, setAnswers] = useState({});
+  const [review, setReview] = useState(() => ({
+    subject: plans[0]?.subject || "",
+    topic: plans[0]?.topic || "",
+    context: "",
+  }));
+  const generate = async () => {
+    if (!review.subject.trim() || !review.topic.trim()) {
+      setError("Informe a disciplina e o conteúdo que deseja revisar.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    setNotice("");
+    setQuestions([]);
+    try {
+      let context = review.context.trim();
+      if (!context) {
+        const diariesResponse = await fetch(`${apiBase}/diaries`, {
+          headers: { Authorization: `Bearer ${session.token}` },
+        });
+        const diaries = diariesResponse.ok ? await diariesResponse.json() : [];
+        const diaryContext = diaries
+          .filter((entry) => entry.subject === review.subject)
+          .flatMap((entry) => [
+            entry.actual,
+            entry.reached,
+            entry.understood,
+            entry.doubts,
+            entry.notes,
+            entry.references,
+          ]);
+        const libraryContext = library
+          .filter((material) => material.subject === review.subject)
+          .flatMap((material) => [material.title, material.notes]);
+        context = [...diaryContext, ...libraryContext]
+          .filter(Boolean)
+          .join("\n")
+          .slice(0, 3000);
+      }
+      const response = await fetch(`${apiBase}/ai/questions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.token}`,
+        },
+        body: JSON.stringify({
+          subject: review.subject,
+          topic: review.topic,
+          context: context || "Revisão acadêmica com conceitos e aplicações.",
+          quantity: 4,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "Não foi possível criar as questões.");
+      setQuestions(data.questions || []);
+      setNotice(data.notice || "");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  return (
+    <div className="page narrow">
+      <button className="back" onClick={() => go("central")}>
+        ‹ Voltar
+      </button>
+      <div className="exam-head">
+        <p>ESPAÇO DE REVISÃO PERSONALIZADA</p>
+        <h1>{review.subject || "O que você quer revisar?"}</h1>
+        <span>Use sua própria matéria para criar questões relevantes.</span>
+      </div>
+      <div className="exam-layout">
+        <Card title="Conteúdo da revisão">
+          <div className="form review-form">
+            <label>
+              Disciplina
+              <input
+                value={review.subject}
+                onChange={(event) =>
+                  setReview((current) => ({
+                    ...current,
+                    subject: event.target.value,
+                  }))
+                }
+                placeholder="Ex.: Biologia"
+              />
+            </label>
+            <label>
+              Assunto ou matéria
+              <input
+                value={review.topic}
+                onChange={(event) =>
+                  setReview((current) => ({
+                    ...current,
+                    topic: event.target.value,
+                  }))
+                }
+                placeholder="Ex.: Fotossíntese e respiração celular"
+              />
+            </label>
+            <label>
+              Anotações para dar contexto à IA
+              <textarea
+                value={review.context}
+                onChange={(event) =>
+                  setReview((current) => ({
+                    ...current,
+                    context: event.target.value,
+                  }))
+                }
+                placeholder="Cole um resumo, tópicos da aula ou suas dúvidas."
+              />
+              <small className="field-help">
+                Se ficar em branco, usamos automaticamente seus registros do
+                Diário e materiais da Biblioteca desta disciplina.
+              </small>
+            </label>
+          </div>
+        </Card>
+        <Card title="Seus conteúdos planejados">
+          {plans.length ? (
+            plans.slice(0, 5).map((plan, index) => (
+              <button
+                className="material-row"
+                key={plan.id}
+                onClick={() =>
+                  setReview((current) => ({
+                    ...current,
+                    subject: plan.subject,
+                    topic: plan.topic,
+                  }))
+                }
+              >
+                <FileText size={16} />
+                <span>
+                  {plan.topic}
+                  <small>{plan.subject}</small>
+                </span>
+                <ChevronRight />
+              </button>
+            ))
+          ) : (
+            <div className="empty">
+              <strong>Nenhum conteúdo planejado</strong>
+              <p>
+                Você pode preencher a revisão livremente ou criar um plano de
+                estudo.
+              </p>
+              <button className="secondary" onClick={() => go("estudos")}>
+                Planejar agora
+              </button>
+            </div>
+          )}
+        </Card>
+      </div>
+      <section className="ai-lab">
+        <div>
+          <span className="ai-kicker">ESTUDA IA</span>
+          <h2>Transforme suas anotações em uma revisão ativa.</h2>
+          <p>
+            Questões inéditas, feitas a partir do tema que você está estudando —
+            com explicação para cada resposta.
+          </p>
+        </div>
+        <button
+          className="primary ai-button"
+          onClick={generate}
+          disabled={loading}
+        >
+          {loading ? "Criando revisão..." : "Gerar questões com IA"}{" "}
+          <CircleHelp size={16} />
+        </button>
+      </section>
+      {notice && <div className="ai-notice">{notice}</div>}
+      {error && <div className="ai-error">{error}</div>}
+      {questions.length > 0 && (
+        <section className="question-set">
+          <div className="question-set-head">
+            <div>
+              <span className="ai-kicker">REVISÃO GERADA</span>
+              <h2>Teste sua compreensão</h2>
+            </div>
+            <span>{questions.length} questões</span>
+          </div>
+          {questions.map((item, index) => (
+            <article className="question" key={`${item.question}-${index}`}>
+              <div className="question-number">
+                {String(index + 1).padStart(2, "0")}
+              </div>
+              <div>
+                <span className="difficulty">{item.difficulty}</span>
+                <h3>{item.question}</h3>
+                <div className="options">
+                  {item.options.map((option, optionIndex) => {
+                    const selected = answers[index] === optionIndex;
+                    const checked = answers[index] !== undefined;
+                    const right = optionIndex === item.correctIndex;
+                    return (
+                      <button
+                        key={option}
+                        onClick={() =>
+                          setAnswers((current) => ({
+                            ...current,
+                            [index]: optionIndex,
+                          }))
+                        }
+                        className={`${selected ? "selected" : ""} ${checked && right ? "right" : ""} ${checked && selected && !right ? "wrong" : ""}`}
+                      >
+                        <b>{String.fromCharCode(65 + optionIndex)}</b>
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
+                {answers[index] !== undefined && (
+                  <p className="explanation">
+                    <strong>
+                      {answers[index] === item.correctIndex
+                        ? "Boa!"
+                        : "Revise este ponto:"}
+                    </strong>{" "}
+                    {item.explanation}
+                  </p>
+                )}
+              </div>
+            </article>
+          ))}
+        </section>
+      )}
+    </div>
+  );
+}
+function LibraryPage({
+  query,
+  setQuery,
+  filtered,
+  setLibrary,
+  authenticatedFetch,
+}) {
+  const [filter, setFilter] = useState("Todos");
+  const [selected, setSelected] = useState(null);
+  const [creating, setCreating] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const [error, setError] = useState("");
+  const list =
+    filter === "Todos" ? filtered : filtered.filter((m) => m.type === filter);
+  const addMaterialToLibrary = async (event) => {
+    event.preventDefault();
+    setError("");
+    try {
+      const response = await authenticatedFetch("/materials", {
+        method: "POST",
+        body: JSON.stringify(
+          Object.fromEntries(new FormData(event.currentTarget)),
+        ),
+      });
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "Não foi possível adicionar o material.");
+      setLibrary((current) => [data, ...current]);
+      setCreating(false);
+      setFeedback("Material adicionado à sua biblioteca.");
+    } catch (failure) {
+      setError(failure.message);
+    }
+  };
+  const deleteMaterial = async () => {
+    setError("");
+    try {
+      const response = await authenticatedFetch(`/materials/${selected.id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error();
+      setLibrary((current) =>
+        current.filter((material) => material.id !== selected.id),
+      );
+      setSelected(null);
+      setFeedback("Material removido da biblioteca.");
+    } catch {
+      setError("Não foi possível remover o material. Tente novamente.");
+    }
+  };
+  return (
+    <div className="page narrow">
+      <div className="page-title">
+        <div>
+          <p>Seu acervo de estudo, organizado e pesquisável.</p>
+          <h1>Biblioteca</h1>
+        </div>
+        <button
+          className="primary"
+          onClick={() => {
+            setError("");
+            setFeedback("");
+            setCreating(true);
+          }}
+        >
+          <Plus size={17} /> Adicionar material
+        </button>
+      </div>
+      {feedback && (
+        <div className="toast" role="status">
+          {feedback}
+        </div>
+      )}
+      {error && (
+        <div className="ai-error" role="alert">
+          {error}
+        </div>
+      )}
+      <div className="library-search">
+        <Search size={17} />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar por título ou formato..."
+        />
+      </div>
+      <div className="filter-tabs">
+        {["Todos", "Slides", "PDF", "Artigo", "Livro", "Link", "Anotação"].map(
+          (x) => (
+            <button
+              onClick={() => setFilter(x)}
+              className={filter === x ? "selected" : ""}
+              key={x}
+            >
+              {x}
+            </button>
+          ),
+        )}
+      </div>
+      <div className="materials">
+        {list.map((m) => (
+          <button
+            className="material"
+            key={m.id}
+            onClick={() => setSelected(m)}
+          >
+            <span>
+              {m.type === "Link" ? "↗" : m.type === "PDF" ? "▣" : "▤"}
+            </span>
+            <strong>{m.title}</strong>
+            <small>{m.subject || "Sem disciplina"}</small>
+            <em>{m.type}</em>
+          </button>
+        ))}
+      </div>
+      {!list.length && (
+        <div className="empty library-empty">
+          <strong>Nenhum material encontrado</strong>
+          <p>
+            {query || filter !== "Todos"
+              ? "Tente outro termo ou filtro."
+              : "Adicione um link, PDF, livro ou anotação para começar sua biblioteca."}
+          </p>
+        </div>
+      )}
+      {selected && (
+        <Modal title={selected.title} close={() => setSelected(null)}>
+          <div className="material-detail">
+            <span className="material-icon">
+              {selected.type === "Link" ? "↗" : "▣"}
+            </span>
+            <p className="eyebrow">{selected.type}</p>
+            <h3>{selected.subject || "Material geral"}</h3>
+            <p>{selected.notes || "Sem anotações adicionais."}</p>
+            <div className="material-actions">
+              {selected.url && (
+                <a
+                  className="primary"
+                  href={selected.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Abrir material
+                </a>
+              )}
+              <button className="danger-button" onClick={deleteMaterial}>
+                Remover
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+      {creating && (
+        <Modal title="Adicionar material" close={() => setCreating(false)}>
+          <form className="form" onSubmit={addMaterialToLibrary}>
+            <label>
+              Título
+              <input name="title" required placeholder="Nome do material" />
+            </label>
+            <label>
+              Tipo
+              <select name="type">
+                <option>Link</option>
+                <option>PDF</option>
+                <option>Slides</option>
+                <option>Artigo</option>
+                <option>Livro</option>
+                <option>Anotação</option>
+              </select>
+            </label>
+            <label>
+              Disciplina
+              <input name="subject" placeholder="Opcional" />
+            </label>
+            <label>
+              Link
+              <input name="url" type="url" placeholder="https://..." />
+            </label>
+            <label>
+              Anotações
+              <textarea
+                name="notes"
+                placeholder="Por que este material é importante?"
+              />
+            </label>
+            {error && (
+              <div className="ai-error" role="alert">
+                {error}
+              </div>
+            )}
+            <button className="primary">Salvar material</button>
+          </form>
+        </Modal>
+      )}
+    </div>
+  );
+}
+function Performance({ plans }) {
+  const personalSubjects = subjectsFromPlans(plans);
+  return (
+    <div className="page narrow">
+      <div className="page-title">
+        <div>
+          <p>Acompanhe sua evolução ao longo do semestre.</p>
+          <h1>Desempenho</h1>
+        </div>
+        <span className="performance-period">Semestre atual</span>
+      </div>
+      <div className="performance-top">
+        <Card title="Visão geral">
+          <div className="score">
+            <b>{plans.length}</b>
+            <span>Em foco</span>
+          </div>
+          <div className="metrics">
+            <p>◉ {personalSubjects.length} disciplinas</p>
+            <p>✓ Dados da sua conta</p>
+            <p>◷ {plans.length} sessões planejadas</p>
+          </div>
+        </Card>
+        <Card title="Leitura honesta">
+          <div className="recommendation">
+            <span>HISTÓRICO REAL</span>
+            <strong>Seu painel cresce com seus registros.</strong>
+            <p>
+              Adicione sessões e conclua seu planejamento para construir um
+              histórico acadêmico útil.
+            </p>
+          </div>
+        </Card>
+      </div>
+      <div className="performance-grid">
+        <Card title="Desempenho por disciplina">
+          {personalSubjects.length ? (
+            personalSubjects.map((subject) => (
+              <div className="score-row" key={subject.name}>
+                <span>{subject.name}</span>
+                <i
+                  className="subject-score-dot"
+                  style={{ background: subject.color }}
+                  aria-hidden="true"
+                />
+                <b>
+                  {subject.pending}{" "}
+                  {subject.pending === 1 ? "sessão" : "sessões"}
+                </b>
+              </div>
+            ))
+          ) : (
+            <div className="empty">
+              <strong>Nada para medir ainda</strong>
+              <p>
+                Seu desempenho será formado somente pelos dados que você
+                registrar.
+              </p>
+            </div>
+          )}
+        </Card>
+        <Card title="Próximos passos">
+          <div className="recommendation">
+            <span>RECOMENDAÇÃO</span>
+            <strong>
+              {plans[0]?.topic || "Planeje seu primeiro conteúdo"}
+            </strong>
+            <p>
+              {plans[0]
+                ? `${plans[0].subject} · ${plans[0].date || "Sem data definida"}`
+                : "Defina uma disciplina, conteúdo e horário para começar."}
+            </p>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+function Profile({
+  session,
+  authenticatedFetch,
+  onSession,
+  signOut,
+  plans,
+  setPlaylist,
+}) {
+  const personalSubjects = subjectsFromPlans(plans);
+  const [editing, setEditing] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const [error, setError] = useState("");
+  const saveProfile = async (event) => {
+    event.preventDefault();
+    setError("");
+    try {
+      const form = new FormData(event.currentTarget);
+      const response = await authenticatedFetch("/me", {
+        method: "PATCH",
+        body: JSON.stringify(Object.fromEntries(form)),
+      });
+      if (!response.ok) throw new Error("Não foi possível atualizar o perfil.");
+      const user = await response.json();
+      onSession({ ...session, user });
+      setEditing(false);
+      setFeedback("Perfil atualizado com sucesso.");
+    } catch (failure) {
+      setError(failure.message);
+    }
+  };
+  const savePlaylist = (event) => {
+    event.preventDefault();
+    setError("");
+    const url = spotifyEmbed(new FormData(event.currentTarget).get("playlist"));
+    if (!url) {
+      setError("Cole um link público válido do Spotify.");
+      return;
+    }
+    localStorage.setItem(spotifyKey, url);
+    setPlaylist(url);
+    event.currentTarget.reset();
+    setFeedback("Playlist atualizada com sucesso.");
+  };
+  return (
+    <div className="page narrow">
+      <div className="page-title">
+        <div>
+          <p>Seu espaço acadêmico</p>
+          <h1>Perfil</h1>
+        </div>
+      </div>
+      {feedback && (
+        <div className="toast" role="status">
+          {feedback}
+        </div>
+      )}
+      {error && (
+        <div className="ai-error" role="alert">
+          {error}
+        </div>
+      )}
+      <div className="profile-grid">
+        <Card title="">
+          <div className="profile-person">
+            <div className="avatar large">{initials(session.user.name)}</div>
+            <div>
+              <h2>{session.user.name}</h2>
+              <p>
+                {session.user.course ||
+                  "Defina seu curso para personalizar a experiência"}
+              </p>
+              <button className="secondary" onClick={() => setEditing(true)}>
+                Editar perfil
+              </button>
+            </div>
+          </div>
+          <hr />
+          <p className="eyebrow">INFORMAÇÕES</p>
+          <dl>
+            <dt>Instituição</dt>
+            <dd>{session.user.institution || "Não informada"}</dd>
+            <dt>Semestre</dt>
+            <dd>{session.user.semester || "Não informado"}</dd>
+            <dt>E-mail</dt>
+            <dd>
+              <a href={`mailto:${session.user.email}`}>{session.user.email}</a>
+            </dd>
+          </dl>
+        </Card>
+        <Card title="Meu curso">
+          <h2>{session.user.course || "Seu curso"}</h2>
+          <p className="muted">
+            {plans.length}{" "}
+            {plans.length === 1 ? "sessão planejada" : "sessões planejadas"}
+          </p>
+          <p className="eyebrow">DISCIPLINAS</p>
+          {personalSubjects.slice(0, 5).map((s) => (
+            <p className="profile-sub" key={s.name}>
+              <i style={{ background: s.color }} />
+              {s.name}
+            </p>
+          ))}
+          {!personalSubjects.length && (
+            <p className="muted">Adicione uma disciplina em Estudos.</p>
+          )}
+        </Card>
+        <Card title="Configurações">
+          <label className="setting">
+            Instalável <span>PWA</span>
+          </label>
+          <label className="setting">
+            Dados sincronizados <span>Conta</span>
+          </label>
+          <button className="signout" onClick={signOut}>
+            Sair da conta
+          </button>
+        </Card>
+        <Card title="Foco com Spotify" className="spotify-card">
+          <p className="muted">
+            O player permanece aberto enquanto você navega pela plataforma. Cole
+            um link público de playlist, álbum, faixa, podcast ou episódio para
+            personalizar seu foco.
+          </p>
+          <form className="spotify-form" onSubmit={savePlaylist}>
+            <input
+              name="playlist"
+              required
+              placeholder="Cole o link de uma playlist do Spotify"
+            />
+            <button className="secondary">Usar playlist</button>
+          </form>
+        </Card>
+      </div>
+      {editing && (
+        <Modal title="Editar perfil" close={() => setEditing(false)}>
+          <form className="form" onSubmit={saveProfile}>
+            <label>
+              Nome
+              <input name="name" defaultValue={session.user.name} required />
+            </label>
+            <label>
+              Curso
+              <input
+                name="course"
+                defaultValue={session.user.course}
+                placeholder="Ex.: Publicidade e Propaganda"
+              />
+            </label>
+            <label>
+              Instituição
+              <input
+                name="institution"
+                defaultValue={session.user.institution}
+              />
+            </label>
+            <label>
+              Semestre
+              <input
+                name="semester"
+                defaultValue={session.user.semester}
+                placeholder="Ex.: 4º semestre"
+              />
+            </label>
+            {error && (
+              <div className="ai-error" role="alert">
+                {error}
+              </div>
+            )}
+            <button className="primary">Salvar perfil</button>
+          </form>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function SpotifyDock({ playlist, go }) {
+  const [expanded, setExpanded] = useState(false);
+  const [activated, setActivated] = useState(false);
+  return (
+    <aside
+      className={`spotify-dock ${expanded ? "expanded" : "collapsed"}`}
+      aria-label="Player de foco do Spotify"
+    >
+      <div className="spotify-dock-head">
+        <button
+          className="spotify-dock-title"
+          onClick={() => {
+            if (!expanded) setActivated(true);
+            setExpanded((current) => !current);
+          }}
+          aria-expanded={expanded}
+        >
+          <Headphones size={17} />
+          <span>
+            <strong>Foco com Spotify</strong>
+            <small>Continua tocando durante a navegação</small>
+          </span>
+          <ChevronRight size={16} aria-hidden="true" />
+        </button>
+        <button className="spotify-settings" onClick={() => go("perfil")}>
+          Configurar
+        </button>
+      </div>
+      {activated && (
+        <iframe
+          title="Player persistente do Spotify"
+          src={playlist}
+          width="100%"
+          height="152"
+          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+          loading="eager"
+        />
+      )}
+    </aside>
+  );
 }
 
 function AuthScreen({ onAuthenticated }) {
-  const [mode, setMode] = useState('register'); const [loading, setLoading] = useState(false); const [error, setError] = useState('');
-  const submit = async event => { event.preventDefault(); setLoading(true); setError(''); const data = Object.fromEntries(new FormData(event.currentTarget)); try { const response = await fetch(`${apiBase}/auth/${mode === 'register' ? 'register' : 'login'}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); const payload = await response.json(); if (!response.ok) throw new Error(payload.error); onAuthenticated(payload); } catch (failure) { setError(failure.message || 'Não foi possível entrar.'); } finally { setLoading(false); } };
-  return <main className="auth-page"><section className="auth-story"><a className="auth-brand" href="/" aria-label="Página inicial estuda."><img src="/icons/icon-192.png" alt="" /><span>estuda.</span></a><div><span className="auth-kicker">DO REGISTRO À REVISÃO</span><h1>Seu semestre,<br/>com clareza.</h1><p>Organize aulas, transforme dúvidas em questões e construa uma rotina de estudo que realmente acompanha você.</p><div className="auth-points"><span>01 <b>Registre a aula</b></span><span>02 <b>Encontre o próximo foco</b></span><span>03 <b>Revise com inteligência</b></span></div></div><small>© {new Date().getFullYear()} estuda. · Instalável no iPhone, Android e computador.</small></section><section className="auth-panel"><div className="auth-box"><span className="auth-kicker">{mode === 'register' ? 'CRIE SEU ESPAÇO' : 'BEM-VINDO DE VOLTA'}</span><h2>{mode === 'register' ? 'Comece pelo que importa.' : 'Continue de onde parou.'}</h2><p>{mode === 'register' ? 'Sua conta sincroniza seus registros entre todos os dispositivos.' : 'Entre com seus dados para acessar seu semestre.'}</p><form className="form auth-form" onSubmit={submit}>{mode === 'register' && <><label>Seu nome<input name="name" autoComplete="name" required placeholder="Como podemos chamar você?" /></label><label>Curso<input name="course" placeholder="Ex.: Publicidade e Propaganda" /></label></>}<label>E-mail<input name="email" type="email" autoComplete="email" required placeholder="voce@exemplo.com" /></label><label>Senha<input name="password" type="password" autoComplete={mode === 'register' ? 'new-password' : 'current-password'} minLength="8" required placeholder="Mínimo de 8 caracteres" /></label>{error && <div className="ai-error" role="alert">{error}</div>}<button className="primary auth-submit" disabled={loading}>{loading ? 'Aguarde...' : mode === 'register' ? 'Criar meu espaço' : 'Entrar'}</button></form><button className="auth-switch" onClick={() => { setError(''); setMode(mode === 'register' ? 'login' : 'register'); }}>{mode === 'register' ? 'Já possui uma conta? Entrar' : 'Ainda não possui conta? Criar agora'}</button></div></section></main>;
+  const [mode, setMode] = useState("register");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const submit = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+    const data = Object.fromEntries(new FormData(event.currentTarget));
+    try {
+      const response = await fetch(
+        `${apiBase}/auth/${mode === "register" ? "register" : "login"}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        },
+      );
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error);
+      onAuthenticated(payload);
+    } catch (failure) {
+      setError(failure.message || "Não foi possível entrar.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  return (
+    <main className="auth-page">
+      <section className="auth-story">
+        <a className="auth-brand" href="/" aria-label="Página inicial estuda.">
+          <img src="/icons/icon-192.png" alt="" />
+          <span>estuda.</span>
+        </a>
+        <div>
+          <span className="auth-kicker">DO REGISTRO À REVISÃO</span>
+          <h1>
+            Seu semestre,
+            <br />
+            com clareza.
+          </h1>
+          <p>
+            Organize aulas, transforme dúvidas em questões e construa uma rotina
+            de estudo que realmente acompanha você.
+          </p>
+          <div className="auth-points">
+            <span>
+              01 <b>Registre a aula</b>
+            </span>
+            <span>
+              02 <b>Encontre o próximo foco</b>
+            </span>
+            <span>
+              03 <b>Revise com inteligência</b>
+            </span>
+          </div>
+        </div>
+        <small>
+          © {new Date().getFullYear()} estuda. · Instalável no iPhone, Android e
+          computador.
+        </small>
+      </section>
+      <section className="auth-panel">
+        <div className="auth-box">
+          <span className="auth-kicker">
+            {mode === "register" ? "CRIE SEU ESPAÇO" : "BEM-VINDO DE VOLTA"}
+          </span>
+          <h2>
+            {mode === "register"
+              ? "Comece pelo que importa."
+              : "Continue de onde parou."}
+          </h2>
+          <p>
+            {mode === "register"
+              ? "Sua conta sincroniza seus registros entre todos os dispositivos."
+              : "Entre com seus dados para acessar seu semestre."}
+          </p>
+          <form className="form auth-form" onSubmit={submit}>
+            {mode === "register" && (
+              <>
+                <label>
+                  Seu nome
+                  <input
+                    name="name"
+                    autoComplete="name"
+                    required
+                    placeholder="Como podemos chamar você?"
+                  />
+                </label>
+                <label>
+                  Curso
+                  <input
+                    name="course"
+                    placeholder="Ex.: Publicidade e Propaganda"
+                  />
+                </label>
+              </>
+            )}
+            <label>
+              E-mail
+              <input
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                placeholder="voce@exemplo.com"
+              />
+            </label>
+            <label>
+              Senha
+              <input
+                name="password"
+                type="password"
+                autoComplete={
+                  mode === "register" ? "new-password" : "current-password"
+                }
+                minLength="8"
+                required
+                placeholder="Mínimo de 8 caracteres"
+              />
+            </label>
+            {error && (
+              <div className="ai-error" role="alert">
+                {error}
+              </div>
+            )}
+            <button className="primary auth-submit" disabled={loading}>
+              {loading
+                ? "Aguarde..."
+                : mode === "register"
+                  ? "Criar meu espaço"
+                  : "Entrar"}
+            </button>
+          </form>
+          <button
+            className="auth-switch"
+            onClick={() => {
+              setError("");
+              setMode(mode === "register" ? "login" : "register");
+            }}
+          >
+            {mode === "register"
+              ? "Já possui uma conta? Entrar"
+              : "Ainda não possui conta? Criar agora"}
+          </button>
+        </div>
+      </section>
+    </main>
+  );
 }
 
-function Footer({ go }) { return <footer className="site-footer"><button className="footer-brand" onClick={() => go('central')}><img src="/icons/favicon-32.png" alt=""/>estuda.</button><span>© {new Date().getFullYear()} · Seu semestre com clareza.</span><div><a href={`mailto:${contactEmail}`}>Contato</a><a href="https://github.com/Rafael2808o/diario-de-aula" target="_blank" rel="noreferrer">GitHub</a></div></footer>; }
+function Footer({ go }) {
+  return (
+    <footer className="site-footer">
+      <button className="footer-brand" onClick={() => go("central")}>
+        <img src="/icons/favicon-32.png" alt="" />
+        estuda.
+      </button>
+      <span>© {new Date().getFullYear()} · Seu semestre com clareza.</span>
+      <div>
+        <a href={`mailto:${contactEmail}`}>Contato</a>
+        <a
+          href="https://github.com/Rafael2808o/diario-de-aula"
+          target="_blank"
+          rel="noreferrer"
+        >
+          GitHub
+        </a>
+      </div>
+    </footer>
+  );
+}
 
-function NotFound() { return <main className="not-found"><a className="not-found-brand" href="/"><img src="/icons/icon-192.png" alt=""/>estuda.</a><span>ERRO 404</span><h1>Esta página saiu para estudar.</h1><p>O endereço não existe, mas seu espaço acadêmico continua no lugar certo.</p><a className="primary" href="/">Voltar para o início</a><small>© {new Date().getFullYear()} estuda.</small></main>; }
+function NotFound() {
+  return (
+    <main className="not-found">
+      <a className="not-found-brand" href="/">
+        <img src="/icons/icon-192.png" alt="" />
+        estuda.
+      </a>
+      <span>ERRO 404</span>
+      <h1>Esta página saiu para estudar.</h1>
+      <p>
+        O endereço não existe, mas seu espaço acadêmico continua no lugar certo.
+      </p>
+      <a className="primary" href="/">
+        Voltar para o início
+      </a>
+      <small>© {new Date().getFullYear()} estuda.</small>
+    </main>
+  );
+}
 
 function PwaPrompt() {
-  const [installEvent, setInstallEvent] = useState(null); const [iosTip, setIosTip] = useState(false); const [hidden, setHidden] = useState(false);
-  useEffect(() => { const handler = event => { event.preventDefault(); setInstallEvent(event); }; window.addEventListener('beforeinstallprompt', handler); const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent); const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone; setIosTip(isIos && !standalone); return () => window.removeEventListener('beforeinstallprompt', handler); }, []);
+  const [installEvent, setInstallEvent] = useState(null);
+  const [iosTip, setIosTip] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    const handler = (event) => {
+      event.preventDefault();
+      setInstallEvent(event);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const standalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      navigator.standalone;
+    setIosTip(isIos && !standalone);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
   if (hidden || (!installEvent && !iosTip)) return null;
-  const install = async () => { if (installEvent) { await installEvent.prompt(); setInstallEvent(null); } else setIosTip(true); };
-  return <aside className="install-card"><button aria-label="Fechar" onClick={() => setHidden(true)}><X size={15}/></button><img src="/icons/favicon-32.png" alt="" /><div><strong>Instalar estuda.</strong><p>{iosTip ? 'No Safari, toque em Compartilhar e depois “Adicionar à Tela de Início”.' : 'Use como aplicativo, com acesso rápido e tela cheia.'}</p><button className="install-action" onClick={install}>{iosTip ? 'Ver instrução' : 'Instalar agora'}</button></div></aside>;
+  const install = async () => {
+    if (installEvent) {
+      await installEvent.prompt();
+      setInstallEvent(null);
+    } else setIosTip(true);
+  };
+  return (
+    <aside className="install-card">
+      <button aria-label="Fechar" onClick={() => setHidden(true)}>
+        <X size={15} />
+      </button>
+      <img src="/icons/favicon-32.png" alt="" />
+      <div>
+        <strong>Instalar estuda.</strong>
+        <p>
+          {iosTip
+            ? "No Safari, toque em Compartilhar e depois “Adicionar à Tela de Início”."
+            : "Use como aplicativo, com acesso rápido e tela cheia."}
+        </p>
+        <button className="install-action" onClick={install}>
+          {iosTip ? "Ver instrução" : "Instalar agora"}
+        </button>
+      </div>
+    </aside>
+  );
 }
-function Modal({ title, close, children }) { return <div className="modal-back" role="presentation" onMouseDown={event => event.target === event.currentTarget && close()}><section className="modal" role="dialog" aria-modal="true" aria-label={title}><header><h2>{title}</h2><button aria-label="Fechar janela" onClick={close}><X /></button></header>{children}</section></div>; }
+function Modal({ title, close, children }) {
+  return (
+    <div
+      className="modal-back"
+      role="presentation"
+      onMouseDown={(event) => event.target === event.currentTarget && close()}
+    >
+      <section
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+      >
+        <header>
+          <h2>{title}</h2>
+          <button aria-label="Fechar janela" onClick={close}>
+            <X />
+          </button>
+        </header>
+        {children}
+      </section>
+    </div>
+  );
+}

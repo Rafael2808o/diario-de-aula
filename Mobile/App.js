@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   BackHandler,
+  Image,
   SafeAreaView,
   StatusBar,
   StyleSheet,
@@ -32,7 +33,7 @@ export default function App() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.offline}>
-          <View style={styles.mark}><Text style={styles.markText}>e.</Text></View>
+          <Image source={require('./assets/icon.png')} style={styles.mark} />
           <Text style={styles.title}>Não foi possível conectar.</Text>
           <Text style={styles.copy}>Confira sua internet e tente abrir seu espaço novamente.</Text>
           <TouchableOpacity style={styles.button} onPress={() => { setFailed(false); setLoading(true); }}>
@@ -53,7 +54,7 @@ export default function App() {
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
         allowsInlineMediaPlayback
-        mediaPlaybackRequiresUserAction
+        mediaPlaybackRequiresUserAction={false}
         setSupportMultipleWindows={false}
         onNavigationStateChange={state => setCanGoBack(state.canGoBack)}
         onLoadEnd={() => setLoading(false)}
@@ -88,13 +89,9 @@ const styles = StyleSheet.create({
   mark: {
     width: 58,
     height: 58,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 22,
-    borderRadius: 17,
-    backgroundColor: '#171a3a'
+    borderRadius: 17
   },
-  markText: { color: '#fff', fontSize: 25, fontWeight: '800' },
   title: { color: '#171a3a', fontSize: 24, fontWeight: '800', textAlign: 'center' },
   copy: { maxWidth: 300, marginTop: 9, color: '#7d7e90', fontSize: 13, lineHeight: 20, textAlign: 'center' },
   button: { marginTop: 24, paddingHorizontal: 18, paddingVertical: 12, borderRadius: 11, backgroundColor: '#171a3a' },

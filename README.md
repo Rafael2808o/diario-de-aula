@@ -28,9 +28,9 @@ A PWA instalada não expira e abre em uma janela própria, como um aplicativo. O
 - modo prova com questões originais geradas pelo Gemini;
 - alternativas corrigidas na hora e explicações didáticas;
 - revisão guiada de contingência quando o provedor de IA estiver indisponível;
-- biblioteca pesquisável e filtrada por formato;
-- painel de desempenho e progresso por disciplina;
-- playlist Deep Focus incorporada pelo Spotify;
+- biblioteca pessoal pesquisável, com criação, abertura e remoção de materiais;
+- painel de desempenho baseado somente nos registros reais da conta;
+- player Spotify persistente durante a navegação;
 - suporte a qualquer link público de playlist, álbum, episódio ou faixa do Spotify;
 - PWA com manifesto, service worker, cache da interface e atalhos;
 - navegação inferior própria para celular;
@@ -66,7 +66,7 @@ Diario de Aula/
 
 | Camada | Tecnologias |
 | --- | --- |
-| Site/PWA | React 18, Vite, Lucide e Service Worker |
+| Site/PWA | React 19, Vite, Lucide e Service Worker |
 | Aplicativo | Expo, React Native e React Native WebView |
 | API | Node.js, Express e Swagger/OpenAPI |
 | Banco | PostgreSQL com fallback local em memória |
@@ -119,7 +119,8 @@ npx eas-cli@latest build --platform ios --profile ios-simulator
 | Perfil | `GET /api/v1/me`, `PATCH /api/v1/me` |
 | Estudos | `GET/POST /api/v1/study-plans`, `DELETE /api/v1/study-plans/:id` |
 | Diário | `GET/PUT /api/v1/diaries` |
-| Conteúdo | `GET /api/v1/subjects`, `GET /api/v1/materials` |
+| Conteúdo | `GET /api/v1/subjects`, `GET/POST /api/v1/materials`, `DELETE /api/v1/materials/:id` |
+| OpenAPI | `GET /api/v1/openapi.json`, interface em `/docs/` |
 | IA | `GET /api/v1/ai/status`, `POST /api/v1/ai/questions` |
 | Spotify | `GET /api/v1/integrations/spotify/status` |
 
@@ -152,7 +153,7 @@ O banco gratuito do Render é adequado para avaliação e demonstração, mas po
 
 ## Estado do projeto
 
-A branch `main` é a fonte de publicação. O site e a API são implantados automaticamente pelo Render. A PWA atende iPhone, iPad, Android e computadores sem assinatura de loja; o APK Android é gerado pelo Expo EAS.
+A branch `main` é a fonte de publicação. O site/PWA é publicado na Vercel e a API com PostgreSQL roda no Render. A PWA atende iPhone, iPad, Android e computadores sem assinatura de loja; o APK Android é gerado pelo Expo EAS.
 
 ## Contribuição
 

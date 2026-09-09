@@ -1,4 +1,4 @@
-const CACHE = 'estuda-shell-v3';
+const CACHE = 'estuda-shell-v4';
 const SHELL = [
   '/',
   '/manifest.json',

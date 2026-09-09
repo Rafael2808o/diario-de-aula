@@ -6,7 +6,7 @@ const pool = process.env.DATABASE_URL
   ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined })
   : null;
 
-const memory = { users: [], sessions: new Map(), plans: [], diaries: [] };
+const memory = { users: [], sessions: new Map(), plans: [], diaries: [], materials: [] };
 let initialization;
 
 function publicUser(user) {
@@ -51,6 +51,11 @@ export function initStore() {
       subject TEXT NOT NULL, lesson_date TEXT NOT NULL, planned TEXT DEFAULT '', actual TEXT DEFAULT '',
       reached TEXT DEFAULT '', understood TEXT DEFAULT '', doubts TEXT DEFAULT '', notes TEXT DEFAULT '', references_text TEXT DEFAULT '',
       created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW(), UNIQUE(user_id, subject, lesson_date)
+    );
+    CREATE TABLE IF NOT EXISTS study_materials (
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title TEXT NOT NULL, material_type TEXT DEFAULT 'Link', subject TEXT DEFAULT '', url TEXT DEFAULT '', notes TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
   return initialization;
@@ -141,4 +146,27 @@ export async function listDiaries(userId) {
   await initStore();
   if (pool) return (await pool.query('SELECT id,subject,lesson_date AS date,planned,actual,reached,understood,doubts,notes,references_text AS references FROM diaries WHERE user_id=$1 ORDER BY lesson_date DESC', [userId])).rows;
   return memory.diaries.filter(diary => diary.userId === userId).map(({ userId, ...diary }) => diary);
+}
+
+export async function listMaterials(userId) {
+  await initStore();
+  if (pool) return (await pool.query('SELECT id,title,material_type AS type,subject,url,notes FROM study_materials WHERE user_id=$1 ORDER BY created_at DESC', [userId])).rows;
+  return memory.materials.filter(material => material.userId === userId).map(({ userId: _userId, ...material }) => material);
+}
+
+export async function addMaterial(userId, material) {
+  await initStore();
+  const item = { id: randomUUID(), ...material };
+  if (pool) await pool.query('INSERT INTO study_materials (id,user_id,title,material_type,subject,url,notes) VALUES ($1,$2,$3,$4,$5,$6,$7)', [item.id, userId, item.title, item.type, item.subject, item.url, item.notes]);
+  else memory.materials.unshift({ ...item, userId });
+  return item;
+}
+
+export async function removeMaterial(userId, id) {
+  await initStore();
+  if (pool) return (await pool.query('DELETE FROM study_materials WHERE id=$1 AND user_id=$2', [id, userId])).rowCount > 0;
+  const index = memory.materials.findIndex(material => material.id === id && material.userId === userId);
+  if (index < 0) return false;
+  memory.materials.splice(index, 1);
+  return true;
 }
