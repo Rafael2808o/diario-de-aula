@@ -38,8 +38,10 @@ services:
       - key: AI_PROVIDER
         value: gemini
       - key: GEMINI_MODEL
-        value: gemini-3-flash-preview
+        value: gemini-flash-latest
       - key: GEMINI_API_KEY
+        sync: false
+      - key: SPOTIFY_CLIENT_ID
         sync: false
 
 databases:
