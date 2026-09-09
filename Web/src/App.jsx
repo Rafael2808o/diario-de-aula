@@ -88,6 +88,10 @@ const spotifyEmbed = (value) => {
     ? `https://open.spotify.com/embed/${match[1]}/${match[2]}?utm_source=generator&theme=0`
     : null;
 };
+const readableError = (error, fallback) =>
+  error instanceof TypeError || error?.message === "Failed to fetch"
+    ? "Não foi possível conectar ao servidor. Verifique sua internet e tente novamente."
+    : error?.message || fallback;
 function Progress({ value, color = "#377cf6" }) {
   return (
     <div className="progress">
@@ -177,6 +181,9 @@ export default function App() {
       fetch(`${apiBase}/materials`, { headers }),
     ])
       .then(async ([plansResponse, materialsResponse]) => {
+        if (plansResponse.status === 401 || materialsResponse.status === 401) {
+          throw new Error("SESSION_EXPIRED");
+        }
         if (!plansResponse.ok || !materialsResponse.ok) throw new Error();
         return Promise.all([plansResponse.json(), materialsResponse.json()]);
       })
@@ -184,11 +191,16 @@ export default function App() {
         setPlans(nextPlans);
         setLibrary(nextMaterials);
       })
-      .catch(() =>
+      .catch((error) => {
+        if (error.message === "SESSION_EXPIRED") {
+          localStorage.removeItem(sessionKey);
+          setSession(null);
+          return;
+        }
         setFeedback(
           "Não foi possível sincronizar seus dados agora. Verifique a conexão e tente novamente.",
-        ),
-      );
+        );
+      });
   }, [session?.token]);
   useEffect(() => {
     if (!feedback) return undefined;
@@ -755,7 +767,7 @@ function Diary({ go, authenticatedFetch }) {
       setSaved(true);
       if (continueToReview) setTimeout(() => go("prova"), 450);
     } catch (failure) {
-      setError(failure.message || "Não foi possível salvar.");
+      setError(readableError(failure, "Não foi possível salvar."));
     } finally {
       setSaving(false);
     }
@@ -943,7 +955,7 @@ function Exam({ go, session, plans, library }) {
       setQuestions(data.questions || []);
       setNotice(data.notice || "");
     } catch (err) {
-      setError(err.message);
+      setError(readableError(err, "Não foi possível criar as questões."));
     } finally {
       setLoading(false);
     }
@@ -1150,7 +1162,7 @@ function LibraryPage({
       setCreating(false);
       setFeedback("Material adicionado à sua biblioteca.");
     } catch (failure) {
-      setError(failure.message);
+      setError(readableError(failure, "Não foi possível adicionar o material."));
     }
   };
   const deleteMaterial = async () => {
@@ -1421,7 +1433,7 @@ function Profile({
       setEditing(false);
       setFeedback("Perfil atualizado com sucesso.");
     } catch (failure) {
-      setError(failure.message);
+      setError(readableError(failure, "Não foi possível atualizar o perfil."));
     }
   };
   const savePlaylist = (event) => {
@@ -1634,7 +1646,7 @@ function AuthScreen({ onAuthenticated }) {
       if (!response.ok) throw new Error(payload.error);
       onAuthenticated(payload);
     } catch (failure) {
-      setError(failure.message || "Não foi possível entrar.");
+      setError(readableError(failure, "Não foi possível entrar."));
     } finally {
       setLoading(false);
     }
