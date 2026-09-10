@@ -1,97 +1,109 @@
-<p align="center">
-  <img src="Web/public/icons/icon-192.png" width="104" alt="Ícone do estuda." />
-</p>
+# Estuda
 
-# estuda. — Diário de Aula
+**Organize o que aconteceu em aula, transforme dúvidas em revisão e acompanhe seu progresso com dados reais.**
 
-**Transforme cada aula em um registro útil, cada dúvida em uma revisão e cada semana em progresso visível.**
-
-O estuda. é uma plataforma acadêmica completa para organizar o semestre. O produto reúne diário de aula, planejamento, biblioteca, desempenho, revisão por inteligência artificial e foco com Spotify em uma experiência própria, instalável e adaptada a computador, tablet, Android e iPhone.
+O Estuda é um espaço acadêmico pessoal para registrar aulas, planejar estudos, reunir materiais e criar revisões com inteligência artificial. Cada conta começa vazia: disciplinas, atividades, avaliações, notas e indicadores aparecem somente depois que o próprio usuário registra suas informações.
 
 ## Teste o projeto
 
-**[Abrir o estuda. no navegador](https://diario-de-aula-web.vercel.app/)**
+**[Abrir o Estuda](https://diario-de-aula-web.vercel.app/)**
 
-- **iPhone e iPad:** abra o site no Safari, toque em **Compartilhar** e selecione **Adicionar à Tela de Início**.
-- **Android:** instale a PWA pelo navegador ou baixe o [APK Android v1.2.2](https://github.com/Rafael2808o/diario-de-aula/releases/download/v1.2.2/estuda-v1.2.2.apk).
-- **Computador e tablet:** use diretamente no navegador ou escolha **Instalar aplicativo** quando essa opção aparecer.
-- **API e Swagger:** consulte a [documentação interativa](https://diario-de-aula-api.onrender.com/docs/).
+- **iPhone e iPad:** abra o site no Safari, toque em **Compartilhar** e escolha **Adicionar à Tela de Início**.
+- **Android:** instale a PWA pelo navegador ou baixe o [APK da versão 1.2.2](https://github.com/Rafael2808o/diario-de-aula/releases/download/v1.2.2/estuda-v1.2.2.apk).
+- **Computador e tablet:** use no navegador ou instale a PWA quando a opção estiver disponível.
+- **API:** consulte e teste os endpoints pelo [Swagger](https://diario-de-aula-api.onrender.com/docs/).
 
-A PWA instalada não expira e abre em uma janela própria, como um aplicativo. O projeto iOS nativo também possui um [build de simulador v1.2.2](https://github.com/Rafael2808o/diario-de-aula/releases/download/v1.2.2/estuda-ios-simulator-v1.2.2.tar.gz); a distribuição nativa via TestFlight ou App Store depende apenas de uma assinatura Apple Developer.
+A PWA não depende de assinatura de loja e permanece disponível enquanto a publicação estiver ativa. A primeira resposta da API pode levar alguns segundos porque o serviço gratuito do Render entra em repouso quando fica sem uso.
 
-O APK publicado possui SHA-256 `2876412A2FAD3350656EB1FC5656C032A65DAF2A07A2C9752D546F6A0125D97C`. Todos os arquivos permanentes da versão estão na [release v1.2.2](https://github.com/Rafael2808o/diario-de-aula/releases/tag/v1.2.2).
+Os artefatos publicados, incluindo APK Android e build para simulador iOS, estão na [release v1.2.2](https://github.com/Rafael2808o/diario-de-aula/releases/tag/v1.2.2).
 
-## O que está implementado
+## Principais recursos
 
 - cadastro, login e sessão individual;
-- perfil editável com curso, instituição e semestre;
-- planejamento de estudos sincronizado e conclusão de tarefas;
-- diário persistente com planejado, realizado, aprendizados, dúvidas, avisos e referências;
-- revisão com IA e questões originais geradas pelo Gemini;
-- alternativas corrigidas na hora e explicações didáticas;
-- falha honesta e opção de nova tentativa quando o provedor de IA estiver indisponível;
-- biblioteca pessoal pesquisável, com criação, abertura e remoção de materiais;
-- painel de desempenho baseado somente nos registros reais da conta;
-- player Spotify persistente durante a navegação;
-- suporte a qualquer link público de playlist, álbum, episódio ou faixa do Spotify;
-- modo Spotify Premium preparado com PKCE, reprodução completa, controles e volume onde a plataforma permite;
-- PWA com manifesto, service worker, cache da interface e atalhos;
-- navegação inferior própria para celular;
-- layouts de uma, duas e três colunas para celular, tablet e computador;
-- APK Expo conectado à mesma plataforma e aos mesmos dados;
-- API REST protegida por token, rate limit de IA e Swagger;
-- PostgreSQL em produção e armazenamento em memória para desenvolvimento rápido.
+- perfil acadêmico editável, sem curso, semestre ou instituição predefinidos;
+- disciplinas, estudos, avaliações e tarefas criados pelo usuário;
+- diário de aula com conteúdo realizado, aprendizados, dúvidas, avisos e referências;
+- biblioteca pessoal pesquisável para materiais e links;
+- questões geradas pelo Gemini a partir da matéria informada pelo usuário;
+- correção de alternativas com explicações e nova tentativa quando a IA estiver indisponível;
+- indicadores de desempenho calculados somente com informações reais da conta;
+- player do Spotify persistente durante a navegação;
+- suporte a links públicos de faixas, álbuns, playlists e episódios;
+- interface responsiva para celular, tablet e computador;
+- PWA instalável no iPhone, iPad, Android e desktop;
+- aplicativo Expo para Android e iOS conectado à mesma plataforma;
+- API REST documentada com Swagger e banco PostgreSQL em produção.
 
 ## Princípios do produto
 
-- **Continuidade:** o registro da aula alimenta planejamento, recomendações e revisão.
-- **Clareza:** cada tela apresenta uma tarefa principal e reduz ruído visual.
-- **Identidade:** formas editoriais, papel contínuo e progresso compõem uma marca própria.
-- **Portabilidade:** a mesma conta funciona no navegador, na PWA e no aplicativo móvel.
-- **Resiliência:** a pessoa continua estudando mesmo quando o provedor de IA oscila.
-- **Privacidade:** senhas usam scrypt, tokens são persistidos apenas como hash e segredos ficam fora do Git.
+- **Dados reais:** nenhuma disciplina, nota, prova ou pendência é inventada para preencher a interface.
+- **Continuidade:** registros do diário alimentam planejamento, revisão e desempenho.
+- **Autonomia:** o usuário decide como estruturar seu semestre e o que deseja acompanhar.
+- **Clareza:** estados vazios orientam o próximo passo sem simular atividade inexistente.
+- **Portabilidade:** a mesma conta funciona no site, na PWA e no aplicativo móvel.
+- **Transparência:** integrações e recursos externos informam suas limitações em vez de esconder falhas.
 
 ## Arquitetura
 
 ```text
 Diario de Aula/
-├── Api/                 API Node.js, Express, PostgreSQL e Swagger
-│   ├── app.js            Rotas, validação, IA e integrações
-│   ├── store.js          Contas, sessões, planejamento e diário
-│   └── test/             Testes integrados da jornada autenticada
-├── Web/                 Aplicação React, Vite e PWA
-│   ├── public/           Manifesto, service worker e identidade visual
-│   └── src/              Interface e estilos responsivos
+├── Api/                 API, autenticação, dados e integrações
+│   ├── app.js            Rotas, validações, Swagger, IA e Spotify
+│   ├── store.js          Contas, sessões e persistência acadêmica
+│   └── test/             Testes integrados da API
+├── Web/                 Site responsivo e PWA
+│   ├── public/           Manifesto, service worker e ícones
+│   └── src/              Interface, navegação e estado da aplicação
 ├── Mobile/              Aplicativo Expo para Android e iOS
-├── DEPLOY.md            Operação e publicação
-└── render.yaml          Site, API e banco no Render
+├── DEPLOY.md            Guia de publicação e operação
+└── render.yaml          Infraestrutura da API no Render
 ```
+
+### Tecnologias principais
 
 | Camada | Tecnologias |
 | --- | --- |
-| Site/PWA | React 19, Vite, Lucide e Service Worker |
+| Site e PWA | React 19, Vite, Lucide e Service Worker |
 | Aplicativo | Expo, React Native e React Native WebView |
 | API | Node.js, Express e Swagger/OpenAPI |
-| Banco | PostgreSQL com fallback local em memória |
-| IA | Google Gemini com saída estruturada |
-| Música | Spotify Embed e Web Playback SDK com OAuth PKCE |
-| Produção | Render, Expo EAS e GitHub |
+| Dados | PostgreSQL em produção e armazenamento em memória no desenvolvimento |
+| Inteligência artificial | Google Gemini com resposta estruturada |
+| Música | Spotify Embed e suporte preparado para Web Playback SDK com OAuth PKCE |
+| Publicação | Vercel, Render, Expo EAS e GitHub Releases |
 
-## Desenvolvimento local
+## Comece localmente
 
-Requisitos: Node.js 20 ou superior.
+### Requisitos
+
+- Node.js 20 ou superior;
+- npm;
+- uma chave do Gemini para testar a geração de questões.
+
+### Instalação
 
 ```bash
+git clone https://github.com/Rafael2808o/diario-de-aula.git
+cd diario-de-aula
 npm install
+```
+
+Copie `Api/.env.example` para `Api/.env` e preencha apenas as credenciais necessárias. O arquivo real é ignorado pelo Git.
+
+Execute a API e o site em terminais separados:
+
+```bash
 npm run dev:api
+```
+
+```bash
 npm run dev:web
 ```
 
-- Site: `http://localhost:5173`
-- API: `http://localhost:3333/api/v1`
-- Swagger: `http://localhost:3333/docs`
-
-Copie `Api/.env.example` para `Api/.env` e mantenha as credenciais reais somente no arquivo ignorado pelo Git.
+| Serviço | Endereço local |
+| --- | --- |
+| Site | `http://localhost:5173` |
+| API | `http://localhost:3333/api/v1` |
+| Swagger | `http://localhost:3333/docs/` |
 
 ### Aplicativo móvel
 
@@ -101,17 +113,25 @@ npm install
 npm start
 ```
 
-Para gerar um APK instalável:
+Para solicitar um APK instalável pelo Expo EAS:
 
 ```bash
 npx eas-cli@latest build --platform android --profile preview
 ```
 
-O perfil `ios-simulator` valida o pacote iOS sem assinatura de distribuição:
+O perfil `ios-simulator` gera um pacote para o simulador. A instalação nativa em iPhones reais por TestFlight ou App Store exige uma conta Apple Developer; no iPhone, a alternativa gratuita e duradoura é instalar a PWA pelo Safari.
 
-```bash
-npx eas-cli@latest build --platform ios --profile ios-simulator
-```
+## Configuração de produção
+
+| Componente | Publicação |
+| --- | --- |
+| Site/PWA | [Vercel](https://diario-de-aula-web.vercel.app/) |
+| API e Swagger | [Render](https://diario-de-aula-api.onrender.com/docs/) |
+| Aplicativos | [GitHub Releases](https://github.com/Rafael2808o/diario-de-aula/releases/tag/v1.2.2) e Expo EAS |
+
+As variáveis de produção estão descritas em `Api/.env.example` e no [guia de deploy](DEPLOY.md). Chaves, tokens e conexões reais não devem ser versionados.
+
+O banco gratuito do Render é apropriado para demonstração e avaliação, mas tem limites de retenção definidos pelo provedor. Um uso comercial de longo prazo deve utilizar PostgreSQL persistente. Reprodução integral e controles avançados do Spotify também dependem de conta Premium e credenciais de um aplicativo no Spotify Developer; sem isso, o produto utiliza o player oficial incorporado.
 
 ## Endpoints principais
 
@@ -122,10 +142,10 @@ npx eas-cli@latest build --platform ios --profile ios-simulator
 | Perfil | `GET /api/v1/me`, `PATCH /api/v1/me` |
 | Estudos | `GET/POST /api/v1/study-plans`, `DELETE /api/v1/study-plans/:id` |
 | Diário | `GET/PUT /api/v1/diaries` |
-| Conteúdo | `GET/POST /api/v1/materials`, `DELETE /api/v1/materials/:id` |
-| OpenAPI | `GET /api/v1/openapi.json`, interface em `/docs/` |
-| IA | `GET /api/v1/ai/status`, `POST /api/v1/ai/questions` |
+| Biblioteca | `GET/POST /api/v1/materials`, `DELETE /api/v1/materials/:id` |
+| Inteligência artificial | `GET /api/v1/ai/status`, `POST /api/v1/ai/questions` |
 | Spotify | `GET /api/v1/integrations/spotify/status` |
+| OpenAPI | `GET /api/v1/openapi.json` e interface em `/docs/` |
 
 ## Qualidade
 
@@ -138,30 +158,26 @@ npx expo export --platform android
 npx expo export --platform ios
 ```
 
-Os testes cobrem recursos públicos, proteção sem autenticação e a jornada completa de cadastro, perfil, planejamento, diário, consulta e conclusão. A verificação de interface percorre ainda os fluxos em 390 px, 768 px e 1440 px.
+A jornada autenticada da API possui testes para cadastro, perfil, planejamento, diário, consulta e conclusão. A interface foi verificada em larguras de 390 px, 768 px e 1440 px, incluindo navegação, estados vazios, acessibilidade, ausência de rolagem horizontal e geração de questões em produção.
 
-## Segurança e operação
+## Segurança e privacidade
 
 - senhas derivadas com `scrypt` e salt individual;
-- tokens aleatórios de 256 bits, armazenados no banco somente como SHA-256;
-- sessões com expiração;
+- tokens de sessão aleatórios, persistidos no banco somente como hash SHA-256;
+- sessões com expiração e isolamento dos dados por conta;
 - consultas SQL parametrizadas;
-- isolamento dos dados pelo identificador da conta;
-- limite por usuário para geração com IA;
-- entrada textual limitada e normalizada;
+- limites de entrada e de requisições à IA;
 - CORS restrito às origens configuradas;
-- chave Gemini e conexão PostgreSQL fora do repositório.
-
-O banco gratuito do Render é adequado para avaliação e demonstração, mas possui limitações de retenção do próprio provedor. Antes de uma abertura comercial nacional, migre a mesma `DATABASE_URL` para um plano persistente ou PostgreSQL gerenciado de longo prazo.
+- credenciais do Gemini, Spotify e PostgreSQL fora do repositório.
 
 ## Estado do projeto
 
-A branch `main` é a fonte de publicação. O site/PWA é publicado na Vercel e a API com PostgreSQL roda no Render. A PWA atende iPhone, iPad, Android e computadores sem assinatura de loja; o APK Android é gerado pelo Expo EAS.
+A branch `main` é a fonte das publicações atuais. O site e a PWA estão na Vercel, enquanto a API e o PostgreSQL rodam no Render. O APK Android está disponível para instalação direta; no ecossistema Apple, a PWA é a distribuição gratuita para aparelhos reais e o pacote nativo publicado destina-se ao simulador.
 
 ## Contribuição
 
 1. Crie uma branch a partir de `main`.
-2. Faça alterações pequenas e objetivas.
-3. Execute testes, build web e Expo Doctor.
-4. Não envie `.env`, chaves, tokens, bancos ou builds locais.
-5. Descreva como a mudança foi validada.
+2. Faça alterações pequenas e com objetivo claro.
+3. Execute os testes, o build web e o Expo Doctor.
+4. Não envie arquivos `.env`, chaves, tokens, bancos ou builds locais.
+5. Explique no pull request como a mudança foi validada.
