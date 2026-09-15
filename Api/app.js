@@ -160,7 +160,10 @@ const swagger = {
           email: { type: 'string', format: 'email' },
           course: { type: 'string' },
           institution: { type: 'string' },
-          semester: { type: 'string' }
+          semester: { type: 'string' },
+          classDays: { type: 'array', items: { type: 'string' } },
+          classTime: { type: 'string' },
+          onboardingDone: { type: 'boolean' }
         }
       },
       RegisterInput: {
@@ -291,14 +294,22 @@ app.post('/api/v1/auth/login', async (req, res, next) => {
   }
 });
 
+const weekdays = new Set(['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']);
+
 app.get('/api/v1/me', requireAuth, (req, res) => res.json(req.user));
 app.patch('/api/v1/me', requireAuth, async (req, res, next) => {
   try {
+    const classDays = Array.isArray(req.body.classDays)
+      ? req.body.classDays.filter(day => weekdays.has(day)).join(',')
+      : req.user.classDays.join(',');
     const user = await updateUser(req.user.id, {
       name: cleanText(req.body.name, 80) || req.user.name,
-      course: cleanText(req.body.course, 100),
-      institution: cleanText(req.body.institution, 100),
-      semester: cleanText(req.body.semester, 40)
+      course: req.body.course !== undefined ? cleanText(req.body.course, 100) : req.user.course,
+      institution: req.body.institution !== undefined ? cleanText(req.body.institution, 100) : req.user.institution,
+      semester: req.body.semester !== undefined ? cleanText(req.body.semester, 40) : req.user.semester,
+      classDays,
+      classTime: req.body.classTime !== undefined ? cleanText(req.body.classTime, 5) : req.user.classTime,
+      onboardingDone: req.body.onboardingDone !== undefined ? Boolean(req.body.onboardingDone) : req.user.onboardingDone
     });
     return res.json(user);
   } catch (error) {

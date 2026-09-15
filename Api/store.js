@@ -11,7 +11,17 @@ let initialization;
 
 function publicUser(user) {
   if (!user) return null;
-  return { id: user.id, name: user.name, email: user.email, course: user.course || '', institution: user.institution || '', semester: user.semester || '' };
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    course: user.course || '',
+    institution: user.institution || '',
+    semester: user.semester || '',
+    classDays: user.class_days ? user.class_days.split(',').filter(Boolean) : [],
+    classTime: user.class_time || '',
+    onboardingDone: Boolean(user.onboarding_done)
+  };
 }
 
 function passwordRecord(password, salt = randomBytes(16).toString('hex')) {
@@ -35,8 +45,12 @@ export function initStore() {
       id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
       password_hash TEXT NOT NULL, password_salt TEXT NOT NULL,
       course TEXT DEFAULT '', institution TEXT DEFAULT '', semester TEXT DEFAULT '',
+      class_days TEXT DEFAULT '', class_time TEXT DEFAULT '', onboarding_done BOOLEAN DEFAULT FALSE,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS class_days TEXT DEFAULT '';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS class_time TEXT DEFAULT '';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_done BOOLEAN DEFAULT FALSE;
     CREATE TABLE IF NOT EXISTS sessions (
       token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       expires_at TIMESTAMPTZ NOT NULL
@@ -68,7 +82,7 @@ export async function createUser(input) {
   if (existing) return null;
   const id = randomUUID();
   const password = passwordRecord(input.password);
-  const user = { id, email, name: input.name, password_hash: password.hash, password_salt: password.salt, course: input.course || '', institution: input.institution || '', semester: input.semester || '' };
+  const user = { id, email, name: input.name, password_hash: password.hash, password_salt: password.salt, course: input.course || '', institution: input.institution || '', semester: input.semester || '', class_days: '', class_time: '', onboarding_done: false };
   if (pool) await pool.query('INSERT INTO users (id,email,name,password_hash,password_salt,course,institution,semester) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [id, email, user.name, user.password_hash, user.password_salt, user.course, user.institution, user.semester]);
   else memory.users.push(user);
   return createSession(user);
@@ -100,10 +114,21 @@ export async function userFromToken(token) {
 
 export async function updateUser(userId, changes) {
   await initStore();
-  if (pool) return publicUser((await pool.query('UPDATE users SET name=$2,course=$3,institution=$4,semester=$5 WHERE id=$1 RETURNING *', [userId, changes.name, changes.course, changes.institution, changes.semester])).rows[0]);
+  if (pool) return publicUser((await pool.query(
+    'UPDATE users SET name=$2,course=$3,institution=$4,semester=$5,class_days=$6,class_time=$7,onboarding_done=$8 WHERE id=$1 RETURNING *',
+    [userId, changes.name, changes.course, changes.institution, changes.semester, changes.classDays, changes.classTime, changes.onboardingDone]
+  )).rows[0]);
   const user = memory.users.find(item => item.id === userId);
   if (!user) return null;
-  Object.assign(user, changes);
+  Object.assign(user, {
+    name: changes.name,
+    course: changes.course,
+    institution: changes.institution,
+    semester: changes.semester,
+    class_days: changes.classDays,
+    class_time: changes.classTime,
+    onboarding_done: changes.onboardingDone
+  });
   return publicUser(user);
 }
 

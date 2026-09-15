@@ -174,6 +174,20 @@ main {
   position: relative;
   z-index: 1;
 }
+.hero-routine {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 14px;
+  padding: 5px 10px;
+  border-radius: 99px;
+  background: rgba(29, 45, 66, 0.08);
+  color: #35455c;
+  font-size: 11px;
+  font-weight: 600;
+}
 .hero button {
   z-index: 1;
   position: relative;
@@ -185,6 +199,31 @@ main {
   align-items: center;
   gap: 5px;
   font-size: 12px;
+}
+.quick-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.quick-actions button {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 11px;
+  background: #fff;
+  border: 1px solid #ebeff4;
+  box-shadow: 0 8px 30px rgba(36, 55, 76, 0.025);
+  color: #33445c;
+  font-size: 12px;
+  font-weight: 600;
+}
+.quick-actions button:hover {
+  border-color: #d7deea;
+  background: #f7f9fc;
 }
 .central-grid {
   display: grid;
@@ -292,14 +331,71 @@ main {
 .calendar .dates {
   color: #626577;
 }
-.calendar .dates span {
+.calendar .dates span,
+.calendar .dates button {
   height: 19px;
+}
+.calendar .dates button {
+  position: relative;
+  border-radius: 50%;
+  width: 19px;
+  margin: 0 auto;
+}
+.calendar .dates button:hover {
+  background: #eef2f7;
 }
 .today {
   background: #243549;
   color: white !important;
   border-radius: 50%;
   padding-top: 3px;
+}
+.calendar .dates button.picked:not(.today) {
+  box-shadow: inset 0 0 0 1.5px #377cf6;
+}
+.day-dot {
+  position: absolute;
+  bottom: 1px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #e17a4f;
+}
+.today .day-dot {
+  background: #fff;
+}
+.day-summary {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #edf0f4;
+  display: grid;
+  gap: 8px;
+}
+.day-summary p {
+  margin: 0;
+  font-size: 11px;
+  color: #9aa4af;
+}
+.day-summary-item {
+  display: grid;
+  gap: 1px;
+}
+.day-summary-item span {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #8fa0c9;
+}
+.day-summary-item strong {
+  font-size: 12px;
+  color: #263547;
+}
+.day-summary-item small {
+  color: #929dab;
+  font-size: 10px;
 }
 .continue {
   grid-column: span 2;
@@ -1709,6 +1805,28 @@ nav button.active {
 .auth-form input {
   height: 44px;
   border-radius: 10px;
+}
+.day-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 7px;
+}
+.day-picker button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 9px 13px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  color: #6d6e82;
+  font-size: 11px;
+  font-weight: 700;
+}
+.day-picker button.selected {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
 }
 .auth-submit {
   height: 45px;

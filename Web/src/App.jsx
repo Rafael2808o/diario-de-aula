@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   BookOpen,
   CalendarDays,
+  Check,
   ChevronRight,
   CircleHelp,
   ClipboardList,
@@ -34,6 +35,8 @@ const pageTitles = Object.fromEntries(
 );
 const validPages = new Set(nav.map((item) => item.id));
 const contactEmail = "rafael.o.silva30@aluno.senai.br";
+const weekdayOptions = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const quickLinks = ["diario", "estudos", "prova", "biblioteca", "desempenho"];
 const subjectColors = [
   "#5e8df7",
   "#aa76eb",
@@ -291,6 +294,15 @@ export default function App() {
   );
   if (unknownPath) return <NotFound />;
   if (!session) return <AuthScreen onAuthenticated={authenticated} />;
+  if (!session.user.onboardingDone) {
+    return (
+      <Onboarding
+        session={session}
+        authenticatedFetch={authenticatedFetch}
+        onDone={(user) => authenticated({ ...session, user })}
+      />
+    );
+  }
   const pageProps = {
     go,
     plans,
@@ -393,7 +405,9 @@ export default function App() {
         )}
         <Footer go={go} />
       </main>
-      <SpotifyPlayer playlist={playlist} go={go} apiBase={apiBase} />
+      {page !== "central" && (
+        <SpotifyPlayer playlist={playlist} go={go} apiBase={apiBase} />
+      )}
       <nav className="bottom-nav" aria-label="Navegação principal">
         {nav.slice(0, 5).map(({ id, label, icon: Icon }) => (
           <button
@@ -466,6 +480,9 @@ function Central({ go, session, plans, diaries }) {
   const next = plans[0];
   const lastDiary = diaries[0];
   const today = new Date();
+  const pad = (value) => String(value).padStart(2, "0");
+  const todayIso = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  const [selectedDay, setSelectedDay] = useState(todayIso);
   const calendarTitle = new Intl.DateTimeFormat("pt-BR", {
     month: "long",
     year: "numeric",
@@ -480,6 +497,33 @@ function Central({ go, session, plans, diaries }) {
     today.getMonth(),
     1,
   ).getDay();
+  const itemsByDay = useMemo(() => {
+    const map = {};
+    for (const plan of plans) {
+      if (!plan.date) continue;
+      (map[plan.date] ||= []).push({
+        key: `plan-${plan.id}`,
+        label: plan.topic,
+        subject: plan.subject,
+        kind: "Planejado",
+      });
+    }
+    for (const entry of diaries) {
+      if (!entry.date) continue;
+      (map[entry.date] ||= []).push({
+        key: `diary-${entry.date}-${entry.subject}`,
+        label: entry.subject,
+        subject: entry.doubts || entry.understood || "Aula registrada",
+        kind: "Diário",
+      });
+    }
+    return map;
+  }, [plans, diaries]);
+  const selectedItems = itemsByDay[selectedDay] || [];
+  const routine =
+    session.user.classDays?.length > 0
+      ? `${session.user.classDays.join(", ")}${session.user.classTime ? ` · ${session.user.classTime}` : ""}`
+      : "";
   return (
     <div className="page">
       <div className="hero">
@@ -488,10 +532,27 @@ function Central({ go, session, plans, diaries }) {
           {greeting}, {session.user.name.split(" ")[0]}.
         </p>
         <h1>Transforme cada aula em progresso real.</h1>
+        {routine && (
+          <span className="hero-routine">
+            <CalendarDays size={13} /> {routine}
+          </span>
+        )}
         <button onClick={() => go("diario")}>
           Registrar no diário <ChevronRight size={16} />
         </button>
       </div>
+      <nav className="quick-actions" aria-label="Atalhos">
+        {quickLinks.map((id) => {
+          const item = nav.find((entry) => entry.id === id);
+          const Icon = item.icon;
+          return (
+            <button key={id} onClick={() => go(id)}>
+              <Icon size={18} />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
       <div className="central-grid">
         <Card
           title="Seu próximo passo"
@@ -553,15 +614,41 @@ function Central({ go, session, plans, diaries }) {
             ))}
             {Array.from({ length: daysInMonth }, (_, index) => {
               const day = index + 1;
+              const iso = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(day)}`;
+              const dayItems = itemsByDay[iso] || [];
+              const label = dayItems
+                .map((entry) => `${entry.subject}${entry.label ? ` · ${entry.label}` : ""}`)
+                .join("; ");
               return (
-                <span
-                  className={day === today.getDate() ? "today" : ""}
+                <button
                   key={day}
+                  type="button"
+                  title={label || undefined}
+                  className={`${day === today.getDate() ? "today" : ""} ${selectedDay === iso ? "picked" : ""}`}
+                  onClick={() => setSelectedDay(iso)}
                 >
                   {day}
-                </span>
+                  {dayItems.length > 0 && <i className="day-dot" aria-hidden="true" />}
+                </button>
               );
             })}
+          </div>
+          <div className="day-summary">
+            {selectedItems.length ? (
+              selectedItems.map((entry) => (
+                <div className="day-summary-item" key={entry.key}>
+                  <span>{entry.kind}</span>
+                  <strong>{entry.subject}</strong>
+                  {entry.label && <small>{entry.label}</small>}
+                </div>
+              ))
+            ) : (
+              <p>
+                {selectedDay === todayIso
+                  ? "Nada registrado para hoje ainda."
+                  : "Sem registros para este dia."}
+              </p>
+            )}
           </div>
         </Card>
         <Card
@@ -1420,6 +1507,13 @@ function Profile({
   const [editing, setEditing] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
+  const [classDays, setClassDays] = useState(session.user.classDays || []);
+  const toggleClassDay = (day) =>
+    setClassDays((current) =>
+      current.includes(day)
+        ? current.filter((item) => item !== day)
+        : [...current, day],
+    );
   const saveProfile = async (event) => {
     event.preventDefault();
     setError("");
@@ -1427,7 +1521,7 @@ function Profile({
       const form = new FormData(event.currentTarget);
       const response = await authenticatedFetch("/me", {
         method: "PATCH",
-        body: JSON.stringify(Object.fromEntries(form)),
+        body: JSON.stringify({ ...Object.fromEntries(form), classDays }),
       });
       if (!response.ok) throw new Error("Não foi possível atualizar o perfil.");
       const user = await response.json();
@@ -1569,6 +1663,31 @@ function Profile({
                 name="semester"
                 defaultValue={session.user.semester}
                 placeholder="Digite seu semestre ou período"
+              />
+            </label>
+            <label>
+              Dias de aula
+              <div className="day-picker" role="group" aria-label="Dias de aula">
+                {weekdayOptions.map((day) => (
+                  <button
+                    type="button"
+                    key={day}
+                    className={classDays.includes(day) ? "selected" : ""}
+                    onClick={() => toggleClassDay(day)}
+                    aria-pressed={classDays.includes(day)}
+                  >
+                    {classDays.includes(day) && <Check size={12} />}
+                    {day}
+                  </button>
+                ))}
+              </div>
+            </label>
+            <label>
+              Horário das aulas
+              <input
+                name="classTime"
+                type="time"
+                defaultValue={session.user.classTime}
               />
             </label>
             {error && (
@@ -1729,6 +1848,153 @@ function AuthScreen({ onAuthenticated }) {
             {mode === "register"
               ? "Já possui uma conta? Entrar"
               : "Ainda não possui conta? Criar agora"}
+          </button>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function Onboarding({ session, authenticatedFetch, onDone }) {
+  const [course, setCourse] = useState(session.user.course || "");
+  const [institution, setInstitution] = useState(session.user.institution || "");
+  const [semester, setSemester] = useState(session.user.semester || "");
+  const [days, setDays] = useState(session.user.classDays || []);
+  const [time, setTime] = useState(session.user.classTime || "19:00");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const toggleDay = (day) =>
+    setDays((current) =>
+      current.includes(day)
+        ? current.filter((item) => item !== day)
+        : [...current, day],
+    );
+  const finish = async (onboardingDone) => {
+    setSaving(true);
+    setError("");
+    try {
+      const response = await authenticatedFetch("/me", {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: session.user.name,
+          course,
+          institution,
+          semester,
+          classDays: days,
+          classTime: time,
+          onboardingDone,
+        }),
+      });
+      if (!response.ok) throw new Error();
+      onDone(await response.json());
+    } catch (failure) {
+      setError(readableError(failure, "Não foi possível salvar suas respostas."));
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <main className="auth-page">
+      <section className="auth-story">
+        <a className="auth-brand" href="/" aria-label="Página inicial estuda.">
+          <img src="/icons/icon-192.png" alt="" />
+          <span>estuda.</span>
+        </a>
+        <div>
+          <span className="auth-kicker">BEM-VINDO</span>
+          <h1>
+            Vamos montar
+            <br />
+            sua rotina.
+          </h1>
+          <p>
+            Poucas respostas rápidas para personalizar sua Central desde o
+            primeiro acesso — nada de disciplinas ou dados inventados.
+          </p>
+        </div>
+        <small>
+          © {new Date().getFullYear()} estuda. · Você pode alterar tudo depois
+          em Perfil.
+        </small>
+      </section>
+      <section className="auth-panel">
+        <div className="auth-box">
+          <span className="auth-kicker">SOBRE VOCÊ</span>
+          <h2>Conte como são suas aulas.</h2>
+          <p>Usamos isso só para deixar sua Central mais útil.</p>
+          <form
+            className="form auth-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              finish(true);
+            }}
+          >
+            <label>
+              Qual curso você faz?
+              <input
+                value={course}
+                onChange={(event) => setCourse(event.target.value)}
+                placeholder="Digite o nome do seu curso"
+              />
+            </label>
+            <div className="form-row">
+              <label>
+                Instituição
+                <input
+                  value={institution}
+                  onChange={(event) => setInstitution(event.target.value)}
+                  placeholder="Opcional"
+                />
+              </label>
+              <label>
+                Semestre ou período
+                <input
+                  value={semester}
+                  onChange={(event) => setSemester(event.target.value)}
+                  placeholder="Opcional"
+                />
+              </label>
+            </div>
+            <label>
+              Quais dias você tem aula?
+              <div className="day-picker" role="group" aria-label="Dias de aula">
+                {weekdayOptions.map((day) => (
+                  <button
+                    type="button"
+                    key={day}
+                    className={days.includes(day) ? "selected" : ""}
+                    onClick={() => toggleDay(day)}
+                    aria-pressed={days.includes(day)}
+                  >
+                    {days.includes(day) && <Check size={12} />}
+                    {day}
+                  </button>
+                ))}
+              </div>
+            </label>
+            <label>
+              Qual o horário das suas aulas?
+              <input
+                type="time"
+                value={time}
+                onChange={(event) => setTime(event.target.value)}
+              />
+            </label>
+            {error && (
+              <div className="ai-error" role="alert">
+                {error}
+              </div>
+            )}
+            <button className="primary auth-submit" disabled={saving}>
+              {saving ? "Aguarde..." : "Começar a estudar"}
+            </button>
+          </form>
+          <button
+            className="auth-switch"
+            disabled={saving}
+            onClick={() => finish(true)}
+          >
+            Prefiro configurar depois
           </button>
         </div>
       </section>
