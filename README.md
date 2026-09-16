@@ -9,13 +9,13 @@ O Estuda é um espaço acadêmico pessoal para registrar aulas, planejar estudos
 **[Abrir o Estuda](https://diario-de-aula-web.vercel.app/)**
 
 - **iPhone e iPad:** abra o site no Safari, toque em **Compartilhar** e escolha **Adicionar à Tela de Início**.
-- **Android:** instale a PWA pelo navegador ou baixe o [APK da versão 1.2.2](https://github.com/Rafael2808o/diario-de-aula/releases/download/v1.2.2/estuda-v1.2.2.apk).
+- **Android:** instale a PWA pelo navegador ou baixe o [APK da versão 1.3.0](https://github.com/Rafael2808o/diario-de-aula/releases/download/v1.3.0/estuda-v1.3.0.apk).
 - **Computador e tablet:** use no navegador ou instale a PWA quando a opção estiver disponível.
 - **API:** consulte e teste os endpoints pelo [Swagger](https://diario-de-aula-api.onrender.com/docs/).
 
 A PWA não depende de assinatura de loja e permanece disponível enquanto a publicação estiver ativa. A primeira resposta da API pode levar alguns segundos porque o serviço gratuito do Render entra em repouso quando fica sem uso.
 
-Os artefatos publicados, incluindo APK Android e build para simulador iOS, estão na [release v1.2.2](https://github.com/Rafael2808o/diario-de-aula/releases/tag/v1.2.2).
+Os artefatos publicados, incluindo APK Android e build para simulador iOS, estão na [release v1.3.0](https://github.com/Rafael2808o/diario-de-aula/releases/tag/v1.3.0).
 
 ## Principais recursos
 
@@ -127,7 +127,7 @@ O perfil `ios-simulator` gera um pacote para o simulador. A instalação nativa 
 | --- | --- |
 | Site/PWA | [Vercel](https://diario-de-aula-web.vercel.app/) |
 | API e Swagger | [Render](https://diario-de-aula-api.onrender.com/docs/) |
-| Aplicativos | [GitHub Releases](https://github.com/Rafael2808o/diario-de-aula/releases/tag/v1.2.2) e Expo EAS |
+| Aplicativos | [GitHub Releases](https://github.com/Rafael2808o/diario-de-aula/releases/tag/v1.3.0) e Expo EAS |
 
 As variáveis de produção estão descritas em `Api/.env.example` e no [guia de deploy](DEPLOY.md). Chaves, tokens e conexões reais não devem ser versionados.
 
