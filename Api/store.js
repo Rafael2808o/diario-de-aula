@@ -3,7 +3,8 @@ import pg from 'pg';
 
 const { Pool } = pg;
 const pool = process.env.DATABASE_URL
-  ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined })
+  // Timeouts curtos: se o banco cair ou expirar, as rotas respondem erro em segundos em vez de travar.
+  ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined, connectionTimeoutMillis: 10_000, query_timeout: 20_000 })
   : null;
 
 const memory = { users: [], sessions: new Map(), resets: new Map(), plans: [], diaries: [], materials: [], subjects: [] };
@@ -51,6 +52,7 @@ export { pool, memory };
 
 export function initStore() {
   if (!pool) return Promise.resolve();
+  // Se a criação das tabelas falhar (banco fora do ar), a próxima requisição tenta de novo.
   if (!initialization) initialization = pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
@@ -96,7 +98,10 @@ export function initStore() {
       title TEXT NOT NULL, material_type TEXT DEFAULT 'Link', subject TEXT DEFAULT '', url TEXT DEFAULT '', notes TEXT DEFAULT '',
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
-  `);
+  `).catch(error => {
+    initialization = null;
+    throw error;
+  });
   return initialization;
 }
 

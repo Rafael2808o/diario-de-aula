@@ -20,7 +20,10 @@ function initFiles() {
       name TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, data BYTEA NOT NULL,
       created_at TIMESTAMPTZ DEFAULT NOW());
       CREATE INDEX IF NOT EXISTS study_files_user_idx ON study_files(user_id)`);
-  })();
+  })().catch(error => {
+    ready = null;
+    throw error;
+  });
   return ready;
 }
 

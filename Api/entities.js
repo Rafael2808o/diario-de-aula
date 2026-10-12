@@ -188,7 +188,10 @@ export function initEntities() {
       }
       await pool.query(statements.join(';\n'));
     }
-  })();
+  })().catch(error => {
+    ready = null;
+    throw error;
+  });
   return ready;
 }
 const entityTable = name => (name === 'subjects' ? 'subjects' : entities[name]?.table || name);
