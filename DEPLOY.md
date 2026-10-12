@@ -1,4 +1,4 @@
-# Publicação do estuda.
+# Publicação do Lúmina
 
 Este documento registra a operação das quatro entregas: PWA, API, banco PostgreSQL e aplicativo Expo.
 
@@ -30,6 +30,22 @@ GEMINI_API_KEY=definida-no-painel
 ```
 
 Nunca copie o valor real de `GEMINI_API_KEY` para Git, README, logs ou imagens.
+
+### Recuperação de senha
+
+A rota `POST /api/v1/auth/forgot-password` envia o link pelo [Resend](https://resend.com). Configure no painel da API:
+
+```env
+APP_URL=https://diario-de-aula-web.vercel.app
+RESEND_API_KEY=definida-no-painel
+MAIL_FROM=Lúmina <nao-responda@seu-dominio-verificado>
+```
+
+Sem `RESEND_API_KEY` e `MAIL_FROM`, em produção a rota responde 503 com a mensagem de que a recuperação ainda não está disponível. Em desenvolvimento, o link aparece no log da API.
+
+### Banco de dados
+
+As tabelas novas (`subjects`, `lessons`, `exams`, `tasks`, `calendar_events`, `teacher_notes`, `password_resets`) e as colunas novas de `users` e `study_materials` são criadas na primeira requisição, com `CREATE TABLE IF NOT EXISTS` e `ADD COLUMN IF NOT EXISTS`. Nenhum dado existente é apagado. Os registros do diário e os planos de estudo antigos continuam acessíveis.
 
 ## Instalação da PWA
 

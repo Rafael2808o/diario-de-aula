@@ -1,16 +1,19 @@
 {
   "id": "/",
-  "name": "estuda. — Diário de Aula",
-  "short_name": "estuda.",
-  "description": "Organize aulas, dúvidas, revisões e sua rotina acadêmica em um só lugar.",
+  "name": "Lúmina — assistente de estudos",
+  "short_name": "Lúmina",
+  "description": "Você registra o semestre. O Lúmina organiza seus estudos.",
   "lang": "pt-BR",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#f6f5f2",
-  "theme_color": "#171a3a",
-  "categories": ["education", "productivity"],
+  "background_color": "#f2f3f6",
+  "theme_color": "#4f5bd5",
+  "categories": [
+    "education",
+    "productivity"
+  ],
   "icons": [
     {
       "src": "/icons/icon-192.png",
@@ -34,15 +37,25 @@
   "shortcuts": [
     {
       "name": "Registrar aula",
-      "short_name": "Novo registro",
-      "url": "/?abrir=diario",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      "short_name": "Registrar",
+      "url": "/?abrir=aulas",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
-      "name": "Modo prova",
-      "short_name": "Revisar",
-      "url": "/?abrir=prova",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      "name": "Socorro, tenho prova!",
+      "short_name": "Socorro",
+      "url": "/?abrir=ia&tool=socorro",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }

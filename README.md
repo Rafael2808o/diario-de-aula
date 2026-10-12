@@ -1,12 +1,14 @@
-# Estuda
+# Lúmina
 
-**Organize o que aconteceu em aula, transforme dúvidas em revisão e acompanhe seu progresso com dados reais.**
+**Você registra o semestre. O Lúmina organiza seus estudos.**
 
-O Estuda é um espaço acadêmico pessoal para registrar aulas, planejar estudos, reunir materiais e criar revisões com inteligência artificial. Cada conta começa vazia: disciplinas, atividades, avaliações, notas e indicadores aparecem somente depois que o próprio usuário registra suas informações.
+O Lúmina (antes Estuda) é um assistente pessoal de estudos para universitários. Durante o semestre, o estudante registra cada aula, guarda os avisos dos professores e cadastra provas, trabalhos e materiais. Quando a prova chega, o Lúmina reúne tudo: o que foi confirmado, em quais aulas cada assunto apareceu, o que ainda falta e quanto tempo sobra. Cada conta começa vazia; nada é inventado para preencher a tela.
+
+A especificação completa está em [docs/lumina-prompt.md](docs/lumina-prompt.md) e o andamento por fase em [docs/lumina-plano.md](docs/lumina-plano.md).
 
 ## Teste o projeto
 
-**[Abrir o Estuda](https://diario-de-aula-web.vercel.app/)**
+**[Abrir o Lúmina](https://diario-de-aula-web.vercel.app/)**
 
 - **iPhone e iPad:** abra o site no Safari, toque em **Compartilhar** e escolha **Adicionar à Tela de Início**.
 - **Android:** instale a PWA pelo navegador ou baixe o [APK da versão 1.3.0](https://github.com/Rafael2808o/diario-de-aula/releases/download/v1.3.0/estuda-v1.3.0.apk).
@@ -19,20 +21,20 @@ Os artefatos publicados, incluindo APK Android e build para simulador iOS, estã
 
 ## Principais recursos
 
-- cadastro, login e sessão individual;
-- perfil acadêmico editável, sem curso, semestre ou instituição predefinidos;
-- disciplinas, estudos, avaliações e tarefas criados pelo usuário;
-- diário de aula com conteúdo realizado, aprendizados, dúvidas, avisos e referências;
-- biblioteca pessoal pesquisável para materiais e links;
-- questões geradas pelo Gemini a partir da matéria informada pelo usuário;
-- correção de alternativas com explicações e nova tentativa quando a IA estiver indisponível;
-- indicadores de desempenho calculados somente com informações reais da conta;
-- player do Spotify persistente durante a navegação;
-- suporte a links públicos de faixas, álbuns, playlists e episódios;
-- interface responsiva para celular, tablet e computador;
-- PWA instalável no iPhone, iPad, Android e desktop;
-- aplicativo Expo para Android e iOS conectado à mesma plataforma;
-- API REST documentada com Swagger e banco PostgreSQL em produção.
+- conta com confirmação de senha, recuperação por e-mail, saída que encerra a sessão e exclusão da conta com todos os dados;
+- configuração inicial em quatro etapas, todas opcionais: perfil acadêmico, disciplinas, rotina e aparência;
+- disciplinas com cor, professor, período e vários horários por semana, que viram aulas no calendário;
+- calendário mensal, semanal, diário e em lista, com filtros por disciplina e tipo;
+- Dias de aula: registro rápido ou completo, presença, falta com conteúdo perdido, cancelamento, rascunho e domínio de 1 a 5;
+- provas com assuntos, progresso por tópico, aulas relacionadas, orientações do professor, simulados e revisão final;
+- “Preparar-me para esta prova” e plano de estudos calculado até a véspera, salvo no calendário;
+- cofre do professor separando o que foi confirmado, hipóteses pessoais e sugestões da IA;
+- materiais com link ou arquivo (PDF, foto, áudio, documento, até 3 MB);
+- Estudar com IA: Socorro tenho prova, simulado, resumo, flashcards com revisão, explicação e gravação/transcrição de aula, sempre citando as fontes;
+- histórico de aprendizagem com indicadores que abrem os registros de origem;
+- busca geral sem acento, avisos no Início e notificações do aparelho;
+- exportação em CSV, JSON e PDF; modo claro e escuro; mascote Nox;
+- PWA instalável (inclusive no iPhone), APK Android e API documentada com Swagger.
 
 ## Princípios do produto
 
@@ -49,12 +51,16 @@ Os artefatos publicados, incluindo APK Android e build para simulador iOS, estã
 Diario de Aula/
 ├── Api/                 API, autenticação, dados e integrações
 │   ├── app.js            Rotas, validações, Swagger, IA e Spotify
-│   ├── store.js          Contas, sessões e persistência acadêmica
+│   ├── entities.js       Aulas, provas, atividades, eventos, cofre, materiais, flashcards e simulados
+│   ├── files.js          Arquivos dos materiais e links de download de uso único
+│   ├── ai.js             Resumo, flashcards, explicação e transcrição com Gemini
+│   ├── store.js          Contas, sessões, disciplinas e dados legados
 │   └── test/             Testes integrados da API
 ├── Web/                 Site responsivo e PWA
 │   ├── public/           Manifesto, service worker e ícones
-│   └── src/              Interface, navegação e estado da aplicação
+│   └── src/              Páginas, componentes, Nox e lógica de datas
 ├── Mobile/              Aplicativo Expo para Android e iOS
+├── docs/                Especificação e plano do Lúmina
 ├── DEPLOY.md            Guia de publicação e operação
 └── render.yaml          Infraestrutura da API no Render
 ```
@@ -138,12 +144,13 @@ O banco gratuito do Render é apropriado para demonstração e avaliação, mas 
 | Área | Endpoints |
 | --- | --- |
 | Saúde | `GET /health/ready` |
-| Conta | `POST /api/v1/auth/register`, `POST /api/v1/auth/login` |
-| Perfil | `GET /api/v1/me`, `PATCH /api/v1/me` |
-| Estudos | `GET/POST /api/v1/study-plans`, `DELETE /api/v1/study-plans/:id` |
-| Diário | `GET/PUT /api/v1/diaries` |
-| Biblioteca | `GET/POST /api/v1/materials`, `DELETE /api/v1/materials/:id` |
-| Inteligência artificial | `GET /api/v1/ai/status`, `POST /api/v1/ai/questions` |
+| Conta | `POST /api/v1/auth/register`, `login`, `logout`, `forgot-password`, `reset-password` |
+| Perfil | `GET /api/v1/me`, `PATCH /api/v1/me`, `DELETE /api/v1/me` |
+| Disciplinas | `GET/POST /api/v1/subjects`, `PUT/DELETE /api/v1/subjects/:id`, `PUT /api/v1/subjects/order` |
+| Registros | `GET/POST /api/v1/{lessons,exams,tasks,events,teacher-notes,materials,flashcards,quiz-results}` e `GET/PATCH/DELETE …/:id` |
+| Arquivos | `GET/POST /api/v1/files`, `GET/DELETE /api/v1/files/:id`, `POST /api/v1/files/:id/ticket`, `GET /api/v1/files/download/:ticket` |
+| Legado | `/api/v1/study-plans` e `/api/v1/diaries`, mantidos para os dados da versão anterior |
+| Inteligência artificial | `GET /api/v1/ai/status`, `POST /api/v1/ai/questions`, `POST /api/v1/ai/study`, `POST /api/v1/ai/transcribe` |
 | Spotify | `GET /api/v1/integrations/spotify/status` |
 | OpenAPI | `GET /api/v1/openapi.json` e interface em `/docs/` |
 
@@ -158,7 +165,7 @@ npx expo export --platform android
 npx expo export --platform ios
 ```
 
-A jornada autenticada da API possui testes para cadastro, perfil, planejamento, diário, consulta e conclusão. A interface foi verificada em larguras de 390 px, 768 px e 1440 px, incluindo navegação, estados vazios, acessibilidade, ausência de rolagem horizontal e geração de questões em produção.
+Os testes da API cobrem cadastro, perfil, disciplinas com horários, aulas, provas, atividades, cofre, materiais, exclusões em cascata, isolamento entre contas, logout e redefinição de senha. Eles rodam em memória e também com `DATABASE_URL` apontando para um PostgreSQL.
 
 ## Segurança e privacidade
 
@@ -168,7 +175,9 @@ A jornada autenticada da API possui testes para cadastro, perfil, planejamento, 
 - consultas SQL parametrizadas;
 - limites de entrada e de requisições à IA;
 - CORS restrito às origens configuradas;
-- credenciais do Gemini, Spotify e PostgreSQL fora do repositório.
+- credenciais do Gemini, Spotify, Resend e PostgreSQL fora do repositório;
+- redefinição de senha com token de uso único, válido por 1 hora, que encerra todas as sessões;
+- registros ligados a outros (aula, prova, disciplina) só aceitam referências da própria conta.
 
 ## Estado do projeto
 

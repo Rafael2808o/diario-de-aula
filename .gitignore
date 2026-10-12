@@ -10,3 +10,4 @@ Builds/
 .vite-cache/
 *.apk
 *.aab
+.playwright-mcp/

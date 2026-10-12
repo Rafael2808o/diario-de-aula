@@ -6,8 +6,14 @@ const pool = process.env.DATABASE_URL
   ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined })
   : null;
 
-const memory = { users: [], sessions: new Map(), plans: [], diaries: [], materials: [] };
+const memory = { users: [], sessions: new Map(), resets: new Map(), plans: [], diaries: [], materials: [], subjects: [] };
+const resetLifetime = 60 * 60 * 1000;
 let initialization;
+
+const parseJson = (value, fallback) => {
+  if (value && typeof value === 'object') return value;
+  try { return JSON.parse(value || ''); } catch { return fallback; }
+};
 
 function publicUser(user) {
   if (!user) return null;
@@ -20,6 +26,10 @@ function publicUser(user) {
     semester: user.semester || '',
     classDays: user.class_days ? user.class_days.split(',').filter(Boolean) : [],
     classTime: user.class_time || '',
+    shift: user.shift || '',
+    termStart: user.term_start || '',
+    termEnd: user.term_end || '',
+    preferences: parseJson(user.preferences, {}),
     onboardingDone: Boolean(user.onboarding_done)
   };
 }
@@ -37,6 +47,7 @@ function validPassword(password, salt, expected) {
 const tokenHash = token => createHash('sha256').update(token).digest('hex');
 
 export function hasDatabase() { return Boolean(pool); }
+export { pool, memory };
 
 export function initStore() {
   if (!pool) return Promise.resolve();
@@ -51,6 +62,20 @@ export function initStore() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS class_days TEXT DEFAULT '';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS class_time TEXT DEFAULT '';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_done BOOLEAN DEFAULT FALSE;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS shift TEXT DEFAULT '';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS term_start TEXT DEFAULT '';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS term_end TEXT DEFAULT '';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS preferences TEXT DEFAULT '{}';
+    CREATE TABLE IF NOT EXISTS password_resets (
+      token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at TIMESTAMPTZ NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS subjects (
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL, professor TEXT DEFAULT '', color TEXT NOT NULL,
+      schedule TEXT DEFAULT '[]', start_date TEXT DEFAULT '', end_date TEXT DEFAULT '',
+      position INTEGER DEFAULT 0, created_at TIMESTAMPTZ DEFAULT NOW()
+    );
     CREATE TABLE IF NOT EXISTS sessions (
       token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       expires_at TIMESTAMPTZ NOT NULL
@@ -115,8 +140,9 @@ export async function userFromToken(token) {
 export async function updateUser(userId, changes) {
   await initStore();
   if (pool) return publicUser((await pool.query(
-    'UPDATE users SET name=$2,course=$3,institution=$4,semester=$5,class_days=$6,class_time=$7,onboarding_done=$8 WHERE id=$1 RETURNING *',
-    [userId, changes.name, changes.course, changes.institution, changes.semester, changes.classDays, changes.classTime, changes.onboardingDone]
+    'UPDATE users SET name=$2,course=$3,institution=$4,semester=$5,class_days=$6,class_time=$7,onboarding_done=$8,shift=$9,term_start=$10,term_end=$11,preferences=$12 WHERE id=$1 RETURNING *',
+    [userId, changes.name, changes.course, changes.institution, changes.semester, changes.classDays, changes.classTime, changes.onboardingDone,
+      changes.shift, changes.termStart, changes.termEnd, JSON.stringify(changes.preferences)]
   )).rows[0]);
   const user = memory.users.find(item => item.id === userId);
   if (!user) return null;
@@ -127,9 +153,117 @@ export async function updateUser(userId, changes) {
     semester: changes.semester,
     class_days: changes.classDays,
     class_time: changes.classTime,
-    onboarding_done: changes.onboardingDone
+    onboarding_done: changes.onboardingDone,
+    shift: changes.shift,
+    term_start: changes.termStart,
+    term_end: changes.termEnd,
+    preferences: changes.preferences
   });
   return publicUser(user);
+}
+
+export async function endSession(token) {
+  if (!token) return;
+  await initStore();
+  if (pool) await pool.query('DELETE FROM sessions WHERE token_hash=$1', [tokenHash(token)]);
+  else memory.sessions.delete(tokenHash(token));
+}
+
+export async function createPasswordReset(email) {
+  await initStore();
+  const normalized = email.toLowerCase();
+  const user = pool
+    ? (await pool.query('SELECT id,name,email FROM users WHERE email=$1', [normalized])).rows[0]
+    : memory.users.find(item => item.email === normalized);
+  if (!user) return null;
+  const token = randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + resetLifetime);
+  if (pool) {
+    await pool.query('DELETE FROM password_resets WHERE user_id=$1', [user.id]);
+    await pool.query('INSERT INTO password_resets (token_hash,user_id,expires_at) VALUES ($1,$2,$3)', [tokenHash(token), user.id, expiresAt]);
+  } else {
+    for (const [hash, reset] of memory.resets) if (reset.userId === user.id) memory.resets.delete(hash);
+    memory.resets.set(tokenHash(token), { userId: user.id, expiresAt });
+  }
+  return { token, name: user.name, email: user.email };
+}
+
+// O token é de uso único: é apagado antes de validar, e a troca encerra todas as sessões da conta.
+export async function resetPassword(token, newPassword) {
+  await initStore();
+  const hash = tokenHash(token);
+  const password = passwordRecord(newPassword);
+  if (pool) {
+    const reset = (await pool.query('DELETE FROM password_resets WHERE token_hash=$1 RETURNING user_id,expires_at', [hash])).rows[0];
+    if (!reset || new Date(reset.expires_at) <= new Date()) return false;
+    await pool.query('UPDATE users SET password_hash=$2,password_salt=$3 WHERE id=$1', [reset.user_id, password.hash, password.salt]);
+    await pool.query('DELETE FROM sessions WHERE user_id=$1', [reset.user_id]);
+    return true;
+  }
+  const reset = memory.resets.get(hash);
+  memory.resets.delete(hash);
+  if (!reset || reset.expiresAt <= new Date()) return false;
+  const user = memory.users.find(item => item.id === reset.userId);
+  Object.assign(user, { password_hash: password.hash, password_salt: password.salt });
+  for (const [key, session] of memory.sessions) if (session.userId === user.id) memory.sessions.delete(key);
+  return true;
+}
+
+const subjectColumns = 'id,name,professor,color,schedule,start_date AS "startDate",end_date AS "endDate",position';
+const publicSubject = ({ userId: _userId, ...subject }) => ({ ...subject, schedule: parseJson(subject.schedule, []) });
+
+export async function listSubjects(userId) {
+  await initStore();
+  if (pool) return (await pool.query(`SELECT ${subjectColumns} FROM subjects WHERE user_id=$1 ORDER BY position, created_at`, [userId])).rows.map(publicSubject);
+  return memory.subjects.filter(subject => subject.userId === userId).sort((a, b) => a.position - b.position).map(publicSubject);
+}
+
+export async function addSubject(userId, subject) {
+  await initStore();
+  const position = pool
+    ? (await pool.query('SELECT COALESCE(MAX(position),-1)+1 AS next FROM subjects WHERE user_id=$1', [userId])).rows[0].next
+    : memory.subjects.filter(item => item.userId === userId).length;
+  const item = { id: randomUUID(), ...subject, position };
+  if (pool) await pool.query('INSERT INTO subjects (id,user_id,name,professor,color,schedule,start_date,end_date,position) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+    [item.id, userId, item.name, item.professor, item.color, JSON.stringify(item.schedule), item.startDate, item.endDate, item.position]);
+  else memory.subjects.push({ ...item, userId });
+  return item;
+}
+
+export async function updateSubject(userId, id, subject) {
+  await initStore();
+  if (pool) {
+    const row = (await pool.query(`UPDATE subjects SET name=$3,professor=$4,color=$5,schedule=$6,start_date=$7,end_date=$8 WHERE id=$1 AND user_id=$2 RETURNING ${subjectColumns}`,
+      [id, userId, subject.name, subject.professor, subject.color, JSON.stringify(subject.schedule), subject.startDate, subject.endDate])).rows[0];
+    return row ? publicSubject(row) : null;
+  }
+  const item = memory.subjects.find(entry => entry.id === id && entry.userId === userId);
+  if (!item) return null;
+  Object.assign(item, subject);
+  return publicSubject(item);
+}
+
+export async function removeSubject(userId, id) {
+  await initStore();
+  if (pool) return (await pool.query('DELETE FROM subjects WHERE id=$1 AND user_id=$2', [id, userId])).rowCount > 0;
+  const index = memory.subjects.findIndex(subject => subject.id === id && subject.userId === userId);
+  if (index < 0) return false;
+  memory.subjects.splice(index, 1);
+  return true;
+}
+
+// Recebe a lista completa de ids na nova ordem; ids de outras contas são ignorados pelo filtro de user_id.
+export async function reorderSubjects(userId, ids) {
+  await initStore();
+  if (pool) {
+    await Promise.all(ids.map((id, position) => pool.query('UPDATE subjects SET position=$3 WHERE id=$1 AND user_id=$2', [id, userId, position])));
+  } else {
+    ids.forEach((id, position) => {
+      const item = memory.subjects.find(subject => subject.id === id && subject.userId === userId);
+      if (item) item.position = position;
+    });
+  }
+  return listSubjects(userId);
 }
 
 export async function listPlans(userId) {
@@ -193,5 +327,21 @@ export async function removeMaterial(userId, id) {
   const index = memory.materials.findIndex(material => material.id === id && material.userId === userId);
   if (index < 0) return false;
   memory.materials.splice(index, 1);
+  return true;
+}
+
+// Exclui a conta e, pelas chaves estrangeiras, todos os registros dela. Exige a senha atual.
+export async function deleteUser(userId, password) {
+  await initStore();
+  const user = pool ? (await pool.query('SELECT * FROM users WHERE id=$1', [userId])).rows[0] : memory.users.find(item => item.id === userId);
+  if (!user || !validPassword(password, user.password_salt, user.password_hash)) return false;
+  if (pool) {
+    await pool.query('DELETE FROM users WHERE id=$1', [userId]);
+    return true;
+  }
+  memory.users = memory.users.filter(item => item.id !== userId);
+  for (const [hash, session] of memory.sessions) if (session.userId === userId) memory.sessions.delete(hash);
+  for (const key of ['plans', 'diaries', 'materials', 'subjects', 'files']) if (Array.isArray(memory[key])) memory[key] = memory[key].filter(row => row.userId !== userId);
+  for (const table of Object.keys(memory.entities || {})) memory.entities[table] = memory.entities[table].filter(row => row.userId !== userId);
   return true;
 }

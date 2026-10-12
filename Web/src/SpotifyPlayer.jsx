@@ -1,3 +1,4 @@
+import "./spotify.css";
 import { useEffect, useRef, useState } from "react";
 import {
   ChevronRight,
@@ -273,7 +274,7 @@ export default function SpotifyPlayer({ playlist, go, apiBase }) {
           </span>
           <ChevronRight size={16} aria-hidden="true" />
         </button>
-        <button className="spotify-settings" onClick={() => go("perfil")}>
+        <button className="spotify-settings" onClick={() => go("ia")}>
           Configurar
         </button>
       </div>

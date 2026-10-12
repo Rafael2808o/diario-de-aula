@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   BackHandler,
   Image,
+  Linking,
   SafeAreaView,
   StatusBar,
   StyleSheet,
@@ -13,6 +14,9 @@ import {
 import { WebView } from 'react-native-webview';
 
 const APP_URL = 'https://diario-de-aula-web.vercel.app/';
+// Avisa o site que ele está dentro do app, para abrir arquivos no navegador do aparelho.
+const APP_FLAG = 'window.LUMINA_APP = true; true;';
+const opensOutside = url => url.includes('/api/v1/files/download/') || !url.startsWith(APP_URL);
 
 export default function App() {
   const webView = useRef(null);
@@ -46,7 +50,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f6f5f2" />
+      <StatusBar barStyle="dark-content" backgroundColor="#f2f3f6" />
       <WebView
         ref={webView}
         source={{ uri: APP_URL }}
@@ -56,6 +60,13 @@ export default function App() {
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}
         setSupportMultipleWindows={false}
+        injectedJavaScriptBeforeContentLoaded={APP_FLAG}
+        mediaCapturePermissionGrantType="grantIfSameHostElsePrompt"
+        onShouldStartLoadWithRequest={request => {
+          if (request.isTopFrame === false || request.url.startsWith('blob:') || request.url.startsWith('about:') || !opensOutside(request.url)) return true;
+          Linking.openURL(request.url).catch(() => {});
+          return false;
+        }}
         onNavigationStateChange={state => setCanGoBack(state.canGoBack)}
         onLoadEnd={() => setLoading(false)}
         onError={() => setFailed(true)}
@@ -66,8 +77,8 @@ export default function App() {
       />
       {loading && (
         <View style={styles.loading}>
-          <ActivityIndicator color="#7278ef" size="large" />
-          <Text style={styles.loadingText}>Abrindo seu espaço…</Text>
+          <ActivityIndicator color="#4f5bd5" size="large" />
+          <Text style={styles.loadingText}>Abrindo o Lúmina…</Text>
         </View>
       )}
     </SafeAreaView>
@@ -75,14 +86,14 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f6f5f2' },
-  web: { flex: 1, backgroundColor: '#f6f5f2' },
+  safe: { flex: 1, backgroundColor: '#f2f3f6' },
+  web: { flex: 1, backgroundColor: '#f2f3f6' },
   loading: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
-    backgroundColor: '#f6f5f2'
+    backgroundColor: '#f2f3f6'
   },
   loadingText: { color: '#737487', fontSize: 12, fontWeight: '600' },
   offline: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 34 },
@@ -92,8 +103,8 @@ const styles = StyleSheet.create({
     marginBottom: 22,
     borderRadius: 17
   },
-  title: { color: '#171a3a', fontSize: 24, fontWeight: '800', textAlign: 'center' },
+  title: { color: '#16171d', fontSize: 24, fontWeight: '800', textAlign: 'center' },
   copy: { maxWidth: 300, marginTop: 9, color: '#7d7e90', fontSize: 13, lineHeight: 20, textAlign: 'center' },
-  button: { marginTop: 24, paddingHorizontal: 18, paddingVertical: 12, borderRadius: 11, backgroundColor: '#171a3a' },
+  button: { marginTop: 24, paddingHorizontal: 18, paddingVertical: 12, borderRadius: 11, backgroundColor: '#16171d' },
   buttonText: { color: '#fff', fontSize: 12, fontWeight: '700' }
 });
