@@ -61,6 +61,7 @@ Este documento registra como a especificação do **Lúmina** (resumo em `lumina
 
 ## Limitações conhecidas
 
+- Banco de produção no Neon (gratuito, sem expiração) desde 2026-10-14; os dados do banco antigo do Render foram perdidos quando ele expirou.
 - Recuperação de senha em produção depende de `RESEND_API_KEY`, `MAIL_FROM` e `APP_URL` na API.
 - Notificações não funcionam dentro do app Android (WebView) nem com o Lúmina fechado.
 - No iPhone, o Lúmina é instalado como PWA pelo Safari. Um app nativo na App Store exige conta Apple Developer paga.

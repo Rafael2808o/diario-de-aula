@@ -45,6 +45,10 @@ Sem `RESEND_API_KEY` e `MAIL_FROM`, em produção a rota responde 503 com a mens
 
 ### Banco de dados
 
+Desde 2026-10-14 o banco é um PostgreSQL gratuito no [Neon](https://console.neon.tech) (projeto `lumina`, região AWS US West 2, a mesma da API). O banco gratuito do Render expira em 30 dias e foi o que derrubou a API em outubro; o do Neon não expira e liga sozinho quando recebe conexão. A `DATABASE_URL` do serviço `diario-de-aula-api` aponta para a conexão com pool do Neon.
+
+Para trocar o banco: `npx neonctl connection-string --pooled` gera a conexão; no Render, atualize `DATABASE_URL` e faça um deploy (Manual Deploy ou `render deploys create srv-dafnrgf40ujc73c3urd0 --wait`).
+
 As tabelas novas (`subjects`, `lessons`, `exams`, `tasks`, `calendar_events`, `teacher_notes`, `password_resets`) e as colunas novas de `users` e `study_materials` são criadas na primeira requisição, com `CREATE TABLE IF NOT EXISTS` e `ADD COLUMN IF NOT EXISTS`. Nenhum dado existente é apagado. Os registros do diário e os planos de estudo antigos continuam acessíveis.
 
 ## Instalação da PWA
