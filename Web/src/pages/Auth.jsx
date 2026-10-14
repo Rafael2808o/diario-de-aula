@@ -109,6 +109,9 @@ export default function Auth({ onAuthenticated }) {
             )}
             {(mode === "forgot" || mode === "reset") && <button type="button" className="link-btn" onClick={() => switchTo("login")}>Voltar para entrar</button>}
           </div>
+          <p className="hint auth-download">
+            Quer no celular? <a href="/baixar">Instale no Android ou iPhone</a>.
+          </p>
         </form>
       </section>
     </main>

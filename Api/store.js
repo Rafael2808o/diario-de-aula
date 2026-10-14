@@ -2,9 +2,16 @@ import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from
 import pg from 'pg';
 
 const { Pool } = pg;
-const pool = process.env.DATABASE_URL
+const connectionString = process.env.DATABASE_URL;
+const pool = connectionString
   // Timeouts curtos: se o banco cair ou expirar, as rotas respondem erro em segundos em vez de travar.
-  ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined, connectionTimeoutMillis: 10_000, query_timeout: 20_000 })
+  ? new Pool({
+      connectionString,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
+      max: 10,
+      connectionTimeoutMillis: 10_000,
+      query_timeout: 20_000
+    })
   : null;
 
 const memory = { users: [], sessions: new Map(), resets: new Map(), plans: [], diaries: [], materials: [], subjects: [] };
@@ -348,5 +355,6 @@ export async function deleteUser(userId, password) {
   for (const [hash, session] of memory.sessions) if (session.userId === userId) memory.sessions.delete(hash);
   for (const key of ['plans', 'diaries', 'materials', 'subjects', 'files']) if (Array.isArray(memory[key])) memory[key] = memory[key].filter(row => row.userId !== userId);
   for (const table of Object.keys(memory.entities || {})) memory.entities[table] = memory.entities[table].filter(row => row.userId !== userId);
+  for (const [id, job] of memory.aiJobs || []) if (job.userId === userId) memory.aiJobs.delete(id);
   return true;
 }

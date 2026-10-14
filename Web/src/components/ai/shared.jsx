@@ -108,13 +108,36 @@ export function BasisHint({ plan }) {
   );
 }
 
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Envia o pedido e acompanha o trabalho até a IA terminar. Transcrições podem levar alguns minutos.
 export async function postAi(session, path, body) {
-  const response = await fetch(`${apiBase}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.token}` },
-    body: JSON.stringify(body),
-  });
+  const headers = { "Content-Type": "application/json", Authorization: `Bearer ${session.token}` };
+  const response = await fetch(`${apiBase}${path}`, { method: "POST", headers, body: JSON.stringify(body) });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error || "A IA não respondeu agora.");
-  return payload;
+  if (!payload.jobId) return payload;
+  // Prazos acima do pior caso do servidor, que encerra trabalhos presos em 11 minutos.
+  const deadline = Date.now() + (path.includes("transcribe") ? 11.5 * 60_000 : 4 * 60_000);
+  let delay = 1200;
+  let failures = 0;
+  while (Date.now() < deadline) {
+    await wait(delay);
+    delay = Math.min(delay + 400, 3000);
+    let poll;
+    try {
+      poll = await fetch(`${apiBase}/ai/jobs/${payload.jobId}`, { headers });
+      failures = 0;
+    } catch (error) {
+      // Uma queda rápida de conexão não perde o pedido; só desiste depois de várias falhas seguidas.
+      failures += 1;
+      if (failures >= 4) throw error;
+      continue;
+    }
+    const job = await poll.json().catch(() => ({}));
+    if (!poll.ok) throw new Error(job.error || "Não foi possível acompanhar o pedido.");
+    if (job.status === "pronto") return job.result;
+    if (job.status === "erro") throw new Error(job.error || "A IA não respondeu agora.");
+  }
+  throw new Error("A IA está demorando mais que o normal. Tente de novo em instantes.");
 }

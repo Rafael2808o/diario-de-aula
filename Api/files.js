@@ -19,7 +19,10 @@ function initFiles() {
       material_id TEXT NOT NULL REFERENCES study_materials(id) ON DELETE CASCADE,
       name TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, data BYTEA NOT NULL,
       created_at TIMESTAMPTZ DEFAULT NOW());
-      CREATE INDEX IF NOT EXISTS study_files_user_idx ON study_files(user_id)`);
+      CREATE INDEX IF NOT EXISTS study_files_user_idx ON study_files(user_id);
+      CREATE TABLE IF NOT EXISTS file_tickets (
+        ticket TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        file_id TEXT NOT NULL REFERENCES study_files(id) ON DELETE CASCADE, expires_at TIMESTAMPTZ NOT NULL)`);
   })().catch(error => {
     ready = null;
     throw error;
@@ -37,8 +40,33 @@ async function usedBytes(userId) {
 
 // Links de download de uso único e curta duração, para abrir arquivos fora do app (navegador, leitor de PDF)
 // sem expor o token da sessão na URL.
-const tickets = new Map();
+// Ficam no banco porque, em funções serverless, quem cria e quem usa o link podem ser instâncias diferentes.
+const memoryTickets = new Map();
 const ticketLifetime = 2 * 60 * 1000;
+
+async function createTicket(userId, fileId) {
+  const ticket = randomBytes(24).toString('hex');
+  const expiresAt = new Date(Date.now() + ticketLifetime);
+  if (pool) {
+    await pool.query('DELETE FROM file_tickets WHERE expires_at < NOW()');
+    await pool.query('INSERT INTO file_tickets (ticket,user_id,file_id,expires_at) VALUES ($1,$2,$3,$4)', [ticket, userId, fileId, expiresAt]);
+  } else {
+    for (const [key, value] of memoryTickets) if (value.expiresAt < Date.now()) memoryTickets.delete(key);
+    memoryTickets.set(ticket, { userId, fileId, expiresAt: expiresAt.getTime() });
+  }
+  return ticket;
+}
+
+// Uso único: o link é apagado na primeira leitura.
+async function useTicket(ticket) {
+  if (pool) {
+    const row = (await pool.query('DELETE FROM file_tickets WHERE ticket=$1 RETURNING user_id AS "userId", file_id AS "fileId", expires_at AS "expiresAt"', [ticket])).rows[0];
+    return row && new Date(row.expiresAt) > new Date() ? row : null;
+  }
+  const value = memoryTickets.get(ticket);
+  memoryTickets.delete(ticket);
+  return value && value.expiresAt > Date.now() ? value : null;
+}
 
 async function readFile(userId, id) {
   if (pool) return (await pool.query('SELECT name, mime, data FROM study_files WHERE id=$1 AND user_id=$2', [id, userId])).rows[0];
@@ -58,10 +86,7 @@ export function registerFileRoutes(app, requireAuth) {
     try {
       await initFiles();
       if (!(await readFile(req.user.id, req.params.id))) return res.status(404).json({ error: 'Arquivo não encontrado.' });
-      const now = Date.now();
-      for (const [key, ticket] of tickets) if (ticket.expiresAt < now) tickets.delete(key);
-      const ticket = randomBytes(24).toString('hex');
-      tickets.set(ticket, { userId: req.user.id, fileId: req.params.id, expiresAt: now + ticketLifetime });
+      const ticket = await createTicket(req.user.id, req.params.id);
       return res.status(201).json({ ticket, expiresInSeconds: ticketLifetime / 1000 });
     } catch (error) {
       return next(error);
@@ -71,9 +96,8 @@ export function registerFileRoutes(app, requireAuth) {
   app.get('/api/v1/files/download/:ticket', async (req, res, next) => {
     try {
       await initFiles();
-      const ticket = tickets.get(req.params.ticket);
-      tickets.delete(req.params.ticket);
-      if (!ticket || ticket.expiresAt < Date.now()) return res.status(410).type('text/plain; charset=utf-8').send('Este link expirou. Volte ao Lúmina e abra o arquivo de novo.');
+      const ticket = /^[0-9a-f]{48}$/.test(req.params.ticket) ? await useTicket(req.params.ticket) : null;
+      if (!ticket) return res.status(410).type('text/plain; charset=utf-8').send('Este link expirou. Volte ao Lúmina e abra o arquivo de novo.');
       const file = await readFile(ticket.userId, ticket.fileId);
       return file ? sendFile(res, file) : res.status(404).type('text/plain; charset=utf-8').send('Arquivo não encontrado.');
     } catch (error) {

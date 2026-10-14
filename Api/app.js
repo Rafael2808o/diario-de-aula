@@ -134,80 +134,6 @@ function aiRateLimit(req, res, next) {
   return next();
 }
 
-function validQuestionSet(value, quantity) {
-  return Boolean(
-    value &&
-    typeof value.title === 'string' &&
-    Array.isArray(value.questions) &&
-    value.questions.length >= quantity &&
-    value.questions.every(question =>
-      typeof question.question === 'string' &&
-      Array.isArray(question.options) &&
-      question.options.length === 4 &&
-      Number.isInteger(question.correctIndex) &&
-      question.correctIndex >= 0 &&
-      question.correctIndex < 4 &&
-      typeof question.explanation === 'string'
-    )
-  );
-}
-
-async function generateWithGemini({ subject, topic, context, quantity, difficulty }) {
-  const level = ['Fácil', 'Média', 'Avançada'].includes(difficulty) ? `Todas com dificuldade ${difficulty}.` : 'Misture dificuldades Fácil, Média e Avançada.';
-  const prompt = `Você é um educador brasileiro. Crie ${quantity} questões originais de múltipla escolha, em português, para revisar ${topic} na disciplina ${subject}. Use quatro alternativas plausíveis por questão, apenas uma correta, uma explicação didática e dificuldade Fácil, Média ou Avançada. ${level} Baseie as explicações no contexto do estudante quando ele trouxer a informação. Contexto fornecido pelo estudante: ${context || 'não informado'}. Evite perguntas genéricas e não invente fatos fora do contexto. Responda exclusivamente como JSON válido neste formato exato: {"title":"Título da revisão","questions":[{"question":"Enunciado","options":["Alternativa A","Alternativa B","Alternativa C","Alternativa D"],"correctIndex":0,"explanation":"Explicação didática","difficulty":"Fácil"}]}. Use exatamente quatro opções e correctIndex entre 0 e 3.`;
-  const models = [...new Set([
-    process.env.GEMINI_MODEL || 'gemini-flash-latest',
-    'gemini-flash-lite-latest',
-    'gemini-3.5-flash-lite',
-    'gemini-3.1-flash-lite',
-  ])];
-  let lastError;
-
-  for (const model of models) {
-    try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-        {
-          method: 'POST',
-          signal: AbortSignal.timeout(model === models[0] ? 10_000 : 20_000),
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': process.env.GEMINI_API_KEY
-          },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              responseMimeType: 'application/json',
-              maxOutputTokens: 2400,
-              temperature: 0.45
-            }
-          })
-        }
-      );
-
-      if (!response.ok) {
-        console.warn(`[ai] ${model} respondeu HTTP ${response.status}.`);
-        lastError = new Error(`Gemini respondeu ${response.status}`);
-        continue;
-      }
-
-      const payload = await response.json();
-      const text = payload.candidates?.[0]?.content?.parts?.[0]?.text;
-      const parsed = text ? JSON.parse(text) : null;
-      if (validQuestionSet(parsed, quantity)) {
-        return { ...parsed, questions: parsed.questions.slice(0, quantity), model };
-      }
-      console.warn(`[ai] ${model} retornou um conjunto de questões inválido.`);
-      lastError = new Error('A IA retornou um formato inválido.');
-    } catch (error) {
-      console.warn(`[ai] ${model} falhou: ${error?.name || 'erro de comunicação'}.`);
-      lastError = error;
-    }
-  }
-
-  throw lastError || new Error('Não foi possível consultar a IA.');
-}
-
 const requestBody = schema => ({
   required: true,
   content: { 'application/json': { schema: { $ref: `#/components/schemas/${schema}` } } }
@@ -354,8 +280,8 @@ const swagger = {
       get: { summary: 'Baixa o arquivo', security: [{ bearerAuth: [] }], parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }], responses: { 200: { description: 'Conteúdo binário' } } },
       delete: { summary: 'Remove o arquivo', security: [{ bearerAuth: [] }], parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }], responses: { 204: { description: 'Removido' } } }
     },
-    '/ai/study': { post: { summary: 'Resumo, flashcards ou explicação a partir dos registros do aluno', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Resultado' }, 502: { description: 'IA indisponível' } } } },
-    '/ai/transcribe': { post: { summary: 'Transcreve e resume o áudio autorizado de uma aula', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Transcrição e resumo' } } } },
+    '/ai/study': { post: { summary: 'Pede resumo, flashcards ou explicação; responde 202 com jobId', security: [{ bearerAuth: [] }], responses: { 202: { description: 'Pedido aceito; consulte /ai/jobs/{id}' } } } },
+    '/ai/transcribe': { post: { summary: 'Pede transcrição e resumo de um áudio autorizado; responde 202 com jobId', security: [{ bearerAuth: [] }], responses: { 202: { description: 'Pedido aceito; consulte /ai/jobs/{id}' } } } },
     '/me': {
       delete: { summary: 'Exclui a conta e todos os dados (exige senha)', security: [{ bearerAuth: [] }], responses: { 204: { description: 'Conta excluída' }, 403: { description: 'Senha incorreta' } } },
       get: { summary: 'Obtém o perfil', security: [{ bearerAuth: [] }], responses: { 200: jsonResponse('Perfil', 'User') } },
@@ -377,9 +303,10 @@ const swagger = {
       get: { summary: 'Lista registros do diário', security: [{ bearerAuth: [] }], responses: { 200: { description: 'OK' } } },
       put: { summary: 'Cria ou atualiza um registro', security: [{ bearerAuth: [] }], requestBody: requestBody('Diary'), responses: { 200: jsonResponse('Salvo', 'Diary') } }
     },
+    '/ai/jobs/{id}': { get: { summary: 'Consulta um pedido de IA (pendente, pronto ou erro) e devolve o resultado', security: [{ bearerAuth: [] }], parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }], responses: { 200: { description: 'Situação do pedido' }, 404: { description: 'Não encontrado' } } } },
     '/ai/status': { get: { summary: 'Informa se a IA está configurada', responses: { 200: { description: 'OK' } } } },
     '/ai/questions': {
-      post: { summary: 'Gera questões com Gemini', security: [{ bearerAuth: [] }], requestBody: requestBody('QuestionRequest'), responses: { 200: { description: 'Questões geradas' }, 429: jsonResponse('Limite temporário atingido', 'Error') } }
+      post: { summary: 'Pede um simulado à IA; responde 202 com jobId', security: [{ bearerAuth: [] }], requestBody: requestBody('QuestionRequest'), responses: { 202: { description: 'Pedido aceito; consulte /ai/jobs/{id}' }, 429: jsonResponse('Limite temporário atingido', 'Error') } }
     },
     '/integrations/spotify/status': { get: { summary: 'Consulta a integração Spotify', responses: { 200: { description: 'OK' } } } }
   }
@@ -643,32 +570,6 @@ app.put('/api/v1/diaries', requireAuth, async (req, res, next) => {
     return res.json(entry);
   } catch (error) {
     return next(error);
-  }
-});
-
-app.get('/api/v1/ai/status', (_req, res) =>
-  res.json({
-    provider: 'gemini',
-    model: process.env.GEMINI_MODEL || 'gemini-flash-latest',
-    configured: Boolean(process.env.GEMINI_API_KEY)
-  })
-);
-
-app.post('/api/v1/ai/questions', requireAuth, aiRateLimit, async (req, res) => {
-  const subject = cleanText(req.body.subject, 100);
-  const topic = cleanText(req.body.topic, 180);
-  const context = cleanMultiline(req.body.context, 6000);
-  const quantity = Math.max(1, Math.min(10, Number.parseInt(req.body.quantity, 10) || 5));
-  if (!subject || !topic) return res.status(400).json({ error: 'Disciplina e conteúdo são obrigatórios.' });
-  if (!process.env.GEMINI_API_KEY) return res.status(503).json({ error: 'A IA ainda não está configurada no servidor.' });
-
-  try {
-    const generated = await generateWithGemini({ subject, topic, context, quantity, difficulty: cleanText(req.body.difficulty, 20) });
-    return res.json({ ...generated, source: 'gemini' });
-  } catch (_error) {
-    return res.status(502).json({
-      error: 'A IA não conseguiu gerar questões agora. Nenhuma questão genérica foi usada; tente novamente em instantes.'
-    });
   }
 });
 

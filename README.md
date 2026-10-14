@@ -150,7 +150,7 @@ O banco gratuito do Render é apropriado para demonstração e avaliação, mas 
 | Registros | `GET/POST /api/v1/{lessons,exams,tasks,events,teacher-notes,materials,flashcards,quiz-results}` e `GET/PATCH/DELETE …/:id` |
 | Arquivos | `GET/POST /api/v1/files`, `GET/DELETE /api/v1/files/:id`, `POST /api/v1/files/:id/ticket`, `GET /api/v1/files/download/:ticket` |
 | Legado | `/api/v1/study-plans` e `/api/v1/diaries`, mantidos para os dados da versão anterior |
-| Inteligência artificial | `GET /api/v1/ai/status`, `POST /api/v1/ai/questions`, `POST /api/v1/ai/study`, `POST /api/v1/ai/transcribe` |
+| Inteligência artificial | `GET /api/v1/ai/status`; `POST /api/v1/ai/questions`, `/ai/study` e `/ai/transcribe` respondem 202 com `jobId`; `GET /api/v1/ai/jobs/:id` traz o resultado |
 | Spotify | `GET /api/v1/integrations/spotify/status` |
 | OpenAPI | `GET /api/v1/openapi.json` e interface em `/docs/` |
 

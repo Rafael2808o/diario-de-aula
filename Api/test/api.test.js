@@ -362,6 +362,8 @@ test('valida pedidos das ferramentas de IA antes de chamar o modelo', async () =
   assert.equal(noTopic.status, 400);
   assert.equal(noConsent.status, 400);
   assert.equal(badAudio.status, 400);
+  const unknownJob = await request(app).get('/api/v1/ai/jobs/nao-existe').set(auth);
+  assert.equal(unknownJob.status, 404);
 });
 
 test('exclui a conta só com a senha correta e apaga os dados', async () => {

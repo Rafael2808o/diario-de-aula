@@ -7,6 +7,7 @@ import { Nox, ToastProvider, useToast } from "./ui.jsx";
 import SearchBox from "./components/SearchBox.jsx";
 import Auth from "./pages/Auth.jsx";
 import Calendar from "./pages/Calendar.jsx";
+import Download from "./pages/Download.jsx";
 import Exams from "./pages/Exams.jsx";
 import History from "./pages/History.jsx";
 import Home from "./pages/Home.jsx";
@@ -252,6 +253,7 @@ function Shell({ session, setSession }) {
 
 export default function App() {
   const [session, setSession] = useState(readSession);
+  if (["/baixar", "/baixar/"].includes(window.location.pathname)) return <Download />;
   if (window.location.pathname !== "/") return <NotFound />;
   return (
     <ToastProvider>
