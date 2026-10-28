@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { ArrowLeft, BookOpen, CircleHelp, Layers, LifeBuoy, PenLine, Plus, Route } from "lucide-react";
+import { ArrowLeft, BookOpen, CircleHelp, Layers, Link2, LifeBuoy, PenLine, Plus, Route, Search, Unlink } from "lucide-react";
 import { useApp } from "../context.js";
 import { countdown, formatFull, formatLong, monthShort, todayIso } from "../lib/dates.js";
-import { lessonsMentioning, subjectById } from "../lib/domain.js";
-import { Confirm, Empty, Segmented, SubjectTag } from "../ui.jsx";
+import { examLessons, lessonHasContent, lessonsMentioning, subjectById } from "../lib/domain.js";
+import { Confirm, Empty, Modal, Segmented, SubjectTag } from "../ui.jsx";
 import { ExamForm, MaterialForm, MaterialLinks, NoteForm } from "../components/forms.jsx";
 import { PlanBuilder } from "../components/ai/ExamTools.jsx";
 
@@ -25,7 +25,7 @@ export default function Exams() {
   return (
     <div className="page">
       <header className="page-head">
-        <h1>Provas</h1>
+        <h1>Desafios Arcanos</h1>
         <div className="page-actions">
           <button className="btn" onClick={() => go("ia", { tool: "socorro" })}>
             <LifeBuoy size={16} /> Socorro, tenho prova!
@@ -91,6 +91,111 @@ export default function Exams() {
   );
 }
 
+const normalize = (value) => String(value || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const lessonText = (lesson) => [lesson.taught, lesson.missedContent, lesson.notes, lesson.examInfo].filter(Boolean).join("\n");
+
+// Conteúdos das aulas na revisão da prova: mostra o registro original (nunca uma cópia), então edições
+// na aula aparecem aqui na hora e nada é duplicado.
+function LessonContents({ exam }) {
+  const { data, go, update, toast } = useApp();
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(null);
+  const [linking, setLinking] = useState(false);
+  const items = examLessons(data, exam);
+  const term = normalize(query.trim());
+  const shown = term ? items.filter(({ lesson }) => normalize([lesson.theme, lessonText(lesson)].join(" ")).includes(term)) : items;
+  const included = new Set(items.map(({ lesson }) => lesson.id));
+  const candidates = data.lessons.filter((lesson) => lesson.subjectId === exam.subjectId && !included.has(lesson.id) && lessonHasContent(lesson)).sort((a, b) => b.date.localeCompare(a.date));
+  const link = async (lesson, examId) => {
+    try {
+      await update("lessons", lesson.id, { examId });
+      toast(examId ? "Aula vinculada a esta prova." : "Vínculo removido. A aula volta a seguir a data.");
+    } catch (failure) {
+      toast(failure.message);
+    }
+  };
+  return (
+    <section>
+      <div className="section-head">
+        <h2 className="section-title">Conteúdos das aulas</h2>
+        <button className="link-btn" onClick={() => setLinking(true)} disabled={!candidates.length}>
+          <Link2 size={14} /> Vincular outra aula
+        </button>
+      </div>
+      {items.length ? (
+        <>
+          <p className="hint">
+            Entram sozinhas as aulas desta disciplina registradas até a data da prova e depois da prova anterior. O texto é o do registro da aula: se você editar a aula, muda aqui também.
+          </p>
+          {items.length > 3 && (
+            <label className="search-field lesson-filter">
+              <Search size={15} aria-hidden="true" />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filtrar por assunto" aria-label="Filtrar conteúdos das aulas por assunto" />
+            </label>
+          )}
+          <ul className="group lesson-contents">
+            {shown.map(({ lesson, origin }) => {
+              const text = lessonText(lesson);
+              const expanded = open === lesson.id;
+              return (
+                <li key={lesson.id} className="row lesson-content">
+                  <span className="row-main">
+                    <span className={`origin ${origin === "vinculada" ? "origin-self" : "origin-prof"}`}>{origin === "vinculada" ? "Vinculada por você" : "Da aula, pela data"}</span>
+                    <strong>
+                      {formatFull(lesson.date)}
+                      {lesson.theme ? `: ${lesson.theme}` : ""}
+                      {lesson.status === "falta" ? " (falta)" : ""}
+                    </strong>
+                    {text && <span className={`prewrap lesson-excerpt ${expanded ? "is-open" : ""}`}>{text}</span>}
+                    <span className="lesson-content-actions">
+                      {text.length > 220 && (
+                        <button className="link-btn" onClick={() => setOpen(expanded ? null : lesson.id)}>
+                          {expanded ? "Mostrar menos" : "Ler tudo"}
+                        </button>
+                      )}
+                      <button className="link-btn" onClick={() => go("aulas", { lesson: lesson.id })}>
+                        Abrir aula
+                      </button>
+                      {origin === "vinculada" && (
+                        <button className="link-btn" onClick={() => link(lesson, null)}>
+                          <Unlink size={13} /> Desvincular
+                        </button>
+                      )}
+                    </span>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          {term && !shown.length && <p className="quiet">Nenhuma aula com esse assunto.</p>}
+        </>
+      ) : (
+        <p className="quiet">Nenhuma aula com conteúdo registrado neste período. Quando você registrar as aulas desta disciplina, o conteúdo aparece aqui.</p>
+      )}
+      {linking && (
+        <Modal title="Vincular aula a esta prova" onClose={() => setLinking(false)}>
+          <p className="modal-text">Escolha uma aula da disciplina. Ela passa a aparecer só nesta prova, mesmo que a data indique outra.</p>
+          <ul className="group">
+            {candidates.map((lesson) => (
+              <li key={lesson.id}>
+                <button type="button" className="row" onClick={() => link(lesson, exam.id).then(() => setLinking(false))}>
+                  <span className="row-main">
+                    <strong>
+                      {formatFull(lesson.date)}
+                      {lesson.theme ? `: ${lesson.theme}` : ""}
+                    </strong>
+                    <small>{lesson.examId ? `Hoje vinculada a: ${data.exams.find((item) => item.id === lesson.examId)?.title || "outra prova"}` : "Segue a data"}</small>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Modal>
+      )}
+    </section>
+  );
+}
+
 function ExamDetail({ exam }) {
   const { data, params, go, update, remove, toast } = useApp();
   const [modal, setModal] = useState(null);
@@ -112,7 +217,7 @@ function ExamDetail({ exam }) {
   return (
     <div className="page exam-detail" style={{ "--subject": subject?.color }}>
       <button className="link-btn back" onClick={() => go("provas")}>
-        <ArrowLeft size={15} /> Provas
+        <ArrowLeft size={15} /> Desafios Arcanos
       </button>
       <header className="detail-head">
         <div>
@@ -159,7 +264,7 @@ function ExamDetail({ exam }) {
             </>
           ) : (
             <p className="warning">
-              O Lúmina não adivinha o que vai cair. Informe os assuntos que o professor confirmou para montar a trilha.{" "}
+              A Grimiau não adivinha o que vai cair. Informe os assuntos que o professor confirmou para montar a trilha.{" "}
               <button className="link-btn" onClick={() => setModal("edit")}>
                 Informar assuntos
               </button>
@@ -170,8 +275,9 @@ function ExamDetail({ exam }) {
 
       <div className="detail-columns">
         <div>
+          <LessonContents exam={exam} />
           <section>
-            <h2 className="section-title">Conteúdos cobrados e meu progresso</h2>
+            <h2 className="section-title">Assuntos adicionados por você e seu progresso</h2>
             {exam.topics.length ? (
               <>
                 <p className="hint">

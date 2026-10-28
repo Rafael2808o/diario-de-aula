@@ -93,7 +93,7 @@ export default function Subjects() {
     <div className="page">
       <header className="page-head">
         <div>
-          <h1>Conteúdos</h1>
+          <h1>Biblioteca Arcana</h1>
         </div>
         <div className="page-actions">
           <button className="btn primary" onClick={() => editing.open()}>

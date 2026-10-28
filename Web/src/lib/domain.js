@@ -1,5 +1,5 @@
 import { BookOpen, CalendarClock, ClipboardCheck, GraduationCap, Sparkles } from "lucide-react";
-import { classOccurrences, formatFull } from "./dates.js";
+import { addDays, classOccurrences, formatFull } from "./dates.js";
 
 export const subjectPalette = ["#6f8cf6", "#9b7cf4", "#c084e8", "#5aa9d6", "#e07fa8", "#58b39a", "#e59a6b", "#7d8aa6"];
 
@@ -175,4 +175,43 @@ export function lessonsMentioning(lessons, subjectId, term) {
       lesson.subjectId === subjectId &&
       [lesson.theme, lesson.expected, lesson.taught, lesson.notes, lesson.examInfo, lesson.missedContent, lesson.transcript].some((text) => normalize(text).includes(needle)),
   );
+}
+
+export const lessonHasContent = (lesson) => Boolean([lesson.theme, lesson.taught, lesson.notes, lesson.transcript, lesson.missedContent].some((text) => String(text || "").trim()));
+
+// Aulas que precisam de atenção, só a partir do que já aconteceu (nunca cria nem apaga registros).
+// "vazia": aula da grade sem registro ou marcada como presente sem conteúdo. "revisar": rascunho.
+// "perdida": falta sem o conteúdo perdido anotado. Aulas canceladas ficam de fora.
+export function pendingLessons(data, user, today, now, days = 45) {
+  const from = addDays(today, -days);
+  return classOccurrences(data.subjects, data.lessons, user, from, today)
+    .filter((occurrence) => occurrence.date < today || !occurrence.start || occurrence.start <= now)
+    .flatMap((occurrence) => {
+      const lesson = occurrence.lesson;
+      if (lesson?.status === "cancelada") return [];
+      let kind = "";
+      if (!lesson || lesson.status === "pendente") kind = "vazia";
+      else if (lesson.draft) kind = "revisar";
+      else if (lesson.status === "presente" && !String(lesson.taught || "").trim() && !String(lesson.transcript || "").trim()) kind = "vazia";
+      else if (lesson.status === "falta" && !lesson.recovered && !String(lesson.missedContent || "").trim()) kind = "perdida";
+      return kind ? [{ ...occurrence, kind }] : [];
+    })
+    .sort((a, b) => `${b.date}${b.start}`.localeCompare(`${a.date}${a.start}`));
+}
+
+// Aulas que alimentam a revisão de uma prova, sempre por referência ao registro original.
+// Vínculo manual (lesson.examId) vale primeiro. Sem vínculo, entram as aulas da mesma disciplina
+// depois da prova anterior dessa disciplina e até a data desta prova.
+export function examLessons(data, exam) {
+  const previous = data.exams
+    .filter((other) => other.id !== exam.id && other.subjectId === exam.subjectId && other.date < exam.date)
+    .reduce((latest, other) => (other.date > latest ? other.date : latest), "");
+  return data.lessons
+    .flatMap((lesson) => {
+      if (lesson.examId === exam.id) return [{ lesson, origin: "vinculada" }];
+      if (lesson.examId || lesson.subjectId !== exam.subjectId || lesson.status === "cancelada") return [];
+      if (lesson.date > exam.date || (previous && lesson.date <= previous) || !lessonHasContent(lesson)) return [];
+      return [{ lesson, origin: "periodo" }];
+    })
+    .sort((a, b) => a.lesson.date.localeCompare(b.lesson.date));
 }

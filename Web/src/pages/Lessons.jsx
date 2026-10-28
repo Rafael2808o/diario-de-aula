@@ -65,7 +65,8 @@ export default function Lessons() {
     <div className="page">
       <header className="page-head">
         <div>
-          <h1>Dias de aula</h1>
+          <h1>Grimório Acadêmico</h1>
+          <p>Cada aula da sua grade, com o que foi ensinado, faltas e materiais.</p>
         </div>
         <div className="page-actions">
           <button className="btn soft" onClick={() => setExtra(true)} disabled={!data.subjects.length}>
@@ -75,7 +76,7 @@ export default function Lessons() {
       </header>
 
       {!data.subjects.length ? (
-        <Empty title="Cadastre suas disciplinas primeiro">Com os dias e horários de cada matéria, o Lúmina monta todas as aulas do semestre aqui.</Empty>
+        <Empty title="Cadastre suas disciplinas primeiro">Com os dias e horários de cada matéria, a Grimiau monta todas as aulas do semestre aqui.</Empty>
       ) : (
         <div className="lessons-layout">
           <Card className="lessons-calendar">

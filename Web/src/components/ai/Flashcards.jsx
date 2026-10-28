@@ -5,8 +5,8 @@ import { todayIso } from "../../lib/dates.js";
 import { Confirm, Empty, FormError, Modal, Segmented, useSubmit } from "../../ui.jsx";
 import { BasisHint, SourceNote, SubjectTopicFields, buildContext, postAi } from "./shared.jsx";
 
-// Ordem de revisão: novos e difíceis antes; os fáceis só voltam quando não houver mais nada pendente.
-const order = { difícil: 0, nova: 1, fácil: 2 };
+// Ordem de revisão: o que pede revisão e as dúvidas antes; o que você já sabe vai para o fim.
+const order = { difícil: 0, dúvida: 1, nova: 2, fácil: 3 };
 
 function CardForm({ card, subjectId, onClose }) {
   const { create, update } = useApp();
@@ -47,53 +47,155 @@ function CardForm({ card, subjectId, onClose }) {
   );
 }
 
+export const levelLabel = { nova: "Nova", difícil: "Revisar", dúvida: "Dúvida", fácil: "Sei" };
+const shuffled = (ids) => {
+  const copy = [...ids];
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const other = Math.floor(Math.random() * (index + 1));
+    [copy[index], copy[other]] = [copy[other], copy[index]];
+  }
+  return copy;
+};
+
+// Cartas do Saber: pergunta na frente, resposta no verso. A classificação de cada carta fica salva no servidor.
 function Review({ cards }) {
   const { update, toast } = useApp();
-  const [round, setRound] = useState(() => [...cards].sort((a, b) => order[a.level] - order[b.level]).map((card) => card.id));
-  const [shown, setShown] = useState(false);
+  const [onlyHard, setOnlyHard] = useState(false);
+  const [mixed, setMixed] = useState(false);
+  const deckIds = (hard, mix) => {
+    const ids = cards.filter((card) => !hard || card.level === "difícil" || card.level === "dúvida").sort((a, b) => order[a.level] - order[b.level]).map((card) => card.id);
+    return mix ? shuffled(ids) : ids;
+  };
+  const [deck, setDeck] = useState(() => deckIds(false, false));
+  const [index, setIndex] = useState(0);
+  const [flipped, setFlipped] = useState(false);
+  const [tally, setTally] = useState({});
   const [busy, setBusy] = useState(false);
-  const current = cards.find((card) => card.id === round[0]);
-  if (!current) {
-    const hard = cards.filter((card) => card.level !== "fácil");
-    return (
-      <Empty compact mood="happy" title="Rodada concluída.">
-        {hard.length ? `${hard.length} ${hard.length === 1 ? "cartão continua difícil" : "cartões continuam difíceis"}.` : "Todos os cartões estão marcados como fáceis."}
-        <button className="btn small" onClick={() => setRound((hard.length ? hard : cards).map((card) => card.id))}>
-          {hard.length ? "Repetir os difíceis" : "Revisar tudo de novo"}
-        </button>
-      </Empty>
-    );
-  }
+  const current = cards.find((card) => card.id === deck[index]);
+
+  const restart = (hard = onlyHard, mix = mixed) => {
+    setDeck(deckIds(hard, mix));
+    setIndex(0);
+    setFlipped(false);
+    setTally({});
+  };
+  const move = (step) => {
+    setIndex((value) => Math.max(0, Math.min(deck.length, value + step)));
+    setFlipped(false);
+  };
   const mark = async (level) => {
     setBusy(true);
     try {
       await update("flashcards", current.id, { level, reviews: current.reviews + 1, reviewedOn: todayIso() });
-      setRound((ids) => (level === "difícil" ? [...ids.slice(1), ids[0]] : ids.slice(1)));
-      setShown(false);
+      setTally((value) => ({ ...value, [current.id]: level }));
+      move(1);
     } catch (error) {
       toast(error.message);
     } finally {
       setBusy(false);
     }
   };
+  const onKey = (event) => {
+    if (event.target.closest("input, select, textarea")) return;
+    if (event.key === "ArrowRight") move(1);
+    if (event.key === "ArrowLeft") move(-1);
+  };
+
+  const counts = Object.values(tally).reduce((sum, level) => ({ ...sum, [level]: (sum[level] || 0) + 1 }), {});
+  const options = (
+    <div className="deck-options">
+      <label className="check">
+        <input type="checkbox" checked={onlyHard} onChange={(event) => { setOnlyHard(event.target.checked); restart(event.target.checked, mixed); }} /> Só dúvidas e “revisar”
+      </label>
+      <label className="check">
+        <input type="checkbox" checked={mixed} onChange={(event) => { setMixed(event.target.checked); restart(onlyHard, event.target.checked); }} /> Embaralhar
+      </label>
+    </div>
+  );
+
+  if (!deck.length) {
+    return (
+      <div className="flashcard-stage">
+        {options}
+        <Empty compact mood="happy" title="Nenhuma carta de dúvida ou para revisar.">
+          Tudo marcado como “Sei”. Desmarque o filtro para revisar tudo.
+        </Empty>
+      </div>
+    );
+  }
+
+  if (!current) {
+    const pending = deck.filter((id) => ["difícil", "dúvida"].includes(cards.find((card) => card.id === id)?.level));
+    return (
+      <div className="flashcard-stage">
+        <Empty compact mood="happy" title="Feitiço lançado com sucesso. Rodada concluída!">
+          {Object.keys(tally).length
+            ? `Sei: ${counts.fácil || 0} · Dúvida: ${counts.dúvida || 0} · Revisar: ${counts.difícil || 0}.`
+            : "Você passou pelas cartas sem classificar nenhuma."}
+          <span className="form-actions centered">
+            <button className="btn small" onClick={() => move(-deck.length)}>
+              Voltar ao início
+            </button>
+            {pending.length > 0 && (
+              <button className="btn small primary" onClick={() => { setOnlyHard(true); restart(true, mixed); }}>
+                Revisar {pending.length} {pending.length === 1 ? "carta difícil" : "cartas difíceis"}
+              </button>
+            )}
+            <button className="btn small" onClick={() => restart()}>
+              Nova rodada
+            </button>
+          </span>
+        </Empty>
+      </div>
+    );
+  }
+
   return (
-    <div className="flashcard-stage">
-      <p className="hint">{round.length} {round.length === 1 ? "cartão restante" : "cartões restantes"} nesta rodada</p>
-      <button type="button" className={`flashcard ${shown ? "is-flipped" : ""}`} onClick={() => setShown(true)} aria-live="polite">
-        <span className="flashcard-side">{shown ? "Resposta" : "Pergunta"}</span>
-        <strong>{shown ? current.back : current.front}</strong>
-        {!shown && <small>Toque para ver a resposta</small>}
+    <div className="flashcard-stage" onKeyDown={onKey}>
+      {options}
+      <div className="deck-progress">
+        <span>
+          Carta {index + 1} de {deck.length}
+        </span>
+        <div className="progress-track" role="progressbar" aria-valuemin={0} aria-valuemax={deck.length} aria-valuenow={index + 1} aria-label="Progresso da rodada">
+          <span style={{ width: `${((index + 1) / deck.length) * 100}%` }} />
+        </div>
+        <span className={`level-tag level-${current.level}`}>{levelLabel[current.level]}</span>
+      </div>
+      <button type="button" className={`flashcard ${flipped ? "is-flipped" : ""}`} onClick={() => setFlipped((value) => !value)} aria-label={flipped ? "Resposta. Toque para voltar à pergunta." : "Pergunta. Toque para ver a resposta."}>
+        <span className="flashcard-inner">
+          <span className="flashcard-face front" aria-hidden={flipped}>
+            <span className="flashcard-side">Pergunta</span>
+            <strong>{current.front}</strong>
+            <small>Toque para ver a resposta</small>
+          </span>
+          <span className="flashcard-face back" aria-hidden={!flipped}>
+            <span className="flashcard-side">Resposta</span>
+            <strong>{current.back}</strong>
+            <small>Toque para voltar à pergunta</small>
+          </span>
+        </span>
       </button>
-      {shown && (
-        <div className="form-actions centered">
-          <button className="btn" disabled={busy} onClick={() => mark("difícil")}>
-            Difícil, repetir
+      <div className="deck-nav">
+        <button type="button" className="btn small ghost" onClick={() => move(-1)} disabled={index === 0}>
+          Anterior
+        </button>
+        <div className="deck-grade" role="group" aria-label="Como foi esta carta?">
+          <button type="button" className="btn small grade-hard" disabled={busy || !flipped} onClick={() => mark("difícil")}>
+            Revisar
           </button>
-          <button className="btn primary" disabled={busy} onClick={() => mark("fácil")}>
-            Fácil
+          <button type="button" className="btn small grade-doubt" disabled={busy || !flipped} onClick={() => mark("dúvida")}>
+            Dúvida
+          </button>
+          <button type="button" className="btn small primary" disabled={busy || !flipped} onClick={() => mark("fácil")}>
+            Sei
           </button>
         </div>
-      )}
+        <button type="button" className="btn small ghost" onClick={() => move(1)}>
+          Próxima
+        </button>
+      </div>
+      {!flipped && <p className="hint centered">Vire a carta para classificar. Use as setas do teclado para navegar.</p>}
     </div>
   );
 }
@@ -109,7 +211,9 @@ export default function Flashcards({ preset = {} }) {
   const [modal, setModal] = useState(null);
   const plan = useMemo(() => buildContext(data, subjectId, topic), [data, subjectId, topic]);
   const subject = data.subjects.find((item) => item.id === subjectId);
-  const cards = data.flashcards.filter((card) => card.subjectId === subjectId);
+  const [examFilter, setExamFilter] = useState(preset.examId || "");
+  const subjectExams = data.exams.filter((exam) => exam.subjectId === subjectId && data.flashcards.some((card) => card.examId === exam.id));
+  const cards = data.flashcards.filter((card) => card.subjectId === subjectId && (!examFilter || card.examId === examFilter));
 
   const generate = async (event) => {
     event.preventDefault();
@@ -146,7 +250,7 @@ export default function Flashcards({ preset = {} }) {
       <div className="toolbar">
         <label className="inline-field">
           Disciplina
-          <select value={subjectId} onChange={(event) => setSubjectId(event.target.value)}>
+          <select value={subjectId} onChange={(event) => { setSubjectId(event.target.value); setExamFilter(""); }}>
             {data.subjects.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name}
@@ -154,12 +258,25 @@ export default function Flashcards({ preset = {} }) {
             ))}
           </select>
         </label>
+        {subjectExams.length > 0 && (
+          <label className="inline-field">
+            Assunto
+            <select value={examFilter} onChange={(event) => setExamFilter(event.target.value)}>
+              <option value="">Todas as cartas</option>
+              {subjectExams.map((exam) => (
+                <option key={exam.id} value={exam.id}>
+                  {exam.title}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <Segmented label="Modo" value={mode} onChange={setMode} options={[["revisar", `Revisar (${cards.length})`], ["criar", "Criar cartões"], ["lista", "Todos os cartões"]]} />
       </div>
 
       {mode === "revisar" &&
         (cards.length ? (
-          <Review key={subjectId} cards={cards} />
+          <Review key={subjectId + examFilter} cards={cards} />
         ) : (
           <Empty compact title="Nenhum cartão nesta disciplina.">
             Crie cartões manualmente ou peça para a IA sugerir a partir das suas aulas.
@@ -218,7 +335,7 @@ export default function Flashcards({ preset = {} }) {
                   <strong>{card.front}</strong>
                   <small>{card.back}</small>
                   <small>
-                    {card.level === "nova" ? "Novo" : card.level === "fácil" ? "Fácil" : "Difícil"}, {card.reviews} {card.reviews === 1 ? "revisão" : "revisões"}
+                    {levelLabel[card.level]}, {card.reviews} {card.reviews === 1 ? "revisão" : "revisões"}
                     {card.origin === "Sugestão da IA" ? ", sugerido pela IA" : ""}
                   </small>
                 </span>

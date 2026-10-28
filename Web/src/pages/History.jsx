@@ -4,6 +4,7 @@ import { useApp } from "../context.js";
 import { addDays, classOccurrences, formatFull, formatShort, startOfWeek, todayIso } from "../lib/dates.js";
 import { subjectById } from "../lib/domain.js";
 import { Empty } from "../ui.jsx";
+import { formatDuration } from "../lib/ritual.js";
 
 // Cada indicador mostra o número e, ao abrir, os registros que o originaram. Sem dados, explica quando vai aparecer.
 function Indicator({ title, value, empty, children, open, onToggle }) {
@@ -107,7 +108,10 @@ export default function History() {
     return { past, registered, unregistered, lowMastery, missed, pendingTopics, futureExams, doneTasks, results, errorsByTopic, weeks };
   }, [data, user, today]);
 
-  const nothing = !data.lessons.length && !data.exams.length && !data.tasks.length && !stats.results.length;
+  const nothing = !data.lessons.length && !data.exams.length && !data.tasks.length && !stats.results.length && !data["study-sessions"].length;
+  const sessions = data["study-sessions"];
+  const sumSeconds = (list) => list.reduce((sum, session) => sum + session.durationSeconds, 0);
+  const weekFrom = startOfWeek(today);
   const review = stats.lowMastery.length + stats.missed.length + stats.pendingTopics.length;
   const average = stats.results.length ? Math.round((stats.results.reduce((sum, result) => sum + result.correct / result.total, 0) / stats.results.length) * 100) : 0;
 
@@ -118,10 +122,52 @@ export default function History() {
       </button>
       <header className="page-head">
         <div>
-          <h1>Histórico de aprendizagem</h1>
+          <h1>Histórico de estudos</h1>
           <p>Sua evolução no semestre, calculada só com o que você registrou. Toque em um indicador para ver os registros.</p>
         </div>
       </header>
+
+      <section className="study-log">
+        <h2 className="section-title">Sessões do Ritual de Concentração</h2>
+        {sessions.length ? (
+          <>
+            <dl className="observatory-stats">
+              <div>
+                <dt>Hoje</dt>
+                <dd>{formatDuration(sumSeconds(sessions.filter((session) => session.date === today)))}</dd>
+              </div>
+              <div>
+                <dt>Nesta semana</dt>
+                <dd>{formatDuration(sumSeconds(sessions.filter((session) => session.date >= weekFrom && session.date <= today)))}</dd>
+              </div>
+              <div>
+                <dt>No total</dt>
+                <dd>{formatDuration(sumSeconds(sessions))}</dd>
+              </div>
+              <div>
+                <dt>Sessões</dt>
+                <dd>{sessions.length}</dd>
+              </div>
+            </dl>
+            <ul className="group">
+              {sessions.slice(0, 8).map((session) => (
+                <li key={session.id} className="row">
+                  <span className="row-main">
+                    <strong>{formatDuration(session.durationSeconds)}</strong>
+                    <small>
+                      {formatFull(session.date)}
+                      {session.startTime ? `, a partir das ${session.startTime}` : ""}
+                      {subjectById(data.subjects, session.subjectId) ? `, ${subjectById(data.subjects, session.subjectId).name}` : ""}
+                    </small>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <p className="quiet">Nenhuma sessão salva ainda. Use o Ritual (botão no topo) e salve no fim para registrar seu tempo de estudo.</p>
+        )}
+      </section>
 
       {nothing ? (
         <Empty title="Ainda não há histórico.">Os indicadores aparecem conforme você registra aulas, cadastra provas e faz simulados.</Empty>

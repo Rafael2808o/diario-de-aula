@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link2, Plus, Vault } from "lucide-react";
 import { useApp } from "../context.js";
-import { formatLong } from "../lib/dates.js";
+import { formatLong, formatShort } from "../lib/dates.js";
 import { lessonStatus } from "../lib/domain.js";
 import { FormError, Modal, Segmented, SubjectTag, useSubmit } from "../ui.jsx";
 import { MaterialForm, MaterialLinks, NoteForm } from "./forms.jsx";
@@ -32,6 +32,7 @@ export function LessonForm({ occurrence, onClose }) {
   });
   const materials = current.lesson ? app.data.materials.filter((material) => material.lessonId === current.lesson.id) : [];
   const notes = current.lesson ? app.data["teacher-notes"].filter((note) => note.lessonId === current.lesson.id) : [];
+  const subjectExams = app.data.exams.filter((exam) => exam.subjectId === occurrence.subject.id).sort((a, b) => a.date.localeCompare(b.date));
   const read = (form) => Object.fromEntries(new FormData(form));
   const ensureSaved = async (form) => {
     if (current.lesson) return current.lesson;
@@ -105,6 +106,20 @@ export function LessonForm({ occurrence, onClose }) {
               Observações importantes
               <textarea name="notes" rows={3} defaultValue={lesson?.notes} placeholder="Dúvidas, recados e pontos a lembrar." />
             </label>
+            {subjectExams.length > 0 && (
+              <label>
+                Este conteúdo vale para qual prova?
+                <select name="examId" defaultValue={lesson?.examId || ""}>
+                  <option value="">Automático (pela data da aula)</option>
+                  {subjectExams.map((exam) => (
+                    <option key={exam.id} value={exam.id}>
+                      {exam.title}, {formatShort(exam.date)}
+                    </option>
+                  ))}
+                </select>
+                <small className="hint">No automático, a aula entra na revisão da próxima prova desta disciplina.</small>
+              </label>
+            )}
             {mode === "completo" && (
               <>
                 <label>

@@ -1,16 +1,10 @@
 // Aparência é preferência do aparelho: fica no navegador e é aplicada antes da primeira pintura (ver index.html).
-const themeKey = "lumina.theme";
-const accentKey = "lumina.accent";
+// A Grimiau nasce no tema escuro (Noite Mística); o claro (Névoa Lunar) é opcional.
+const themeKey = "grimiau.theme";
 
 export const themes = [
-  ["sistema", "Automático"],
-  ["claro", "Claro"],
-  ["escuro", "Escuro"],
-];
-export const accents = [
-  ["lavanda", "Lavanda", "#4f5bd5"],
-  ["azul", "Azul", "#2d6bd6"],
-  ["lilas", "Lilás", "#8a46b8"],
+  ["escuro", "Noite Mística"],
+  ["claro", "Névoa Lunar"],
 ];
 
 const read = (key, fallback) => {
@@ -21,17 +15,15 @@ const read = (key, fallback) => {
   }
 };
 
-export const currentTheme = () => read(themeKey, "sistema");
-export const currentAccent = () => read(accentKey, "lavanda");
+export const currentTheme = () => (read(themeKey, "escuro") === "claro" ? "claro" : "escuro");
 
-export function applyAppearance(theme = currentTheme(), accent = currentAccent()) {
+export function applyAppearance(theme = currentTheme()) {
   const root = document.documentElement;
-  if (theme === "sistema") root.removeAttribute("data-theme");
-  else root.dataset.theme = theme === "escuro" ? "dark" : "light";
-  root.dataset.accent = accent;
+  if (theme === "claro") root.dataset.theme = "light";
+  else root.removeAttribute("data-theme");
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "claro" ? "#f0eaf7" : "#0f0b14");
   try {
     localStorage.setItem(themeKey, theme);
-    localStorage.setItem(accentKey, accent);
   } catch {
     // Sem armazenamento, a escolha vale até fechar a aba.
   }

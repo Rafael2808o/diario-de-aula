@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Check, Plus } from "lucide-react";
 import { useApp } from "../context.js";
-import { accents, applyAppearance, currentAccent, currentTheme, themes } from "../lib/theme.js";
-import { FormError, Nox, Segmented, useSubmit } from "../ui.jsx";
+import { applyAppearance, currentTheme, themes } from "../lib/theme.js";
+import { FormError, Logo, Nox, Segmented, useSubmit } from "../ui.jsx";
 import { AcademicFields, RoutineFields, profileDraft, validProfile } from "../components/ProfileFields.jsx";
 import { SubjectList, useSubjectEditing } from "./Subjects.jsx";
 
@@ -13,7 +13,6 @@ export default function Onboarding() {
   const [step, setStep] = useState(1);
   const [draft, setDraft] = useState(() => profileDraft(user));
   const [theme, setTheme] = useState(currentTheme);
-  const [accent, setAccent] = useState(currentAccent);
   const editing = useSubjectEditing();
   const first = user.name.split(" ")[0];
   const { submit, busy, error, setError } = useSubmit((body) => call("/me", { method: "PATCH", body }));
@@ -37,7 +36,7 @@ export default function Onboarding() {
         <h1>Tudo pronto, {first}!</h1>
         <p>
           {data.subjects.length
-            ? `Suas ${data.subjects.length === 1 ? "aulas de 1 disciplina já estão" : `aulas de ${data.subjects.length} disciplinas já estão`} no calendário. Registre o que acontecer em cada aula e o Lúmina organiza o resto.`
+            ? `Suas ${data.subjects.length === 1 ? "aulas de 1 disciplina já estão" : `aulas de ${data.subjects.length} disciplinas já estão`} no calendário. Registre o que acontecer em cada aula e a Grimiau organiza o resto.`
             : "Quando quiser, cadastre suas disciplinas em Conteúdos. Seu calendário se monta a partir delas."}
         </p>
         <FormError>{error}</FormError>
@@ -52,7 +51,7 @@ export default function Onboarding() {
     <main className="onboarding">
       <header className="onboarding-head">
         <div className="brand-mark">
-          <Nox size={36} /> <span>Lúmina</span>
+          <Logo size={40} /> <span>Grimiau</span>
         </div>
         <button className="link-btn" disabled={busy} onClick={() => advance(null, true)}>
           Terminar depois
@@ -107,14 +106,7 @@ export default function Onboarding() {
             <RoutineFields value={draft} onChange={setDraft} />
             <fieldset>
               <legend>Aparência</legend>
-              <Segmented label="Tema" value={theme} options={themes} onChange={(value) => { setTheme(value); applyAppearance(value, accent); }} />
-              <div className="swatches">
-                {accents.map(([id, label, color]) => (
-                  <button key={id} type="button" className={accent === id ? "swatch labeled active" : "swatch labeled"} style={{ "--swatch": color }} aria-pressed={accent === id} onClick={() => { setAccent(id); applyAppearance(theme, id); }}>
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <Segmented label="Tema" value={theme} options={themes} onChange={(value) => { setTheme(value); applyAppearance(value); }} />
             </fieldset>
           </div>
         )}

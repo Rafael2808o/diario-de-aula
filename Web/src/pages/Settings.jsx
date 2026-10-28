@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { Bell, Download, LogOut, Plus, Printer } from "lucide-react";
 import { useApp } from "../context.js";
-import { accents, applyAppearance, currentAccent, currentTheme, themes } from "../lib/theme.js";
+import { applyAppearance, currentTheme, themes } from "../lib/theme.js";
+import ProfilePhoto from "../components/ProfilePhoto.jsx";
+import { zodiac, useSaveSign } from "../components/Horoscope.jsx";
+import { canonicalSpotify } from "../components/Ritual.jsx";
+import { AnnouncementHistory } from "../components/Announcements.jsx";
 import { disableNotifications, enableNotifications, notificationsEnabled, notificationsSupported } from "../lib/notify.js";
 import { lessonStatus, subjectById } from "../lib/domain.js";
 import { Empty, FormError, Modal, Segmented, useSubmit } from "../ui.jsx";
@@ -25,7 +29,7 @@ function download(name, content, type) {
 // CSV com ponto e vírgula e BOM, que o Excel em português abre com acentos corretos.
 function exportCsv(name, rows, columns) {
   const lines = [columns.map(([, label]) => label).join(";"), ...rows.map((row) => columns.map(([key]) => csvCell(typeof key === "function" ? key(row) : row[key])).join(";"))];
-  download(`lumina-${name}.csv`, `﻿${lines.join("\r\n")}`, "text/csv;charset=utf-8");
+  download(`grimiau-${name}.csv`, `﻿${lines.join("\r\n")}`, "text/csv;charset=utf-8");
 }
 
 function DeleteAccount({ onClose }) {
@@ -69,14 +73,17 @@ export default function Settings() {
   const { user, data, setUser, call, signOut, toast } = useApp();
   const [draft, setDraft] = useState(() => profileDraft(user));
   const [theme, setTheme] = useState(currentTheme);
-  const [accent, setAccent] = useState(currentAccent);
+  const saveSign = useSaveSign();
+  const [spotifyError, setSpotifyError] = useState("");
   const [notify, setNotify] = useState(notificationsEnabled);
   const [notifyError, setNotifyError] = useState("");
   const [deleting, setDeleting] = useState(false);
   const editing = useSubjectEditing();
   const { submit, busy, error, setError } = useSubmit(
     async () => {
-      const saved = await call("/me", { method: "PATCH", body: draft });
+      // Signo, playlist e comunicados são salvos em outros pontos; o formulário só envia o que ele edita.
+      const { sign: _sign, spotifyUrl: _spotify, announcementSeen: _seen, ...preferences } = draft.preferences;
+      const saved = await call("/me", { method: "PATCH", body: { ...draft, preferences } });
       setUser(saved);
       return saved;
     },
@@ -117,6 +124,7 @@ export default function Settings() {
     ["materiais", "Materiais", data.materials, [[(row) => subjectName(row) || row.subject, "Disciplina"], ["title", "Título"], ["type", "Tipo"], ["url", "Link"], ["notes", "Anotações"]]],
     ["eventos", "Eventos", data.events, [[subjectName, "Disciplina"], ["title", "Evento"], ["kind", "Tipo"], ["date", "Data"], ["startTime", "Início"], ["endTime", "Fim"], ["notes", "Observações"]]],
     ["flashcards", "Flashcards", data.flashcards, [[subjectName, "Disciplina"], ["front", "Pergunta"], ["back", "Resposta"], ["level", "Nível"], ["reviews", "Revisões"]]],
+    ["sessoes", "Sessões de estudo", data["study-sessions"], [[subjectName, "Disciplina"], ["date", "Data"], ["startTime", "Início"], [(row) => Math.round(row.durationSeconds / 60), "Minutos"]]],
     ["simulados", "Simulados", data["quiz-results"], [[subjectName, "Disciplina"], ["takenOn", "Data"], ["topic", "Assunto"], ["correct", "Acertos"], ["total", "Questões"]]],
   ];
 
@@ -125,6 +133,13 @@ export default function Settings() {
       <header className="page-head">
         <h1>Configurações</h1>
       </header>
+
+      <section>
+        <h2 className="section-title">Foto de perfil</h2>
+        <div className="group form-group">
+          <ProfilePhoto />
+        </div>
+      </section>
 
       <form className="settings-form" onSubmit={save}>
         <section>
@@ -184,32 +199,63 @@ export default function Settings() {
                 options={themes}
                 onChange={(value) => {
                   setTheme(value);
-                  applyAppearance(value, accent);
+                  applyAppearance(value);
                 }}
               />
             </fieldset>
-            <fieldset>
-              <legend>Cor de destaque</legend>
-              <div className="swatches">
-                {accents.map(([id, label, color]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    className={accent === id ? "swatch labeled active" : "swatch labeled"}
-                    style={{ "--swatch": color }}
-                    aria-pressed={accent === id}
-                    onClick={() => {
-                      setAccent(id);
-                      applyAppearance(theme, id);
-                    }}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
             <p className="hint">A aparência vale para este aparelho.</p>
           </div>
+        </section>
+
+        <section>
+          <h2 className="section-title">Signo do horóscopo</h2>
+          <div className="group form-group form">
+            <label>
+              Signo
+              <select
+                value={user.preferences?.sign || ""}
+                onChange={(event) => saveSign(event.target.value).then(() => toast(event.target.value ? "Signo salvo." : "Horóscopo desligado.")).catch((failure) => toast(failure.message))}
+              >
+                <option value="">Não mostrar horóscopo</option>
+                {zodiac.map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="hint">Fica salvo na sua conta e vale em todos os aparelhos.</p>
+          </div>
+        </section>
+
+        <section>
+          <h2 className="section-title">Playlist de estudos</h2>
+          <form
+            className="group form-group form"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              const raw = String(new FormData(event.currentTarget).get("spotify") || "").trim();
+              const url = raw ? canonicalSpotify(raw) : "";
+              if (raw && !url) return setSpotifyError("Cole o link de uma playlist, álbum, faixa ou podcast do Spotify.");
+              setSpotifyError("");
+              try {
+                setUser(await call("/me", { method: "PATCH", body: { preferences: { spotifyUrl: url } } }));
+                toast(url ? "Playlist salva para o Ritual." : "Playlist removida.");
+              } catch (failure) {
+                setSpotifyError(failure.message);
+              }
+            }}
+          >
+            <label>
+              Link do Spotify
+              <input name="spotify" key={user.preferences?.spotifyUrl || "vazio"} defaultValue={user.preferences?.spotifyUrl || ""} placeholder="https://open.spotify.com/playlist/…" inputMode="url" />
+            </label>
+            <FormError>{spotifyError}</FormError>
+            <div className="form-actions">
+              <button className="btn">Salvar playlist</button>
+            </div>
+            <p className="hint">Aparece no Ritual de Concentração. Deixe vazio para remover.</p>
+          </form>
         </section>
 
         <section>
@@ -224,7 +270,7 @@ export default function Settings() {
             </label>
             <FormError>{notifyError}</FormError>
             <p className="hint">
-              <Bell size={13} aria-hidden="true" /> As notificações chegam enquanto o Lúmina estiver aberto, inclusive minimizado. Com o app fechado, os avisos aparecem no Início quando você voltar. Notificações por e-mail ainda não estão disponíveis. No iPhone, instale o Lúmina na Tela de Início para liberar as notificações.
+              <Bell size={13} aria-hidden="true" /> As notificações chegam enquanto a Grimiau estiver aberta, inclusive minimizado. Com o app fechado, os avisos aparecem no Início quando você voltar. Notificações por e-mail ainda não estão disponíveis. No iPhone, instale a Grimiau na Tela de Início para liberar as notificações.
             </p>
           </div>
         </section>
@@ -247,6 +293,11 @@ export default function Settings() {
         </section>
 
         <section>
+          <h2 className="section-title">Novidades da Grimiau</h2>
+          <AnnouncementHistory />
+        </section>
+
+        <section>
           <h2 className="section-title">Exportar meus dados</h2>
           <ul className="group">
             {exports.map(([file, label, rows, columns]) => (
@@ -264,7 +315,7 @@ export default function Settings() {
             ))}
           </ul>
           <div className="form-actions">
-            <button className="btn small" onClick={() => download("lumina-dados.json", JSON.stringify({ exportadoEm: new Date().toISOString(), perfil: user, ...data }, null, 2), "application/json")}>
+            <button className="btn small" onClick={() => download("grimiau-dados.json", JSON.stringify({ exportadoEm: new Date().toISOString(), perfil: user, ...data }, null, 2), "application/json")}>
               <Download size={14} /> Tudo em JSON
             </button>
             <button className="btn small" onClick={() => window.print()}>

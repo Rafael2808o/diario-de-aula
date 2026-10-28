@@ -151,7 +151,7 @@ export function Rescue({ examId, setExamId, onTool }) {
             <p>{exam.topics.map((topic) => topic.title).join(", ")}.</p>
           ) : (
             <p className="warning">
-              Esta prova ainda não tem assuntos. O Lúmina não adivinha o que vai cair.{" "}
+              Esta prova ainda não tem assuntos. A Grimiau não adivinha o que vai cair.{" "}
               <button className="link-btn" onClick={() => go("provas", { id: exam.id })}>
                 Informar assuntos
               </button>

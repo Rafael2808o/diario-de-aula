@@ -1,5 +1,5 @@
-const CACHE = 'lumina-shell-v5';
-const SHELL = ['/', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png'];
+const CACHE = 'grimiau-shell-v6';
+const SHELL = ['/', '/manifest.json', '/icons/grimiau-192.png', '/icons/grimiau-512.png', '/icons/grimiau-apple-180.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)));

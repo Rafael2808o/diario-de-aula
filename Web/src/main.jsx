@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import './lumina.css';
+import './grimiau.css';
 import App from './App';
 import { applyAppearance } from './lib/theme.js';
 

@@ -354,7 +354,7 @@ export function EventForm({ event, defaults = {}, onClose, onDelete }) {
               </option>
             ))}
           </select>
-          <small className="hint">O aviso aparece no Início do Lúmina. Notificações no celular ainda não estão disponíveis.</small>
+          <small className="hint">O aviso aparece no Início da Grimiau. Notificações no celular ainda não estão disponíveis.</small>
         </label>
         <label>
           Observações

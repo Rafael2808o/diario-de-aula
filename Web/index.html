@@ -3,31 +3,30 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#f2f3f6" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#111216" media="(prefers-color-scheme: dark)" />
-    <meta name="description" content="Você registra o semestre. O Lúmina organiza seus estudos: aulas, provas, trabalhos e avisos do professor em um só lugar." />
+    <meta name="theme-color" content="#0f0b14" />
+    <meta name="description" content="Grimiau, seu grimório acadêmico. Aulas, provas, resumos, flashcards e sessões de estudo em um só lugar. Conhecimento é magia." />
     <meta name="format-detection" content="telephone=no" />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="pt_BR" />
-    <meta property="og:title" content="Lúmina — assistente de estudos" />
-    <meta property="og:description" content="Você registra o semestre. O Lúmina organiza seus estudos." />
+    <meta property="og:title" content="Grimiau — seu grimório acadêmico" />
+    <meta property="og:description" content="Conhecimento é magia. Organize aulas, provas e sessões de estudo da faculdade." />
     <meta property="og:url" content="https://diario-de-aula-web.vercel.app/" />
-    <meta property="og:image" content="https://diario-de-aula-web.vercel.app/icons/icon-512.png" />
+    <meta property="og:image" content="https://diario-de-aula-web.vercel.app/icons/grimiau-512.png" />
     <link rel="canonical" href="https://diario-de-aula-web.vercel.app/" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Lúmina" />
+    <meta name="apple-mobile-web-app-title" content="Grimiau" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@1,500;1,600&family=Inter:wght@400;500;600;700&display=swap" />
     <link rel="manifest" href="/manifest.json" />
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-    <link rel="icon" type="image/png" href="/icons/favicon-32.png" />
-    <title>Lúmina — assistente de estudos</title>
+    <link rel="apple-touch-icon" href="/icons/grimiau-apple-180.png" />
+    <link rel="icon" type="image/png" href="/icons/grimiau-favicon-32.png" />
+    <title>Grimiau — seu grimório acadêmico</title>
     <script>
-      // Aplica o tema salvo antes da primeira pintura, evitando piscar claro no modo escuro.
+      // Aplica o tema salvo antes da primeira pintura. O padrão é o escuro (Noite Mística).
       try {
-        var theme = localStorage.getItem("lumina.theme");
-        if (theme === "escuro") document.documentElement.dataset.theme = "dark";
-        if (theme === "claro") document.documentElement.dataset.theme = "light";
-        document.documentElement.dataset.accent = localStorage.getItem("lumina.accent") || "lavanda";
+        if (localStorage.getItem("grimiau.theme") === "claro") document.documentElement.dataset.theme = "light";
       } catch (error) {}
     </script>
   </head>

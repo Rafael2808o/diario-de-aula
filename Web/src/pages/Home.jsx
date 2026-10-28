@@ -1,11 +1,15 @@
 import { useMemo, useState } from "react";
-import { AlarmClock, BookOpen, ChevronRight, ClipboardPlus, GraduationCap, LifeBuoy, PenLine, Sparkles } from "lucide-react";
+import { AlarmClock, BookOpen, ChevronRight, ClipboardPlus, GraduationCap, Hourglass, LifeBuoy, PenLine, Sparkles } from "lucide-react";
 import { useApp } from "../context.js";
-import { addDays, countdown, formatLong, formatShort, nowTime, todayIso, weekdayOf } from "../lib/dates.js";
-import { agendaItems, itemKinds, lessonStatus, subjectById, topicProgress } from "../lib/domain.js";
-import { Empty } from "../ui.jsx";
+import { addDays, countdown, formatFull, formatLong, formatShort, nowTime, startOfWeek, todayIso } from "../lib/dates.js";
+import { agendaItems, itemKinds, lessonStatus, pendingLessons, subjectById, topicProgress } from "../lib/domain.js";
+import { formatDuration } from "../lib/ritual.js";
+import { Avatar, Empty } from "../ui.jsx";
 import { ExamForm, TaskForm } from "../components/forms.jsx";
 import { LessonForm, saveLesson } from "../components/LessonForm.jsx";
+import { AnnouncementBanner } from "../components/Announcements.jsx";
+import Horoscope from "../components/Horoscope.jsx";
+import { PostRow, usePosts } from "./Community.jsx";
 
 // Linha de agenda usada no Início e no Calendário. Tipo sempre aparece em texto e ícone, não só pela cor.
 export function AgendaRow({ item, onOpen, showDate = false }) {
@@ -27,27 +31,18 @@ export function AgendaRow({ item, onOpen, showDate = false }) {
   );
 }
 
+// Avisos que não cabem nas outras seções do Observatório. Aulas sem conteúdo têm seção própria.
 function useReminders(data, user, today) {
   return useMemo(() => {
     const list = [];
     const prefs = user.preferences?.reminders || {};
     const now = nowTime();
-    if (prefs.classes !== false) {
-      const unregistered = agendaItems(data, user, today, today).filter((item) => item.kind === "aula" && item.status === "pendente" && (!item.start || item.start <= now));
-      if (unregistered.length) list.push({ id: "aula", icon: BookOpen, text: unregistered.length === 1 ? "Você ainda não registrou a aula de hoje." : `Você ainda não registrou ${unregistered.length} aulas de hoje.`, page: "aulas" });
-    }
-    const drafts = data.lessons.filter((lesson) => lesson.draft);
-    if (drafts.length) list.push({ id: "rascunho", icon: PenLine, text: drafts.length === 1 ? "Há um registro de aula em rascunho." : `Há ${drafts.length} registros de aula em rascunho.`, page: "aulas" });
     if (prefs.exams !== false) {
       const soonExam = data.exams.find((exam) => exam.date >= today && exam.date <= addDays(today, 14) && exam.prepStatus === "Não iniciada");
       if (soonExam) list.push({ id: "prova", icon: GraduationCap, text: `Sua prova “${soonExam.title}” é ${countdown(soonExam.date, today)}. Que tal começar a revisão?`, page: "provas", params: { id: soonExam.id } });
     }
-    const soonTask = data.tasks.find((task) => !task.done && task.dueDate >= today && task.dueDate <= addDays(today, 3));
-    if (soonTask) list.push({ id: "tarefa", icon: ClipboardPlus, text: `Há um trabalho com prazo próximo: “${soonTask.title}”, ${countdown(soonTask.dueDate, today)}.`, page: "calendario", params: { date: soonTask.dueDate } });
     const lateTasks = data.tasks.filter((task) => !task.done && task.dueDate < today);
     if (lateTasks.length) list.push({ id: "atrasada", icon: AlarmClock, text: lateTasks.length === 1 ? "Uma atividade passou do prazo." : `${lateTasks.length} atividades passaram do prazo.`, page: "calendario" });
-    const pendingTopics = data.exams.filter((exam) => exam.date >= today).flatMap((exam) => exam.topics).filter((topic) => topic.status === "Não iniciado").length;
-    if (pendingTopics && !list.some((item) => item.id === "prova")) list.push({ id: "topicos", icon: Sparkles, text: `Você tem ${pendingTopics} ${pendingTopics === 1 ? "conteúdo pendente" : "conteúdos pendentes"} para revisar.`, page: "provas" });
     if (prefs.study !== false) {
       const nowStamp = Date.parse(`${today}T${now}:00`);
       for (const event of data.events) {
@@ -58,32 +53,139 @@ function useReminders(data, user, today) {
         }
       }
     }
-    return list.slice(0, 4);
+    return list.slice(0, 3);
   }, [data, user, today]);
+}
+
+const pendingLabel = {
+  vazia: "Sem conteúdo",
+  revisar: "Rascunho para revisar",
+  perdida: "Falta sem o conteúdo perdido",
+};
+
+function PendingLessons({ items, onOpen, onStatus }) {
+  const [all, setAll] = useState(false);
+  const bySubject = items.reduce((map, item) => map.set(item.subject.id, (map.get(item.subject.id) || 0) + 1), new Map());
+  const shown = all ? items : items.slice(0, 5);
+  return (
+    <section aria-labelledby="pendentes-title">
+      <div className="section-head">
+        <h2 className="section-title" id="pendentes-title">
+          Aulas que precisam de conteúdo {items.length > 0 && <span className="count-badge">{items.length}</span>}
+        </h2>
+      </div>
+      {items.length ? (
+        <>
+          {bySubject.size > 1 && (
+            <p className="hint pending-summary">
+              {[...bySubject].map(([id, count]) => `${items.find((item) => item.subject.id === id).subject.name}: ${count}`).join(" · ")}
+            </p>
+          )}
+          <ul className="group">
+            {shown.map((item) => (
+              <li key={item.key} className="row pending-row" style={{ "--subject": item.subject.color }}>
+                <span className="subject-dot" aria-hidden="true" />
+                <span className="row-main">
+                  <strong>{item.subject.name}</strong>
+                  <small>
+                    {item.date === todayIso() ? "Hoje" : formatFull(item.date)}
+                    {item.start ? `, ${item.start}` : ""}
+                    {item.lesson?.theme ? `, ${item.lesson.theme}` : ""}
+                  </small>
+                </span>
+                <span className={`pending-tag pending-${item.kind}`}>{pendingLabel[item.kind]}</span>
+                <span className="row-actions">
+                  <button className="btn primary small" onClick={() => onOpen(item)}>
+                    {item.kind === "revisar" ? "Revisar" : item.lesson ? "Completar" : "Registrar"}
+                  </button>
+                  {!item.lesson && (
+                    <>
+                      <button className="btn small ghost" onClick={() => onStatus(item, "falta")}>
+                        Faltei
+                      </button>
+                      <button className="btn small ghost" onClick={() => onStatus(item, "cancelada")}>
+                        Cancelada
+                      </button>
+                    </>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {items.length > 5 && (
+            <button className="link-btn" onClick={() => setAll(!all)}>
+              {all ? "Mostrar menos" : `Ver todas as ${items.length}`}
+            </button>
+          )}
+        </>
+      ) : (
+        <Empty compact mood="happy" title="Tudo em dia! Todas as aulas possuem conteúdo cadastrado.">
+          As aulas das últimas semanas estão registradas, com falta anotada ou canceladas.
+        </Empty>
+      )}
+    </section>
+  );
+}
+
+function CommunityPreview() {
+  const { go } = useApp();
+  const { status, posts } = usePosts();
+  return (
+    <section aria-labelledby="quadro-title">
+      <div className="section-head">
+        <h2 className="section-title" id="quadro-title">
+          Quadro de Dúvidas
+        </h2>
+        <button className="link-btn" onClick={() => go("comunidade")}>
+          Abrir quadro <ChevronRight size={14} />
+        </button>
+      </div>
+      {status === "loading" ? (
+        <p className="quiet">Carregando...</p>
+      ) : status === "error" ? (
+        <p className="quiet">O quadro não abriu agora. Tente de novo mais tarde.</p>
+      ) : posts.length ? (
+        <ul className="group">
+          {posts.slice(0, 3).map((post) => (
+            <PostRow key={post.id} post={post} onOpen={(item) => go("comunidade", { id: item.id })} />
+          ))}
+        </ul>
+      ) : (
+        <p className="quiet">
+          Ninguém publicou ainda.{" "}
+          <button className="link-btn" onClick={() => go("comunidade")}>
+            Deixe a primeira dúvida ou ideia
+          </button>
+        </p>
+      )}
+    </section>
+  );
 }
 
 export default function Home() {
   const app = useApp();
-  const { data, user, go, update, toast } = app;
+  const { data, user, go, update, toast, ritual } = app;
   const today = todayIso();
   const [modal, setModal] = useState(null);
   const todays = agendaItems(data, user, today, today);
-  const todaysClasses = todays.filter((item) => item.kind === "aula");
-  const week = agendaItems(data, user, addDays(today, 1), addDays(today, 7)).filter((item) => item.kind !== "aula");
-  const weekAll = agendaItems(data, user, today, addDays(today, 6));
-  const exams = data.exams.filter((exam) => exam.date >= today).slice(0, 4);
-  const tasks = data.tasks.filter((task) => !task.done).slice(0, 5);
+  const exams = data.exams.filter((exam) => exam.date >= today).slice(0, 3);
+  const tasks = data.tasks.filter((task) => !task.done).slice(0, 4);
   const reminders = useReminders(data, user, today);
+  const pending = useMemo(() => pendingLessons(data, user, today, nowTime()), [data, user, today]);
   const progress = topicProgress(data.exams);
   const totalTopics = Object.values(progress).reduce((sum, value) => sum + value, 0);
-  const doneTasks = data.tasks.filter((task) => task.done).length;
   const registered = data.lessons.filter((lesson) => lesson.status === "presente" && !lesson.draft).length;
+  const weekStart = startOfWeek(today);
+  const sessions = data["study-sessions"];
+  const todaySeconds = sessions.filter((session) => session.date === today).reduce((sum, session) => sum + session.durationSeconds, 0);
+  const weekSeconds = sessions.filter((session) => session.date >= weekStart && session.date <= today).reduce((sum, session) => sum + session.durationSeconds, 0);
   const first = user.name.split(" ")[0];
+  const ritualActive = ritual.state.status === "running" || ritual.state.status === "paused";
 
   const quickStatus = async (occurrence, status) => {
     try {
       await saveLesson(app, occurrence, { status, draft: false });
-      toast(status === "falta" ? "Falta registrada. A aula continua no calendário." : "Aula marcada como cancelada.");
+      toast(status === "falta" ? "Falta registrada. Anote depois o conteúdo perdido." : "Aula marcada como cancelada.");
     } catch (error) {
       toast(error.message);
     }
@@ -92,26 +194,56 @@ export default function Home() {
   return (
     <div className="page home">
       <header className="home-head">
-        <p className="today-date">{formatLong(today)}</p>
-        <h1>Olá, {first}! Vamos organizar seus estudos?</h1>
-        <div className="quick-actions">
-          <button className="btn primary" onClick={() => go("aulas")}>
-            <BookOpen size={16} /> Registrar aula
-          </button>
-          <button className="btn" onClick={() => setModal({ type: "exam" })}>
-            <GraduationCap size={16} /> Adicionar prova
-          </button>
-          <button className="btn" onClick={() => setModal({ type: "task" })}>
-            <ClipboardPlus size={16} /> Cadastrar atividade
-          </button>
-          <button className="btn" onClick={() => go("ia")}>
-            <Sparkles size={16} /> Começar a estudar
-          </button>
-          <button className="btn sos" onClick={() => go("ia", { tool: "socorro" })}>
-            <LifeBuoy size={16} /> Socorro, tenho prova!
-          </button>
+        <Avatar user={user} size={56} className="home-avatar" />
+        <div>
+          <p className="today-date">{formatLong(today)}</p>
+          <h1>Olá, {first}. Vamos desvendar alguns conteúdos?</h1>
         </div>
       </header>
+      <div className="quick-actions">
+        <button className="btn primary" onClick={() => ritual.setView("open")}>
+          <Hourglass size={16} /> {ritualActive ? "Voltar ao ritual" : "Iniciar ritual de estudo"}
+        </button>
+        <button className="btn" onClick={() => go("aulas")}>
+          <BookOpen size={16} /> Registrar aula
+        </button>
+        <button className="btn" onClick={() => setModal({ type: "exam" })}>
+          <GraduationCap size={16} /> Adicionar prova
+        </button>
+        <button className="btn" onClick={() => setModal({ type: "task" })}>
+          <ClipboardPlus size={16} /> Cadastrar atividade
+        </button>
+        <button className="btn sos" onClick={() => go("ia", { tool: "socorro" })}>
+          <LifeBuoy size={16} /> Socorro, tenho prova!
+        </button>
+      </div>
+
+      <AnnouncementBanner />
+
+      <dl className="observatory-stats" aria-label="Seu progresso">
+        <div>
+          <dt>Estudo hoje</dt>
+          <dd>{todaySeconds ? formatDuration(todaySeconds) : "0 min"}</dd>
+        </div>
+        <div>
+          <dt>Nesta semana</dt>
+          <dd>{weekSeconds ? formatDuration(weekSeconds) : "0 min"}</dd>
+        </div>
+        <div>
+          <dt>Aulas registradas</dt>
+          <dd>{registered}</dd>
+        </div>
+        <div>
+          <dt>Conteúdos revisados</dt>
+          <dd>{totalTopics ? `${progress.Revisado + progress.Dominado} de ${totalTopics}` : "–"}</dd>
+        </div>
+      </dl>
+      <p className="footnote">
+        Tempo de estudo vem das sessões salvas no Ritual. Conteúdos revisados são os que você marcou nas provas.{" "}
+        <button className="link-btn" onClick={() => go("historico")}>
+          Ver histórico
+        </button>
+      </p>
 
       {reminders.length > 0 && (
         <ul className="group reminders" aria-label="Avisos">
@@ -129,57 +261,24 @@ export default function Home() {
 
       <div className="home-columns">
         <div className="home-main">
-          <section>
-            <h2 className="section-title">Você teve aula hoje?</h2>
-            {todaysClasses.length ? (
-              <ul className="group">
-                {todaysClasses.map((item) => {
-                  const lesson = item.occurrence.lesson;
-                  return (
-                    <li key={item.id} className="row class-row" style={{ "--subject": item.subject.color }}>
-                      <span className="row-time">{item.start}</span>
-                      <span className="subject-dot" aria-hidden="true" />
-                      <span className="row-main">
-                        <strong>{item.subject.name}</strong>
-                        <small>
-                          {lessonStatus[item.status].label}
-                          {lesson?.draft ? ", rascunho" : ""}
-                          {item.occurrence.room ? `, ${item.occurrence.room}` : ""}
-                        </small>
-                      </span>
-                      <span className="row-actions">
-                        <button className="btn primary small" onClick={() => setModal({ type: "lesson", occurrence: item.occurrence })}>
-                          {lesson?.draft ? "Continuar" : lesson ? "Abrir registro" : "Registrar aula"}
-                        </button>
-                        {!lesson && (
-                          <>
-                            <button className="btn small" onClick={() => quickStatus(item.occurrence, "falta")}>
-                              Faltei
-                            </button>
-                            <button className="btn small" onClick={() => quickStatus(item.occurrence, "cancelada")}>
-                              Cancelada
-                            </button>
-                          </>
-                        )}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <Empty compact mood="sleepy" title={data.subjects.length ? "Nenhuma aula na sua grade hoje." : "Cadastre suas disciplinas para ver suas aulas aqui."}>
-                {data.subjects.length ? "Se teve aula extra ou reposição, registre em Dias de aula." : null}
-                {!data.subjects.length && (
-                  <button className="btn small" onClick={() => go("conteudos")}>
-                    Cadastrar disciplinas
-                  </button>
-                )}
-              </Empty>
-            )}
-          </section>
+          {data.subjects.length ? (
+            <PendingLessons items={pending} onOpen={(item) => setModal({ type: "lesson", occurrence: item })} onStatus={quickStatus} />
+          ) : (
+            <Empty title="Cadastre suas disciplinas para começar.">
+              Com os dias e horários de cada matéria, a Grimiau monta as aulas do semestre e mostra o que falta registrar.
+              <button className="btn small primary" onClick={() => go("conteudos")}>
+                Cadastrar disciplinas
+              </button>
+            </Empty>
+          )}
 
           <section>
-            <h2 className="section-title">Minha rotina de hoje</h2>
+            <div className="section-head">
+              <h2 className="section-title">Hoje</h2>
+              <button className="link-btn" onClick={() => go("calendario")}>
+                Calendário <ChevronRight size={14} />
+              </button>
+            </div>
             {todays.length ? (
               <div className="group">
                 {todays.map((item) => (
@@ -191,55 +290,24 @@ export default function Home() {
                 ))}
               </div>
             ) : (
-              <p className="quiet">Nada marcado para hoje. Você pode planejar uma sessão de estudo no calendário.</p>
+              <p className="quiet">Nada marcado para hoje. Bom dia para adiantar uma revisão.</p>
             )}
           </section>
 
-          <section>
-            <div className="section-head">
-              <h2 className="section-title">Próximos dias</h2>
-              <button className="link-btn" onClick={() => go("calendario")}>
-                Abrir calendário <ChevronRight size={14} />
-              </button>
-            </div>
-            <div className="week-strip">
-              {Array.from({ length: 7 }, (_, index) => {
-                const day = addDays(today, index);
-                const items = weekAll.filter((item) => item.date === day);
-                return (
-                  <button key={day} type="button" className={index === 0 ? "is-today" : ""} onClick={() => go("calendario", { date: day, view: "dia" })} aria-label={`${formatLong(day)}: ${items.length} ${items.length === 1 ? "item" : "itens"}`}>
-                    <small>{weekdayOf(day)}</small>
-                    <strong>{Number(day.slice(8))}</strong>
-                    <span className="dots" aria-hidden="true">
-                      {items.slice(0, 4).map((item) => (
-                        <i key={item.id} className={`dot kind-${item.kind}`} style={{ "--subject": item.subject?.color || "var(--accent)" }} />
-                      ))}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            {week.length > 0 && (
-              <div className="group">
-                {week.slice(0, 5).map((item) => (
-                  <AgendaRow key={item.id} item={item} showDate onOpen={() => (item.kind === "prova" ? go("provas", { id: item.record.id }) : go("calendario", { date: item.date, view: "dia" }))} />
-                ))}
-              </div>
-            )}
-          </section>
+          <CommunityPreview />
         </div>
 
         <aside className="home-side">
           <section>
             <div className="section-head">
-              <h2 className="section-title">Próximas avaliações</h2>
+              <h2 className="section-title">Próximas provas e entregas</h2>
               {data.exams.length > 0 && (
                 <button className="link-btn" onClick={() => go("provas")}>
-                  Ver todas
+                  Ver provas
                 </button>
               )}
             </div>
-            {exams.length ? (
+            {exams.length || tasks.length ? (
               <ul className="group">
                 {exams.map((exam) => {
                   const subject = subjectById(data.subjects, exam.subjectId);
@@ -253,23 +321,12 @@ export default function Home() {
                             {subject?.name}, {formatShort(exam.date)}
                             {exam.time ? ` às ${exam.time}` : ""}
                           </small>
-                          <small>Preparação: {exam.prepStatus.toLowerCase()}</small>
                         </span>
                         <span className="countdown">{countdown(exam.date, today)}</span>
                       </button>
                     </li>
                   );
                 })}
-              </ul>
-            ) : (
-              <p className="quiet">Nenhuma prova cadastrada. Quando o professor marcar uma avaliação, adicione aqui para acompanhar a preparação.</p>
-            )}
-          </section>
-
-          <section>
-            <h2 className="section-title">Próximas entregas</h2>
-            {tasks.length ? (
-              <ul className="group">
                 {tasks.map((task) => {
                   const subject = subjectById(data.subjects, task.subjectId);
                   const late = task.dueDate < today;
@@ -283,7 +340,7 @@ export default function Home() {
                         onChange={async () => {
                           try {
                             await update("tasks", task.id, { done: !task.done });
-                            toast("Atividade concluída.");
+                            toast("Atividade concluída. Mais um feitiço riscado da lista!");
                           } catch (error) {
                             toast(error.message);
                           }
@@ -305,40 +362,20 @@ export default function Home() {
                 })}
               </ul>
             ) : (
-              <p className="quiet">Sem entregas pendentes.</p>
+              <p className="quiet">Nenhuma prova ou entrega à vista. Quando o professor marcar uma avaliação, cadastre aqui.</p>
             )}
           </section>
 
-          <section>
-            <div className="section-head">
-              <h2 className="section-title">Progresso</h2>
-              <button className="link-btn" onClick={() => go("historico")}>
-                Histórico
-              </button>
-            </div>
-            {totalTopics || data.tasks.length || data.lessons.length ? (
-              <dl className="group stat-list">
-                <div className="row">
-                  <dt>Conteúdos revisados</dt>
-                  <dd>{totalTopics ? `${progress.Revisado + progress.Dominado} de ${totalTopics}` : "Sem provas com tópicos"}</dd>
-                </div>
-                <div className="row">
-                  <dt>Tópicos pendentes</dt>
-                  <dd>{totalTopics ? progress["Não iniciado"] + progress["Em estudo"] : "–"}</dd>
-                </div>
-                <div className="row">
-                  <dt>Tarefas concluídas</dt>
-                  <dd>{data.tasks.length ? `${doneTasks} de ${data.tasks.length}` : "–"}</dd>
-                </div>
-                <div className="row">
-                  <dt>Aulas registradas</dt>
-                  <dd>{registered}</dd>
-                </div>
-              </dl>
-            ) : (
-              <p className="quiet">Os números aparecem quando você registrar aulas, provas com tópicos e atividades.</p>
-            )}
-            <p className="footnote">Tarefas concluídas mostram organização, não domínio do conteúdo. O domínio é você quem marca em cada prova.</p>
+          <Horoscope />
+
+          <section className="ritual-invite">
+            <Sparkles size={18} aria-hidden="true" />
+            <p>
+              {ritualActive ? "Seu ritual está em andamento. O tempo continua contando mesmo com o painel fechado." : "Seu ritual de concentração começa com um clique. Dá para fechar o painel e o tempo continua contando."}
+            </p>
+            <button className="btn small" onClick={() => ritual.setView("open")}>
+              {ritualActive ? "Abrir painel" : "Abrir ritual"}
+            </button>
           </section>
         </aside>
       </div>

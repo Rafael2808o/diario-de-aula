@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { addDays, classOccurrences, nowTime, todayIso } from "./dates.js";
 
-// Notificações do aparelho enquanto o Lúmina está aberto (aba, PWA ou app). Não há push do servidor:
+// Notificações do aparelho enquanto a Grimiau está aberta (aba, PWA ou app). Não há push do servidor:
 // com o app fechado, nada é enviado, e a tela de Configurações diz isso.
 const enabledKey = "lumina.notify";
 const sentKey = "lumina.notify.sent";
@@ -26,7 +26,7 @@ export const notificationsEnabled = () => notificationsSupported() && Notificati
 
 export async function enableNotifications() {
   if (window.LUMINA_APP) throw new Error("No app Android, as notificações ainda não funcionam. Use o Lúmina pelo navegador ou instalado na tela inicial para recebê-las.");
-  if (!notificationsSupported()) throw new Error("Este navegador não mostra notificações. No iPhone, instale o Lúmina na Tela de Início primeiro.");
+  if (!notificationsSupported()) throw new Error("Este navegador não mostra notificações. No iPhone, instale a Grimiau na Tela de Início primeiro.");
   const permission = await Notification.requestPermission();
   if (permission !== "granted") throw new Error("A permissão foi negada. Libere as notificações do site nas configurações do navegador.");
   write(enabledKey, "1");
@@ -35,7 +35,7 @@ export async function enableNotifications() {
 export const disableNotifications = () => write(enabledKey, "0");
 
 async function show(title, body, tag) {
-  const options = { body, tag, icon: "/icons/icon-192.png", badge: "/icons/icon-192.png" };
+  const options = { body, tag, icon: "/icons/grimiau-192.png", badge: "/icons/grimiau-192.png" };
   const registration = await navigator.serviceWorker?.getRegistration?.();
   if (registration) return registration.showNotification(title, options);
   return new Notification(title, options);

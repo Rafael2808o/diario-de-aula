@@ -1,16 +1,16 @@
 import { useEffect, useState } from "react";
 import { Apple, Download as DownloadIcon, Laptop, Smartphone } from "lucide-react";
-import { Nox } from "../ui.jsx";
+import { Logo, Nox } from "../ui.jsx";
 
 const apkUrl = "https://github.com/Rafael2808o/diario-de-aula/releases/download/v1.4.0/lumina-v1.4.0.apk";
 const siteUrl = "https://diario-de-aula-web.vercel.app";
 
-// Página pública com todas as formas de usar o Lúmina. Detecta o aparelho para mostrar primeiro o caminho certo.
+// Página pública com todas as formas de usar a Grimiau. Detecta o aparelho para mostrar primeiro o caminho certo.
 export default function Download() {
   const [device, setDevice] = useState("computador");
   const [installEvent, setInstallEvent] = useState(null);
   useEffect(() => {
-    document.title = "Baixar o Lúmina";
+    document.title = "Instalar a Grimiau";
     const agent = navigator.userAgent;
     setDevice(/iphone|ipad|ipod/i.test(agent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) ? "iphone" : /android/i.test(agent) ? "android" : "computador");
     const handler = (event) => {
@@ -36,7 +36,7 @@ export default function Download() {
             Escolha <strong>Adicionar à Tela de Início</strong> e toque em <strong>Adicionar</strong>.
           </li>
         </ol>
-        <p className="hint">O Lúmina abre em tela cheia, como um app, e recebe atualizações sozinho. É grátis e não precisa da App Store.</p>
+        <p className="hint">A Grimiau abre em tela cheia, como um app, e recebe atualizações sozinho. É grátis e não precisa da App Store.</p>
       </section>
     ),
     android: (
@@ -89,14 +89,14 @@ export default function Download() {
     <main className="download-page">
       <header>
         <a className="brand-mark" href="/">
-          <Nox size={36} /> <span>Lúmina</span>
+          <Logo size={40} /> <span>Grimiau</span>
         </a>
         <a className="btn primary" href="/">
           Abrir no navegador
         </a>
       </header>
       <div className="download-intro">
-        <h1>Instale o Lúmina</h1>
+        <h1>Instale a Grimiau</h1>
         <p>A mesma conta funciona no celular, no tablet e no computador. Seus registros ficam sincronizados.</p>
       </div>
       {order.map((item) => sections[item])}

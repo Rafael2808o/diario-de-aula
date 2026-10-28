@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BookOpen, CalendarDays, GraduationCap, Home as HomeIcon, Library, MoreHorizontal, Settings as SettingsIcon, Sparkles, X } from "lucide-react";
-import { AppContext } from "./context.js";
+import { BookOpen, CalendarDays, GraduationCap, Home as HomeIcon, Layers, Library, MessagesSquare, MoreHorizontal, Settings as SettingsIcon, Sparkles, X } from "lucide-react";
+import { AppContext, useApp } from "./context.js";
 import { readSession, request, storeSession, useAcademicData } from "./lib/api.js";
 import { useLocalNotifications } from "./lib/notify.js";
-import { Nox, ToastProvider, useToast } from "./ui.jsx";
+import { useRitual } from "./lib/ritual.js";
+import { activeStatuses, useTranscription } from "./lib/transcription.js";
+import { Avatar, Logo, Nox, ToastProvider, useToast } from "./ui.jsx";
 import SearchBox from "./components/SearchBox.jsx";
+import Ritual, { RitualButton } from "./components/Ritual.jsx";
+import { stageText } from "./components/ai/Transcribe.jsx";
 import Auth from "./pages/Auth.jsx";
 import Calendar from "./pages/Calendar.jsx";
+import Cards from "./pages/Cards.jsx";
+import Community from "./pages/Community.jsx";
 import Download from "./pages/Download.jsx";
 import Exams from "./pages/Exams.jsx";
 import History from "./pages/History.jsx";
@@ -17,20 +23,23 @@ import Settings from "./pages/Settings.jsx";
 import StudyAI from "./pages/StudyAI.jsx";
 import Subjects from "./pages/Subjects.jsx";
 
+// Rótulos do menu são funcionais; os nomes da Grimiau aparecem no título de cada página.
 const nav = [
-  { id: "inicio", label: "Início", icon: HomeIcon, page: Home },
-  { id: "calendario", label: "Calendário", icon: CalendarDays, page: Calendar },
-  { id: "provas", label: "Provas", icon: GraduationCap, page: Exams },
-  { id: "conteudos", label: "Conteúdos", icon: Library, page: Subjects },
-  { id: "aulas", label: "Dias de aula", icon: BookOpen, page: Lessons },
-  { id: "ia", label: "Estudar com IA", icon: Sparkles, page: StudyAI },
-  { id: "configuracoes", label: "Configurações", icon: SettingsIcon, page: Settings },
+  { id: "inicio", label: "Início", title: "Observatório", icon: HomeIcon, page: Home },
+  { id: "calendario", label: "Calendário", title: "Calendário", icon: CalendarDays, page: Calendar },
+  { id: "aulas", label: "Aulas", title: "Grimório Acadêmico", icon: BookOpen, page: Lessons },
+  { id: "conteudos", label: "Disciplinas", title: "Biblioteca Arcana", icon: Library, page: Subjects },
+  { id: "provas", label: "Provas", title: "Desafios Arcanos", icon: GraduationCap, page: Exams },
+  { id: "cartoes", label: "Cartas do Saber", title: "Cartas do Saber", icon: Layers, page: Cards },
+  { id: "ia", label: "Estudar com IA", title: "Estudar com IA", icon: Sparkles, page: StudyAI },
+  { id: "comunidade", label: "Quadro de Dúvidas", title: "Quadro de Dúvidas", icon: MessagesSquare, page: Community },
+  { id: "configuracoes", label: "Configurações", title: "Configurações", icon: SettingsIcon, page: Settings },
 ];
 // Páginas acessíveis por links, fora do menu principal.
-const extraPages = [{ id: "historico", label: "Histórico de aprendizagem", page: History }];
+const extraPages = [{ id: "historico", label: "Histórico de estudos", title: "Histórico de estudos", page: History }];
 const allPages = [...nav, ...extraPages];
-const mobileNav = ["inicio", "calendario", "aulas", "provas"];
-// Endereços da versão anterior continuam funcionando.
+const mobileNav = ["inicio", "aulas", "provas", "cartoes"];
+// Endereços das versões anteriores continuam funcionando.
 const legacyPages = { central: "inicio", diario: "aulas", prova: "ia", estudos: "calendario", biblioteca: "conteudos", desempenho: "inicio", perfil: "configuracoes" };
 
 function readLocation() {
@@ -77,7 +86,7 @@ function PwaPrompt() {
     <aside className="install-card">
       <Nox size={36} />
       <div>
-        <strong>Instalar o Lúmina</strong>
+        <strong>Instalar a Grimiau</strong>
         <p>{iosTip && !installEvent ? "No Safari, toque em Compartilhar e depois em “Adicionar à Tela de Início”." : "Use como aplicativo, com acesso rápido e tela cheia."}</p>
         {installEvent && (
           <button className="btn primary small" onClick={async () => { await installEvent.prompt(); setInstallEvent(null); }}>
@@ -104,6 +113,21 @@ function NotFound() {
   );
 }
 
+// Aviso discreto no topo enquanto uma transcrição anda em outra página.
+function TranscriptionChip() {
+  const { transcription, page, params, go } = useApp();
+  const job = transcription.job;
+  if (!job || (page === "ia" && params.tool === "gravar")) return null;
+  if (!activeStatuses.includes(job.status) && job.status !== "pronto" && job.status !== "erro") return null;
+  const label = job.status === "pronto" ? "Transcrição pronta: revisar" : job.status === "erro" ? "A transcrição falhou: ver opções" : `${stageText[job.status][0]}…`;
+  return (
+    <button type="button" className={`transcription-chip status-${job.status}`} onClick={() => go("ia", { tool: "gravar" })}>
+      {activeStatuses.includes(job.status) && <span className="pulse" aria-hidden="true" />}
+      {label}
+    </button>
+  );
+}
+
 function Shell({ session, setSession }) {
   const toast = useToast();
   const [location, setLocation] = useState(readLocation);
@@ -114,6 +138,8 @@ function Shell({ session, setSession }) {
     setSession(null);
   }, [setSession]);
   const academic = useAcademicData(session, expire);
+  const ritual = useRitual();
+  const transcription = useTranscription(session);
 
   useEffect(() => {
     const sync = () => setLocation(readLocation());
@@ -124,7 +150,7 @@ function Shell({ session, setSession }) {
   const current = allPages.find((item) => item.id === location.page);
   useLocalNotifications(academic.data, session.user);
   useEffect(() => {
-    document.title = `${current.label} — Lúmina`;
+    document.title = `${current.title} — Grimiau`;
   }, [current]);
 
   const go = useCallback((page, params = {}) => {
@@ -155,8 +181,8 @@ function Shell({ session, setSession }) {
   }, [session.token, setSession]);
 
   const context = useMemo(
-    () => ({ ...academic, session, user: session.user, setUser, signOut, go, params: location.params, page: location.page, toast }),
-    [academic, session, setUser, signOut, go, location, toast],
+    () => ({ ...academic, session, user: session.user, setUser, signOut, go, params: location.params, page: location.page, toast, ritual, transcription }),
+    [academic, session, setUser, signOut, go, location, toast, ritual, transcription],
   );
 
   if (!session.user.onboardingDone) {
@@ -168,12 +194,13 @@ function Shell({ session, setSession }) {
   }
 
   const Page = current.page;
+  const ready = !(academic.status === "loading" && academic.data.subjects.length === 0) && academic.status !== "error";
   return (
     <AppContext.Provider value={context}>
       <div className="shell">
         <aside className="sidebar" aria-label="Menu principal">
-          <button className="brand-mark" onClick={() => go("inicio")} aria-label="Lúmina, ir para o Início">
-            <Nox size={34} /> <span>Lúmina</span>
+          <button className="brand-mark" onClick={() => go("inicio")} aria-label="Grimiau, ir para o Início">
+            <Logo size={40} /> <span>Grimiau</span>
           </button>
           <nav>
             {nav.map(({ id, label, icon: Icon }) => (
@@ -182,27 +209,24 @@ function Shell({ session, setSession }) {
               </button>
             ))}
           </nav>
-          <p className="sidebar-note">Você registra o semestre. O Lúmina organiza seus estudos.</p>
+          <p className="sidebar-note">Conhecimento é magia.</p>
         </aside>
         <div className="main-column">
           <header className="topbar">
             <button className="brand-mark compact" onClick={() => go("inicio")} aria-label="Ir para o Início">
-              <Nox size={30} />
+              <Logo size={34} />
             </button>
             <SearchBox />
-            <button className="avatar" onClick={() => go("configuracoes")} aria-label="Abrir configurações da conta">
-              {session.user.name
-                .split(/\s+/)
-                .slice(0, 2)
-                .map((part) => part[0])
-                .join("")
-                .toUpperCase()}
+            <TranscriptionChip />
+            {ready && <RitualButton />}
+            <button className="avatar" onClick={() => go("configuracoes")} aria-label="Abrir perfil e configurações">
+              <Avatar user={session.user} size={34} />
             </button>
           </header>
-          {academic.status === "loading" && academic.data.subjects.length === 0 ? (
+          {!ready && academic.status !== "error" ? (
             <div className="page loading" role="status">
-              <Nox size={72} mood="sleepy" />
-              <p>Carregando seus registros...</p>
+              <Nox size={72} mood="sleepy" alive />
+              <p>Abrindo seu grimório...</p>
             </div>
           ) : academic.status === "error" ? (
             <div className="page loading" role="alert">
@@ -222,7 +246,7 @@ function Shell({ session, setSession }) {
             return (
               <button key={id} className={location.page === id ? "active" : ""} aria-current={location.page === id ? "page" : undefined} onClick={() => go(id)}>
                 <Icon size={20} aria-hidden="true" />
-                <span>{label === "Dias de aula" ? "Aulas" : label}</span>
+                <span>{id === "cartoes" ? "Cartas" : label}</span>
               </button>
             );
           })}
@@ -245,6 +269,7 @@ function Shell({ session, setSession }) {
             </div>
           </div>
         )}
+        {ready && <Ritual />}
         <PwaPrompt />
       </div>
     </AppContext.Provider>

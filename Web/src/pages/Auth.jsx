@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { request } from "../lib/api.js";
-import { FormError, Nox } from "../ui.jsx";
+import { FormError, Logo } from "../ui.jsx";
 
 const resetToken = () => new URLSearchParams(window.location.search).get("redefinir") || "";
 
 export default function Auth({ onAuthenticated }) {
-  const [mode, setMode] = useState(resetToken() ? "reset" : "register");
+  const [mode, setMode] = useState(resetToken() ? "reset" : "welcome");
   useEffect(() => {
-    document.title = "Entrar — Lúmina";
+    document.title = "Grimiau — seu grimório acadêmico";
   }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -44,28 +44,57 @@ export default function Auth({ onAuthenticated }) {
   };
 
   const copy = {
+    welcome: ["", "", ""],
     register: ["Crie sua conta", "Leva menos de um minuto. Depois, montamos seu semestre juntos.", "Criar conta"],
-    login: ["Bem-vindo de volta", "Entre para continuar de onde parou.", "Entrar"],
+    login: ["Que bom te ver de novo", "Entre para continuar de onde parou. Seus registros estão no lugar.", "Entrar"],
     forgot: ["Recuperar senha", "Enviaremos um link para você criar uma nova senha.", "Enviar link"],
     reset: ["Nova senha", "Escolha uma nova senha para sua conta.", "Salvar nova senha"],
   }[mode];
+
+  if (mode === "welcome") {
+    return (
+      <main className="welcome-screen">
+        <div className="welcome-sky" aria-hidden="true" />
+        <section className="welcome-card">
+          <Logo size={168} alive />
+          <h1 className="wordmark">Grimiau</h1>
+          <p className="slogan">Conhecimento é magia.</p>
+          <p className="welcome-text">Seu grimório acadêmico: aulas, provas, flashcards e sessões de estudo da faculdade, organizados num lugar só.</p>
+          <div className="welcome-actions">
+            <button type="button" className="btn primary" onClick={() => switchTo("register")}>
+              Criar conta
+            </button>
+            <button type="button" className="btn ghost" onClick={() => switchTo("login")}>
+              Fazer login
+            </button>
+          </div>
+          <p className="hint">Já usava o Lúmina? Sua conta continua valendo: é só fazer login.</p>
+          <a className="hint welcome-download" href="/baixar">
+            Instalar no Android ou iPhone
+          </a>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="auth">
       <section className="auth-story">
         <div className="brand-mark">
-          <Nox size={44} /> <span>Lúmina</span>
+          <Logo size={48} /> <span>Grimiau</span>
         </div>
         <div>
-          <h1>Você registra o semestre. O Lúmina organiza seus estudos.</h1>
-          <p>Aulas, provas, trabalhos e avisos do professor em um só lugar. Quando a prova chegar, você sabe por onde começar.</p>
+          <h1>Olá, bruxinha. Vamos desvendar alguns conteúdos?</h1>
+          <p>Registre as aulas, acompanhe as provas e estude com o Nox do seu lado. Conhecimento é magia.</p>
         </div>
-        <Nox size={150} className="auth-nox" />
+        <Logo size={170} alive />
       </section>
       <section className="auth-panel">
         <form className="form auth-form" onSubmit={submit} noValidate={false}>
-          <h2>{copy[0]}</h2>
-          <p className="hint">{copy[1]}</p>
+          <button type="button" className="link-btn back" onClick={() => switchTo("welcome")}>
+            ← Voltar
+          </button>
+          <h2>{copy[0]}</h2>          <p className="hint">{copy[1]}</p>
           {mode === "register" && (
             <label>
               Nome

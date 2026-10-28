@@ -1,13 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from "react";
 import { Check, X } from "lucide-react";
 
-// Nox: um só desenho em todas as telas, em cores chapadas; só a expressão muda (calm, happy, sleepy).
-export function Nox({ size = 72, mood = "calm", className = "" }) {
+// Nox, o gatinho preto da Grimiau: um só desenho em todas as telas, em cores chapadas.
+// Só a expressão muda (calm, happy, sleepy, focused). Com "alive", pisca e mexe a cauda (respeita movimento reduzido).
+export function Nox({ size = 72, mood = "calm", className = "", alive = false, label = "Nox, o gatinho da Grimiau" }) {
   const closed = mood === "happy" || mood === "sleepy";
   return (
-    <svg className={`nox ${className}`} width={size} height={size} viewBox="0 0 120 120" role="img" aria-label="Nox, o gatinho do Lúmina">
+    <svg className={`nox ${alive ? "alive" : ""} ${className}`} width={size} height={size} viewBox="0 0 120 120" role="img" aria-label={label}>
       <path className="nox-body" d="M36 113c-4-18 6-30 24-30s28 12 24 30c-1 4-47 4-48 0z" />
-      <path d="M80 110c12 2 22-3 23-13 .6-6-3-9-6.5-8.5" fill="none" strokeWidth="6.5" strokeLinecap="round" stroke="var(--nox-fur)" />
+      <path className="nox-tail" d="M80 110c12 2 22-3 23-13 .6-6-3-9-6.5-8.5" fill="none" strokeWidth="6.5" strokeLinecap="round" />
       <path className="nox-body" d="M22 60c0-12 3.5-22 9.5-30L29 10l20 13c3.5-1 7.3-1.5 11-1.5s7.5.5 11 1.5l20-13-2.5 20c6 8 9.5 18 9.5 30 0 18-17 28-38 28S22 78 22 60z" />
       <path d="M33 17l12 8-9.5 6zM87 17l-12 8 9.5 6z" fill="var(--nox-ear)" />
       <path d="M63 27a8 8 0 1 0 0 14 6.4 6.4 0 1 1 0-14z" fill="var(--nox-moon)" />
@@ -16,11 +17,11 @@ export function Nox({ size = 72, mood = "calm", className = "" }) {
           <path d={mood === "sleepy" ? "M39 58h14M67 58h14" : "M39 59q7-6 14 0M67 59q7-6 14 0"} />
         </g>
       ) : (
-        <g>
+        <g className="nox-eyes">
           <path d="M37 57c3-7 13-8 17-1-2 7-14 8-17 1z" fill="var(--nox-eye)" />
           <path d="M66 56c4-7 14-6 17 1-3 7-15 6-17-1z" fill="var(--nox-eye)" />
-          <ellipse cx="46" cy="56.5" rx="2" ry="4.6" fill="var(--nox-pupil)" />
-          <ellipse cx="74.5" cy="56.5" rx="2" ry="4.6" fill="var(--nox-pupil)" />
+          <ellipse cx={mood === "focused" ? 47.5 : 46} cy={mood === "focused" ? 58 : 56.5} rx="2" ry="4.6" fill="var(--nox-pupil)" />
+          <ellipse cx={mood === "focused" ? 76 : 74.5} cy={mood === "focused" ? 58 : 56.5} rx="2" ry="4.6" fill="var(--nox-pupil)" />
           <circle cx="43.5" cy="54" r="1.4" fill="#fff" />
           <circle cx="72" cy="54" r="1.4" fill="#fff" />
         </g>
@@ -30,6 +31,41 @@ export function Nox({ size = 72, mood = "calm", className = "" }) {
     </svg>
   );
 }
+
+// Logotipo: Nox sentado sobre um grimório aberto, com a lua crescente dourada e estrelas.
+export function Logo({ size = 120, alive = false }) {
+  return (
+    <svg className={`grimiau-logo ${alive ? "alive" : ""}`} width={size} height={size} viewBox="0 0 160 160" role="img" aria-label="Grimiau: Nox sentado sobre um grimório aberto">
+      <path d="M138 8a15 15 0 1 0 13 22 12 12 0 1 1-13-22z" fill="var(--nox-moon)" />
+      <path d="M30 30l1.4 3.2 3.2 1.4-3.2 1.4-1.4 3.2-1.4-3.2-3.2-1.4 3.2-1.4z M138 70l1 2.3 2.3 1-2.3 1-1 2.3-1-2.3-2.3-1 2.3-1z M22 78l.8 1.8 1.8.8-1.8.8-.8 1.8-.8-1.8-1.8-.8 1.8-.8z" fill="var(--nox-moon)" />
+      <g transform="translate(20 14)">
+        <Nox size={120} alive={alive} label="" />
+      </g>
+      <path d="M14 128c22-8 44-8 66 2 22-10 44-10 66-2v14c-22-8-44-8-66 2-22-10-44-10-66-2z" fill="var(--surface-2)" stroke="var(--nox-ear)" strokeWidth="2.4" strokeLinejoin="round" />
+      <path d="M80 130v14" stroke="var(--nox-ear)" strokeWidth="2.4" />
+      <path d="M24 133c16-4 32-4 48 1M88 134c16-5 32-5 48-1" stroke="var(--line-strong)" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// Foto de perfil, ou as iniciais quando a conta não tem foto.
+export function Avatar({ user, size = 34, className = "" }) {
+  const initials = String(user?.name || "?")
+    .split(/s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+  const [broken, setBroken] = useState(false);
+  const version = user?.avatarVersion;
+  return (
+    <span className={`avatar-img ${className}`} style={{ width: size, height: size, fontSize: Math.round(size * 0.38) }} aria-hidden="true">
+      {version && !broken ? <img src={`${avatarUrl(user.id, version)}`} alt="" width={size} height={size} onError={() => setBroken(true)} /> : initials}
+    </span>
+  );
+}
+export const avatarUrl = (userId, version) => `${import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:3333/api/v1" : "/api/v1")}/avatars/${userId}?v=${version}`;
 
 // Seção agrupada: título fora do bloco, conteúdo numa superfície única (padrão de listas agrupadas).
 export function Card({ title, action, children, className = "", as: Tag = "section" }) {

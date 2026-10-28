@@ -1,34 +1,34 @@
 {
   "id": "/",
-  "name": "Lúmina — assistente de estudos",
-  "short_name": "Lúmina",
-  "description": "Você registra o semestre. O Lúmina organiza seus estudos.",
+  "name": "Grimiau — Seu grimório acadêmico",
+  "short_name": "Grimiau",
+  "description": "Conhecimento é magia. Aulas, provas, cartas de estudo e o Ritual de Concentração em um só grimório.",
   "lang": "pt-BR",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#f2f3f6",
-  "theme_color": "#4f5bd5",
+  "background_color": "#0f0b14",
+  "theme_color": "#0f0b14",
   "categories": [
     "education",
     "productivity"
   ],
   "icons": [
     {
-      "src": "/icons/icon-192.png",
+      "src": "/icons/grimiau-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "/icons/grimiau-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "/icons/grimiau-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
@@ -41,7 +41,7 @@
       "url": "/?abrir=aulas",
       "icons": [
         {
-          "src": "/icons/icon-192.png",
+          "src": "/icons/grimiau-192.png",
           "sizes": "192x192"
         }
       ]
@@ -52,7 +52,7 @@
       "url": "/?abrir=ia&tool=socorro",
       "icons": [
         {
-          "src": "/icons/icon-192.png",
+          "src": "/icons/grimiau-192.png",
           "sizes": "192x192"
         }
       ]

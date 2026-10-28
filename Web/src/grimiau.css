@@ -1,0 +1,325 @@
+/*
+  Grimiau — camada de identidade sobre o sistema visual base (lumina.css).
+  Estrelas só no fundo e em momentos de conquista; Cinzel no logotipo e títulos de página;
+  Cormorant itálico em frases decorativas (Cinzel não tem itálico no Google Fonts).
+*/
+
+/* ---------- Fundo e marca ---------- */
+body {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(229, 199, 123, 0.55), transparent 60%),
+    radial-gradient(1px 1px at 78% 9%, rgba(199, 184, 220, 0.5), transparent 60%),
+    radial-gradient(1.4px 1.4px at 41% 63%, rgba(199, 184, 220, 0.35), transparent 60%),
+    radial-gradient(1px 1px at 91% 72%, rgba(229, 199, 123, 0.4), transparent 60%),
+    radial-gradient(1px 1px at 23% 88%, rgba(199, 184, 220, 0.3), transparent 60%);
+  background-attachment: fixed;
+}
+:root[data-theme="light"] body { background-image: none; }
+
+.brand-mark { font-family: var(--font-display); font-weight: 700; letter-spacing: 0.04em; gap: 10px; }
+.sidebar .brand-mark { padding: 2px 4px; font-size: 21px; }
+.sidebar-note { font-family: var(--font-script); font-style: italic; font-size: 16px; color: var(--text-2); }
+.sidebar nav button.active { background: var(--accent-soft); color: var(--text); box-shadow: inset 2px 0 0 var(--gold); }
+.sidebar nav button.active svg { color: var(--gold); }
+.page-head h1, .detail-head h1, .home-head h1 { text-wrap: balance; }
+.grimiau-logo { flex: none; overflow: visible; }
+
+/* ---------- Avatar ---------- */
+.avatar { background: none; width: auto; height: auto; border-radius: 50%; }
+.avatar-img {
+  display: inline-grid; place-items: center; flex: none; overflow: hidden; border-radius: 50%;
+  background: var(--accent-soft); color: var(--text); font-weight: 600; letter-spacing: 0.02em;
+  box-shadow: 0 0 0 1.5px var(--line-strong);
+}
+.avatar-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+img.avatar-img { object-fit: cover; }
+
+/* ---------- Boas-vindas ---------- */
+.welcome-screen { position: relative; min-height: 100vh; display: grid; place-items: center; padding: 32px 16px; overflow: hidden; }
+.welcome-sky {
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(141, 112, 184, 0.16), transparent 42%),
+    radial-gradient(1.5px 1.5px at 30% 22%, var(--gold), transparent 60%),
+    radial-gradient(1px 1px at 68% 30%, var(--text-2), transparent 60%),
+    radial-gradient(1.2px 1.2px at 20% 70%, var(--text-2), transparent 60%),
+    radial-gradient(1.5px 1.5px at 82% 64%, var(--gold), transparent 60%);
+}
+.welcome-card { position: relative; display: grid; justify-items: center; text-align: center; gap: 10px; width: min(460px, 100%); }
+.wordmark { font-family: var(--font-display); font-size: clamp(40px, 9vw, 58px); font-weight: 600; letter-spacing: 0.08em; margin-top: 4px; }
+.slogan { font-family: var(--font-script); font-style: italic; font-size: 24px; color: var(--gold); }
+.welcome-text { color: var(--text-2); max-width: 38ch; margin: 6px 0 10px; }
+.welcome-actions { display: grid; gap: 10px; width: min(300px, 100%); }
+.welcome-actions .btn { min-height: 46px; font-size: 15.5px; }
+.welcome-card .hint { margin-top: 8px; }
+.welcome-download { font-size: 13.5px; color: var(--link); }
+.auth-story { background: var(--surface); color: var(--text); border-right: 1px solid var(--separator); }
+.auth-story .brand-mark { color: var(--text); }
+.auth-story h1 { color: var(--text); font-family: var(--font-display); font-size: clamp(26px, 3vw, 36px); max-width: 18ch; line-height: 1.2; }
+.auth-story p { color: var(--text-2); }
+.auth-form h2 { font-family: var(--font-display); font-weight: 600; }
+
+/* ---------- Topo ---------- */
+.ritual-launch {
+  display: inline-flex; align-items: center; gap: 6px; flex: none; height: 34px; padding: 0 12px; border-radius: 17px;
+  background: var(--fill); color: var(--text); font-size: 13.5px; font-weight: 500;
+}
+.ritual-launch:hover { background: var(--fill-hover); }
+.ritual-launch svg { color: var(--gold); }
+.ritual-launch.is-active { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.ritual-launch-time { font-variant-numeric: tabular-nums; }
+.topbar .avatar { margin-left: 0; }
+.topbar .searchbox { min-width: 0; }
+@media (max-width: 900px) { .topbar { gap: 8px; } }
+.transcription-chip {
+  display: inline-flex; align-items: center; gap: 8px; flex: none; max-width: 260px; height: 32px; padding: 0 12px;
+  border-radius: 16px; background: var(--surface-2); color: var(--text-2); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  box-shadow: inset 0 0 0 1px var(--separator);
+}
+.transcription-chip.status-pronto { color: var(--success); }
+.transcription-chip.status-erro { color: var(--danger); }
+.pulse { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--gold); }
+@media (prefers-reduced-motion: no-preference) {
+  .pulse { animation: pulse 1.4s ease-in-out infinite; }
+}
+@keyframes pulse { 50% { opacity: 0.3; transform: scale(0.7); } }
+
+/* ---------- Observatório ---------- */
+.home-head { display: flex; align-items: center; gap: 14px; }
+.home-head h1 { max-width: 30ch; font-size: clamp(24px, 3vw, 30px); }
+.today-date { font-size: 13.5px; color: var(--text-3); }
+.quick-actions { margin-top: -10px; }
+.announcement {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px 14px;
+  padding: 14px 16px; border-radius: var(--radius); background: var(--gold-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 35%, transparent);
+}
+.announcement-icon { color: var(--gold); }
+.announcement strong { display: block; }
+.announcement p { color: var(--text-2); font-size: 14px; margin-top: 2px; }
+.announcement-actions { display: flex; gap: 8px; }
+.announcement-detail { display: grid; gap: 12px; }
+.announcement-detail ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; color: var(--text-2); }
+.observatory-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 0; border-radius: var(--radius); overflow: hidden; background: var(--separator); }
+.observatory-stats > div { background: var(--surface); padding: 12px 14px; }
+.observatory-stats dt { font-size: 12.5px; color: var(--text-3); }
+.observatory-stats dd { margin: 2px 0 0; font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.home .footnote { margin-top: -20px; }
+.count-badge { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; margin-left: 4px; border-radius: 11px; background: var(--accent-soft); color: var(--text); font-size: 12.5px; font-weight: 600; vertical-align: 2px; }
+.pending-summary { margin-top: -2px; }
+.pending-row { flex-wrap: wrap; }
+.pending-row .row-main { min-width: 140px; }
+.pending-tag { font-size: 12px; padding: 3px 8px; border-radius: 6px; white-space: nowrap; background: var(--fill); color: var(--text-2); }
+.pending-vazia { background: var(--warning-soft); color: var(--warning); }
+.pending-revisar { background: var(--accent-soft); color: var(--link); }
+.pending-perdida { background: var(--danger-soft); color: var(--danger); }
+.ritual-invite { display: grid !important; grid-template-columns: auto 1fr; gap: 10px 12px !important; align-items: start; padding: 14px; border-radius: var(--radius); background: var(--surface); }
+.ritual-invite svg { color: var(--gold); margin-top: 2px; }
+.ritual-invite p { font-size: 14px; color: var(--text-2); }
+.ritual-invite .btn { grid-column: 2; justify-self: start; }
+
+/* ---------- Horóscopo ---------- */
+.horoscope { display: grid; gap: 10px !important; padding: 16px; border-radius: var(--radius); background: var(--surface); box-shadow: inset 0 0 0 1px var(--separator); position: relative; overflow: hidden; }
+.horoscope::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.6;
+  background:
+    radial-gradient(1px 1px at 85% 18%, var(--gold), transparent 70%),
+    radial-gradient(1px 1px at 92% 40%, var(--text-2), transparent 70%),
+    radial-gradient(1.2px 1.2px at 74% 12%, var(--text-2), transparent 70%);
+}
+.horoscope-head { display: flex; align-items: center; gap: 12px; }
+.horoscope-head .link-btn { margin-left: auto; font-size: 13px; }
+.horoscope-head small { color: var(--text-3); }
+.horoscope-title { font-family: var(--font-display); font-size: 18px; font-weight: 600; }
+.zodiac-symbol { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--accent-soft); color: var(--gold); font-size: 20px; font-family: "Segoe UI Symbol", "Apple Symbols", "Noto Sans Symbols", sans-serif; }
+.horoscope-text { font-size: 14.5px; line-height: 1.55; color: var(--text); }
+.horoscope-source { color: var(--text-3); font-size: 12px; }
+.zodiac-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.zodiac-grid button { display: flex; align-items: center; gap: 6px; padding: 8px; border-radius: 9px; background: var(--fill); font-size: 13px; }
+.zodiac-grid button span { color: var(--gold); font-family: "Segoe UI Symbol", "Apple Symbols", "Noto Sans Symbols", sans-serif; }
+.zodiac-grid button:hover, .zodiac-grid button.active { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+
+/* ---------- Ritual de Concentração ---------- */
+.ritual-panel {
+  position: fixed; z-index: 40; right: 20px; bottom: 20px; width: min(380px, calc(100vw - 32px));
+  max-height: calc(100vh - 88px); overflow-y: auto; overscroll-behavior: contain;
+  display: grid; gap: 12px; padding: 16px; border-radius: 18px;
+  background: var(--surface); box-shadow: var(--popover-shadow), inset 0 0 0 1px var(--separator);
+}
+.ritual-panel[hidden] { display: none; }
+.ritual-panel, .ritual-summary { grid-template-columns: minmax(0, 1fr); }
+.ritual-panel select { width: 100%; min-width: 0; }
+.ritual-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 4px 10px; }
+.ritual-head h2 { font-family: var(--font-display); font-size: 16px; font-weight: 600; }
+.ritual-head p { font-size: 12.5px; color: var(--text-3); }
+.ritual-clock { text-align: center; font-size: clamp(40px, 11vw, 52px); font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; line-height: 1.1; color: var(--text); }
+.ritual-phrase { min-height: 3.2em; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; text-align: center; }
+.ritual-phrase button { font-family: var(--font-script); font-style: italic; font-size: 19px; line-height: 1.3; color: var(--text-2); white-space: normal; }
+@media (prefers-reduced-motion: no-preference) {
+  .ritual-phrase { animation: phrase-in 0.6s ease; }
+}
+@keyframes phrase-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.ritual-subject { display: grid; gap: 4px; font-size: 13px; color: var(--text-2); }
+.ritual-subject select { min-height: 36px; padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--line-strong); background: var(--surface-2); }
+.ritual-controls { display: flex; gap: 8px; }
+.ritual-controls .btn { flex: 1; min-height: 42px; }
+.ritual-summary { display: grid; gap: 10px; padding: 12px; border-radius: 12px; background: var(--surface-2); }
+.ritual-today { font-size: 12.5px; color: var(--text-3); text-align: center; }
+.ritual-section { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--separator); }
+.ritual-section h3 { font-size: 13px; font-weight: 600; color: var(--text-3); }
+.ritual-music iframe { width: 100%; border: 0; border-radius: 12px; display: block; background: var(--surface-2); }
+.ritual-music-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.ritual-music-form { display: grid; gap: 8px; }
+.ritual-music-form label { display: grid; gap: 4px; font-size: 13px; color: var(--text-2); }
+.ritual-music-form input { min-height: 38px; padding: 7px 10px; border-radius: var(--radius-sm); border: 1px solid var(--line-strong); background: var(--surface-2); }
+.ritual-pill {
+  position: fixed; z-index: 40; right: 20px; bottom: 20px; display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 14px 6px 8px; border-radius: 26px; background: var(--surface); box-shadow: var(--popover-shadow), inset 0 0 0 1px var(--accent);
+  font-variant-numeric: tabular-nums; font-weight: 600;
+}
+.ritual-pill small { font-weight: 400; color: var(--text-3); }
+.ritual-pill.status-paused span { color: var(--text-3); }
+.ritual-stars { position: absolute; inset: 0; pointer-events: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .ritual-stars {
+    background:
+      radial-gradient(2px 2px at 20% 30%, var(--gold), transparent 70%),
+      radial-gradient(2px 2px at 75% 22%, var(--gold), transparent 70%),
+      radial-gradient(1.6px 1.6px at 60% 55%, var(--text-2), transparent 70%),
+      radial-gradient(2px 2px at 35% 70%, var(--gold), transparent 70%);
+    animation: stars 2.4s ease-out forwards;
+  }
+}
+@keyframes stars { 0% { opacity: 0; transform: translateY(8px); } 25% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px); } }
+
+/* ---------- Transcrição ---------- */
+.transcription-status { display: grid; gap: 10px; padding: 14px; border-radius: 12px; background: var(--surface-2); }
+.transcription-status.compact { padding: 10px 12px; }
+.transcription-head { display: flex; align-items: center; gap: 12px; }
+.transcription-head strong { display: block; }
+.transcription-head small { color: var(--text-3); }
+.transcription-status.status-pronto .transcription-head svg { color: var(--success); }
+.transcription-status.status-erro .transcription-head svg { color: var(--danger); }
+.transcription-status > p { font-size: 14px; color: var(--text-2); }
+.indeterminate { position: relative; height: 4px; border-radius: 2px; background: var(--fill); overflow: hidden; }
+.indeterminate::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 35%; border-radius: inherit; background: var(--accent); }
+@media (prefers-reduced-motion: no-preference) {
+  .indeterminate::after { animation: indeterminate 1.4s ease-in-out infinite; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .indeterminate::after { width: 100%; opacity: 0.5; }
+}
+@keyframes indeterminate { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+.transcription-steps { display: flex; flex-wrap: wrap; gap: 4px 16px; list-style: none; margin: 0; padding: 0; font-size: 12.5px; color: var(--text-3); }
+.transcription-steps li::before { content: "○ "; }
+.transcription-steps li.done { color: var(--success); }
+.transcription-steps li.done::before { content: "● "; }
+.transcription-steps li.current { color: var(--text); font-weight: 600; }
+.transcription-steps li.current::before { content: "◐ "; color: var(--gold); }
+
+/* ---------- Provas: conteúdos das aulas ---------- */
+.lesson-filter { max-width: 320px; }
+.lesson-content { align-items: flex-start; }
+.lesson-content .row-main { display: grid; gap: 4px; }
+.lesson-excerpt { font-size: 14px; color: var(--text-2); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.lesson-excerpt.is-open { display: block; -webkit-line-clamp: unset; }
+.lesson-content-actions { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.lesson-content-actions .link-btn { font-size: 13px; }
+
+/* ---------- Cartas do Saber ---------- */
+.deck-options { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; font-size: 13.5px; }
+.deck-progress { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; width: min(560px, 100%); font-size: 13px; color: var(--text-3); }
+.progress-track { height: 6px; border-radius: 3px; background: var(--fill); overflow: hidden; }
+.progress-track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), var(--gold)); transition: width 0.25s ease; }
+.level-tag { font-size: 12px; padding: 2px 8px; border-radius: 6px; background: var(--fill); color: var(--text-2); }
+.level-difícil { background: var(--danger-soft); color: var(--danger); }
+.level-dúvida { background: var(--warning-soft); color: var(--warning); }
+.level-fácil { background: var(--success-soft); color: var(--success); }
+.flashcard { perspective: 1200px; padding: 0; min-height: 240px; display: block; background: none; box-shadow: none; width: min(560px, 100%); }
+.flashcard-inner { position: relative; display: grid; min-height: 240px; transform-style: preserve-3d; transition: transform 0.5s cubic-bezier(0.3, 0.7, 0.3, 1); }
+.flashcard.is-flipped .flashcard-inner { transform: rotateY(180deg); }
+.flashcard-face {
+  grid-area: 1 / 1; display: grid; place-content: center; gap: 10px; padding: 28px; border-radius: 18px; text-align: center;
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--separator);
+}
+.flashcard-face.back { transform: rotateY(180deg); background: var(--accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent); }
+.flashcard-face strong { font-size: 19px; font-weight: 600; line-height: 1.4; }
+.flashcard-face.back strong { font-weight: 400; font-size: 17px; }
+.flashcard.is-flipped strong { font-weight: inherit; font-size: inherit; }
+.flashcard-face.back strong { font-weight: 400; }
+@media (prefers-reduced-motion: reduce) {
+  .flashcard-inner { transition: none; }
+}
+.deck-nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; width: min(560px, 100%); }
+.deck-grade { display: flex; gap: 6px; }
+.grade-hard { color: var(--danger); }
+.grade-doubt { color: var(--warning); }
+.hint.centered { text-align: center; }
+.cards-page .tool-panel { padding: 18px; border-radius: var(--radius); background: var(--surface); }
+
+/* ---------- Quadro de Dúvidas ---------- */
+.community-tools { flex-wrap: wrap; align-items: center; }
+.community-tools .search-field { flex: 1 1 220px; }
+.post-row { align-items: center; }
+.post-row .row-main small { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.post-category { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 7px; border-radius: 6px; background: var(--fill); color: var(--text-2); }
+.post-category.cat-0 { background: var(--accent-soft); color: var(--link); }
+.post-category.cat-1 { background: var(--gold-soft); color: var(--gold); }
+.post-category.cat-2 { background: var(--danger-soft); color: var(--danger); }
+.post-category.cat-3 { background: var(--success-soft); color: var(--success); }
+.post-count { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--text-3); }
+.post-detail { display: grid; gap: 18px; padding: 18px; border-radius: var(--radius); background: var(--surface); }
+.post-head { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: start; }
+.post-head h2 { font-size: 20px; margin: 6px 0 2px; }
+.post-head small { color: var(--text-3); }
+.post-body { font-size: 15px; line-height: 1.6; }
+.comments { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.comment { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; }
+.comment-meta { font-size: 13px; color: var(--text-3); }
+.comment-meta strong { color: var(--text); margin-right: 4px; }
+.comment-body { min-width: 0; display: grid; gap: 4px; }
+.comment-actions { display: flex; }
+.comment-form { padding-top: 12px; border-top: 1px solid var(--separator); }
+
+/* ---------- Configurações: foto ---------- */
+.profile-photo { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.profile-photo > div { display: grid; gap: 8px; }
+.profile-photo .avatar-img { box-shadow: 0 0 0 2px var(--accent); }
+
+/* ---------- Histórico ---------- */
+.study-log .observatory-stats { margin-bottom: 4px; }
+
+/* ---------- Telas pequenas ---------- */
+@media (max-width: 900px) {
+  .ritual-panel { right: 8px; left: 8px; width: auto; bottom: calc(68px + env(safe-area-inset-bottom)); max-height: calc(100vh - 140px); }
+  .ritual-pill { right: 12px; bottom: calc(72px + env(safe-area-inset-bottom)); }
+  .ritual-launch-label { display: none; }
+  .ritual-launch { padding: 0 10px; }
+  .transcription-chip { max-width: 150px; }
+}
+@media (max-width: 760px) {
+  .observatory-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .announcement { grid-template-columns: auto 1fr; }
+  .announcement-actions { grid-column: 1 / -1; justify-content: flex-end; }
+}
+@media (max-width: 620px) {
+  .home-head .home-avatar { display: none; }
+  .zodiac-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .post-head { grid-template-columns: auto 1fr; }
+  .post-head .page-actions { grid-column: 1 / -1; }
+  .deck-nav { justify-content: center; }
+  .deck-grade { order: -1; width: 100%; justify-content: center; }
+  .deck-grade .btn { flex: 1; }
+  .transcription-chip { display: none; }
+}
+@media (max-width: 900px) {
+  .auth-story > .grimiau-logo:last-child { display: none; }
+  .auth-story { gap: 16px; padding-bottom: 24px; }
+}
+
+/* Cartas e ferramentas de IA: nada passa da largura do painel em telas estreitas. */
+.page, .tool-panel, .tool-body { grid-template-columns: minmax(0, 1fr); }
+.toolbar .inline-field { min-width: 0; max-width: 100%; grid-template-columns: auto minmax(0, 1fr); }
+.toolbar .inline-field select { min-width: 0; max-width: 100%; }
+.segmented { overflow-x: auto; scrollbar-width: none; min-width: 0; }

@@ -12,14 +12,8 @@ import Transcribe from "../components/ai/Transcribe.jsx";
 import { ExamPicker, PlanBuilder, Rescue } from "../components/ai/ExamTools.jsx";
 import { AiUnavailable, useAiStatus } from "../components/ai/shared.jsx";
 
-const playlistKey = "estuda.spotify.playlist";
-const readPlaylist = () => {
-  try {
-    return localStorage.getItem(playlistKey) || "";
-  } catch {
-    return "";
-  }
-};
+import { canonicalSpotify } from "../components/Ritual.jsx";
+
 const spotifyEmbed = (value) => {
   const match = String(value || "").match(/open\.spotify\.com\/(?:intl-[a-z]+\/)?(?:embed\/)?(playlist|album|episode|show|track)\/([A-Za-z0-9]+)/);
   return match ? `https://open.spotify.com/embed/${match[1]}/${match[2]}?utm_source=generator&theme=0` : null;
@@ -36,13 +30,14 @@ const tools = [
 ];
 
 export default function StudyAI() {
-  const { params, data, go } = useApp();
+  const { params, data, go, user, call, setUser } = useApp();
   const status = useAiStatus();
   const examFromLink = params.exam ? data.exams.find((exam) => exam.id === params.exam) : null;
   const [tool, setTool] = useState(tools.some((item) => item.id === params.tool) ? params.tool : examFromLink ? "simulado" : "socorro");
   const [preset, setPreset] = useState(examFromLink ? { subjectId: examFromLink.subjectId, examId: examFromLink.id, topic: examFromLink.topics.find((topic) => topic.status !== "Dominado")?.title || "" } : {});
   const [examId, setExamId] = useState(params.exam || "");
-  const [playlist, setPlaylist] = useState(readPlaylist);
+  // A playlist é a mesma do Ritual de Concentração, salva na conta.
+  const playlist = spotifyEmbed(user.preferences?.spotifyUrl) || "";
   const [playlistError, setPlaylistError] = useState("");
   const active = tools.find((item) => item.id === tool);
   const switchTool = (id, nextPreset = {}) => {
@@ -118,18 +113,18 @@ export default function StudyAI() {
         <h2 className="section-title">Música para estudar</h2>
         <form
           className="inline-form"
-          onSubmit={(event) => {
+          onSubmit={async (event) => {
             event.preventDefault();
-            const url = spotifyEmbed(new FormData(event.currentTarget).get("playlist"));
+            const form = event.currentTarget;
+            const url = canonicalSpotify(new FormData(form).get("playlist"));
             if (!url) return setPlaylistError("Cole um link público do Spotify: playlist, álbum, faixa ou episódio.");
             setPlaylistError("");
             try {
-              localStorage.setItem(playlistKey, url);
-            } catch {
-              // Sem armazenamento local, a playlist vale só nesta visita.
+              setUser(await call("/me", { method: "PATCH", body: { preferences: { spotifyUrl: url } } }));
+              form.reset();
+            } catch (failure) {
+              setPlaylistError(failure.message);
             }
-            setPlaylist(url);
-            event.currentTarget.reset();
           }}
         >
           <label className="search-field">

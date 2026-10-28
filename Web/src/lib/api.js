@@ -51,7 +51,7 @@ export async function request(path, { token, method = "GET", body } = {}) {
   return payload;
 }
 
-export const collections = ["subjects", "lessons", "exams", "tasks", "events", "teacher-notes", "materials", "flashcards", "quiz-results", "files", "study-plans", "diaries"];
+export const collections = ["subjects", "lessons", "exams", "tasks", "events", "teacher-notes", "materials", "flashcards", "quiz-results", "files", "study-plans", "diaries", "study-sessions"];
 
 // Carrega todas as coleções da conta e expõe operações que só alteram o estado local depois que a API confirma.
 export function useAcademicData(session, onExpired) {
