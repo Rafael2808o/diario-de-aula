@@ -9,7 +9,8 @@ import { initStore, memory, pool } from './store.js';
 
 export const avatarMaxBytes = 400 * 1024;
 const avatarTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
-export const postCategories = ['Dúvida', 'Ideia ou sugestão', 'Erro encontrado', 'Atualização', 'Comentário geral'];
+// Novas categorias entram sempre no fim, para não mudar as publicações que já existem.
+export const postCategories = ['Dúvida', 'Ideia ou sugestão', 'Erro encontrado', 'Atualização', 'Comentário geral', 'Material', 'Dica de estudo'];
 
 let ready;
 function initSocial() {

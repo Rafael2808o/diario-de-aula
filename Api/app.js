@@ -30,6 +30,7 @@ import { registerAiRoutes } from './ai.js';
 import { registerFileRoutes } from './files.js';
 import { registerSocialRoutes } from './social.js';
 import { registerHoroscopeRoutes } from './horoscope.js';
+import { registerRankingRoutes } from './ranking.js';
 
 const app = express();
 const corsOrigins = (process.env.CORS_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean);
@@ -85,7 +86,9 @@ function cleanPreferences(value, current = {}) {
     // Chaves da Grimiau: ausentes no pedido, mantêm o valor salvo.
     sign: input.sign !== undefined ? (zodiacSigns.has(input.sign) ? input.sign : '') : current.sign || '',
     spotifyUrl: input.spotifyUrl !== undefined ? cleanSpotifyUrl(input.spotifyUrl) : current.spotifyUrl || '',
-    announcementSeen: input.announcementSeen !== undefined ? cleanText(input.announcementSeen, 20) : current.announcementSeen || ''
+    announcementSeen: input.announcementSeen !== undefined ? cleanText(input.announcementSeen, 20) : current.announcementSeen || '',
+    // Ranking é opcional: começa desligado e só muda quando a própria pessoa escolhe.
+    rankingPublic: input.rankingPublic !== undefined ? input.rankingPublic === true : current.rankingPublic === true
   };
 }
 
@@ -610,6 +613,7 @@ app.put('/api/v1/diaries', requireAuth, async (req, res, next) => {
 registerAiRoutes(app, requireAuth, aiRateLimit);
 registerSocialRoutes(app, requireAuth);
 registerHoroscopeRoutes(app, requireAuth);
+registerRankingRoutes(app, requireAuth);
 
 app.get('/api/v1/integrations/spotify/status', (_req, res) =>
   res.json({
