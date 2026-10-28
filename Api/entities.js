@@ -63,7 +63,9 @@ export const entities = {
       missedContent: multiline('missed_content'),
       transcript: multiline('transcript', 50000),
       recovered: bool('recovered'),
-      draft: bool('draft')
+      draft: bool('draft'),
+      // Vínculo manual com uma prova; sem ele, a prova reúne as aulas da disciplina pelo período.
+      examId: ref('exam_id', 'exams', 'SET NULL')
     }
   },
   exams: {
@@ -130,7 +132,7 @@ export const entities = {
       examId: ref('exam_id', 'exams', 'SET NULL'),
       front: text('front', 300, { required: 'Escreva a pergunta.' }),
       back: multiline('back', 1200, { required: 'Escreva a resposta.' }),
-      level: oneOf('level', ['nova', 'difícil', 'fácil'], { default: 'nova' }),
+      level: oneOf('level', ['nova', 'difícil', 'dúvida', 'fácil'], { default: 'nova' }),
       reviews: int('reviews', 0, 10000),
       reviewedOn: date('reviewed_on'),
       origin: oneOf('origin', ['Criado por você', 'Sugestão da IA'], { default: 'Criado por você' })
@@ -146,6 +148,20 @@ export const entities = {
       correct: int('correct', 0, 50),
       takenOn: date('taken_on', { required: 'Informe a data.' }),
       mistakes: { column: 'mistakes', type: 'json', clean: cleanMistakes, fallback: [] }
+    }
+  },
+  'study-sessions': {
+    table: 'study_sessions', schema: 'StudySession', label: 'Sessão de estudo', order: 'session_date DESC, start_time DESC',
+    // A chave vem do navegador: reenviar a mesma sessão devolve conflito em vez de duplicar.
+    unique: ['client_id'],
+    conflict: 'Esta sessão já foi salva.',
+    fields: {
+      clientId: text('client_id', 64, { required: 'Sessão sem identificação.' }),
+      subjectId: ref('subject_id', 'subjects', 'SET NULL'),
+      date: date('session_date', { required: 'Informe a data da sessão.' }),
+      startTime: time('start_time'),
+      durationSeconds: int('duration_seconds', 1, 86400),
+      notes: multiline('notes', 1000)
     }
   },
   materials: {
@@ -172,10 +188,12 @@ export function initEntities() {
   ready ||= (async () => {
     await initStore();
     if (!pool) return;
+    // Primeiro todas as tabelas, depois as colunas: uma referência pode apontar para uma tabela definida mais abaixo.
+    await pool.query(Object.values(entities).map(config => `CREATE TABLE IF NOT EXISTS ${config.table} (
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`).join(';\n'));
     for (const config of Object.values(entities)) {
-      const statements = [`CREATE TABLE IF NOT EXISTS ${config.table} (
-        id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`];
+      const statements = [];
       for (const field of Object.values(config.fields)) {
         const definition = field.type === 'ref'
           ? `TEXT REFERENCES ${entityTable(field.table)}(id) ON DELETE ${field.onDelete}`

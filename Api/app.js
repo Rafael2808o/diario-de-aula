@@ -28,14 +28,16 @@ import {
 import { cascadeMemory, entitySchemas, initEntities, registerEntityRoutes } from './entities.js';
 import { registerAiRoutes } from './ai.js';
 import { registerFileRoutes } from './files.js';
+import { registerSocialRoutes } from './social.js';
+import { registerHoroscopeRoutes } from './horoscope.js';
 
 const app = express();
 const corsOrigins = (process.env.CORS_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean);
 app.use(cors({ origin: corsOrigins.length ? corsOrigins : true }));
 // Arquivos e áudio usam um limite maior, aplicado na própria rota.
 const smallJson = express.json({ limit: '120kb' });
-const largeBodyRoutes = new Set(['/api/v1/files', '/api/v1/ai/transcribe']);
-app.use((req, res, next) => (req.method === 'POST' && largeBodyRoutes.has(req.path) ? next() : smallJson(req, res, next)));
+const largeBodyRoutes = new Set(['POST /api/v1/files', 'POST /api/v1/ai/transcribe', 'PUT /api/v1/me/avatar']);
+app.use((req, res, next) => (largeBodyRoutes.has(`${req.method} ${req.path}`) ? next() : smallJson(req, res, next)));
 
 
 const cleanText = (value, max) =>
@@ -79,8 +81,19 @@ function cleanPreferences(value, current = {}) {
       exams: Boolean(reminders.exams),
       study: Boolean(reminders.study)
     },
-    organization: organizationModes.has(organization) ? organization : current.organization || ''
+    organization: input.organization !== undefined && organizationModes.has(organization) ? organization : current.organization || '',
+    // Chaves da Grimiau: ausentes no pedido, mantêm o valor salvo.
+    sign: input.sign !== undefined ? (zodiacSigns.has(input.sign) ? input.sign : '') : current.sign || '',
+    spotifyUrl: input.spotifyUrl !== undefined ? cleanSpotifyUrl(input.spotifyUrl) : current.spotifyUrl || '',
+    announcementSeen: input.announcementSeen !== undefined ? cleanText(input.announcementSeen, 20) : current.announcementSeen || ''
   };
+}
+
+const zodiacSigns = new Set(['aries', 'touro', 'gemeos', 'cancer', 'leao', 'virgem', 'libra', 'escorpiao', 'sagitario', 'capricornio', 'aquario', 'peixes']);
+// Só links públicos do Spotify; o que não for reconhecido é descartado.
+function cleanSpotifyUrl(value) {
+  const match = cleanText(value, 300).match(/^https:\/\/open\.spotify\.com\/(?:intl-[a-z-]+\/)?(?:embed\/)?(playlist|album|episode|show|track)\/([A-Za-z0-9]{8,40})/);
+  return match ? `https://open.spotify.com/${match[1]}/${match[2]}` : '';
 }
 
 function subjectInput(body) {
@@ -180,7 +193,8 @@ const swagger = {
               organization: { type: 'string', enum: [...organizationModes] }
             }
           },
-          onboardingDone: { type: 'boolean' }
+          onboardingDone: { type: 'boolean' },
+          avatarVersion: { type: 'string', readOnly: true }
         }
       },
       TimeSlot: {
@@ -308,6 +322,26 @@ const swagger = {
     '/ai/questions': {
       post: { summary: 'Pede um simulado à IA; responde 202 com jobId', security: [{ bearerAuth: [] }], requestBody: requestBody('QuestionRequest'), responses: { 202: { description: 'Pedido aceito; consulte /ai/jobs/{id}' }, 429: jsonResponse('Limite temporário atingido', 'Error') } }
     },
+    '/me/avatar': {
+      put: { summary: 'Envia a foto de perfil (base64, JPG/PNG/WEBP até 400 KB)', security: [{ bearerAuth: [] }], responses: { 200: jsonResponse('Perfil', 'User') } },
+      delete: { summary: 'Remove a foto de perfil', security: [{ bearerAuth: [] }], responses: { 200: jsonResponse('Perfil', 'User') } }
+    },
+    '/avatars/{userId}': { get: { summary: 'Foto de perfil pública', parameters: [{ in: 'path', name: 'userId', required: true, schema: { type: 'string' } }], responses: { 200: { description: 'Imagem' }, 404: { description: 'Sem foto' } } } },
+    '/community/posts': {
+      get: { summary: 'Quadro global: lista publicações (filtros category e q)', security: [{ bearerAuth: [] }], responses: { 200: { description: 'OK' } } },
+      post: { summary: 'Publica no quadro global', security: [{ bearerAuth: [] }], responses: { 201: { description: 'Publicado' } } }
+    },
+    '/community/posts/{id}': {
+      get: { summary: 'Publicação com comentários', security: [{ bearerAuth: [] }], parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }], responses: { 200: { description: 'OK' } } },
+      patch: { summary: 'Edita a própria publicação', security: [{ bearerAuth: [] }], parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }], responses: { 200: { description: 'OK' } } },
+      delete: { summary: 'Exclui a própria publicação', security: [{ bearerAuth: [] }], parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }], responses: { 204: { description: 'Excluída' } } }
+    },
+    '/community/posts/{id}/comments': { post: { summary: 'Comenta uma publicação', security: [{ bearerAuth: [] }], parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }], responses: { 201: { description: 'OK' } } } },
+    '/community/comments/{id}': {
+      patch: { summary: 'Edita o próprio comentário', security: [{ bearerAuth: [] }], parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }], responses: { 200: { description: 'OK' } } },
+      delete: { summary: 'Exclui o próprio comentário', security: [{ bearerAuth: [] }], parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string' } }], responses: { 204: { description: 'Excluído' } } }
+    },
+    '/horoscope/{sign}': { get: { summary: 'Horóscopo do dia (data de São Paulo), traduzido e resumido', security: [{ bearerAuth: [] }], parameters: [{ in: 'path', name: 'sign', required: true, schema: { type: 'string' } }], responses: { 200: { description: 'OK' }, 503: { description: 'Fonte indisponível' } } } },
     '/integrations/spotify/status': { get: { summary: 'Consulta a integração Spotify', responses: { 200: { description: 'OK' } } } }
   }
 };
@@ -574,6 +608,8 @@ app.put('/api/v1/diaries', requireAuth, async (req, res, next) => {
 });
 
 registerAiRoutes(app, requireAuth, aiRateLimit);
+registerSocialRoutes(app, requireAuth);
+registerHoroscopeRoutes(app, requireAuth);
 
 app.get('/api/v1/integrations/spotify/status', (_req, res) =>
   res.json({

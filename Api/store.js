@@ -38,7 +38,8 @@ function publicUser(user) {
     termStart: user.term_start || '',
     termEnd: user.term_end || '',
     preferences: parseJson(user.preferences, {}),
-    onboardingDone: Boolean(user.onboarding_done)
+    onboardingDone: Boolean(user.onboarding_done),
+    avatarVersion: user.avatar_version || ''
   };
 }
 
@@ -75,6 +76,7 @@ export function initStore() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS term_start TEXT DEFAULT '';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS term_end TEXT DEFAULT '';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS preferences TEXT DEFAULT '{}';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_version TEXT DEFAULT '';
     CREATE TABLE IF NOT EXISTS password_resets (
       token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       expires_at TIMESTAMPTZ NOT NULL
@@ -356,5 +358,8 @@ export async function deleteUser(userId, password) {
   for (const key of ['plans', 'diaries', 'materials', 'subjects', 'files']) if (Array.isArray(memory[key])) memory[key] = memory[key].filter(row => row.userId !== userId);
   for (const table of Object.keys(memory.entities || {})) memory.entities[table] = memory.entities[table].filter(row => row.userId !== userId);
   for (const [id, job] of memory.aiJobs || []) if (job.userId === userId) memory.aiJobs.delete(id);
+  memory.avatars?.delete(userId);
+  if (memory.posts) memory.posts = memory.posts.filter(post => post.userId !== userId);
+  if (memory.comments) memory.comments = memory.comments.filter(comment => comment.userId !== userId && (memory.posts || []).some(post => post.id === comment.postId));
   return true;
 }

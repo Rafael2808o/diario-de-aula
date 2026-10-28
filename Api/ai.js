@@ -11,7 +11,7 @@ const models = () => [...new Set([process.env.GEMINI_MODEL || 'gemini-flash-late
 const text = (value, max) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
 const list = (value, max = 20) => (Array.isArray(value) ? value.slice(0, max) : []);
 
-async function callGemini(parts, { maxOutputTokens = 2400, timeout = 45_000, temperature = 0.3 } = {}) {
+export async function callGemini(parts, { maxOutputTokens = 2400, timeout = 45_000, temperature = 0.3 } = {}) {
   let lastError;
   for (const model of models()) {
     try {
