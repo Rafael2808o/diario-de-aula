@@ -15,7 +15,8 @@ const read = (key, fallback) => {
   }
 };
 
-export const currentTheme = () => (read(themeKey, "escuro") === "claro" ? "claro" : "escuro");
+// Quem escolheu o tema claro no Lúmina (chave antiga) continua no claro.
+export const currentTheme = () => (read(themeKey, read("lumina.theme", "escuro")) === "claro" ? "claro" : "escuro");
 
 export function applyAppearance(theme = currentTheme()) {
   const root = document.documentElement;
