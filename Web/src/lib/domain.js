@@ -1,4 +1,5 @@
 import { BookOpen, CalendarClock, ClipboardCheck, GraduationCap, Sparkles } from "lucide-react";
+import { computeProgress } from "./progress.js";
 import { addDays, classOccurrences, formatFull } from "./dates.js";
 
 export const subjectPalette = ["#6f8cf6", "#9b7cf4", "#c084e8", "#5aa9d6", "#e07fa8", "#58b39a", "#e59a6b", "#7d8aa6"];
@@ -214,4 +215,27 @@ export function examLessons(data, exam) {
       return [{ lesson, origin: "periodo" }];
     })
     .sort((a, b) => a.lesson.date.localeCompare(b.lesson.date));
+}
+
+// XP, nível e relíquias do perfil, a partir das coleções carregadas no app.
+export const progressOf = (data, today) => computeProgress({ ...data, studySessions: data["study-sessions"], quizResults: data["quiz-results"] }, today);
+
+// Progresso de uma disciplina: aulas que já aconteceram com conteúdo registrado e assuntos de prova revisados.
+// Aulas canceladas não contam. Sem grade nem assuntos, o progresso fica indefinido (null).
+export function subjectProgress(data, user, subject, today) {
+  const occurrences = classOccurrences([subject], data.lessons, user, "0000-01-01", today).filter((occurrence) => occurrence.lesson?.status !== "cancelada" && (occurrence.date < today || occurrence.lesson));
+  // Mesmo critério das aulas pendentes do Início: presente com conteúdo, ou falta com o conteúdo perdido anotado.
+  const filled = (text) => Boolean(String(text || "").trim());
+  const registered = occurrences.filter(({ lesson }) => lesson && !lesson.draft && ((lesson.status === "presente" && (filled(lesson.taught) || filled(lesson.transcript))) || (lesson.status === "falta" && (lesson.recovered || filled(lesson.missedContent))))).length;
+  const topics = data.exams.filter((exam) => exam.subjectId === subject.id).flatMap((exam) => exam.topics);
+  const topicsDone = topics.filter((topic) => topic.status === "Revisado" || topic.status === "Dominado").length;
+  const total = occurrences.length + topics.length;
+  return {
+    percent: total ? Math.round(((registered + topicsDone) / total) * 100) : null,
+    registered,
+    occurred: occurrences.length,
+    topicsDone,
+    topics: topics.length,
+    pending: occurrences.length - registered,
+  };
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BookOpen, CalendarDays, GraduationCap, Home as HomeIcon, Layers, Library, MessagesSquare, MoreHorizontal, Settings as SettingsIcon, Sparkles, X } from "lucide-react";
+import { BookOpen, CalendarDays, GraduationCap, Home as HomeIcon, Layers, MessagesSquare, NotebookPen, Settings as SettingsIcon, Sparkles, Trophy, UserRound, X } from "lucide-react";
 import { AppContext, useApp } from "./context.js";
 import { readSession, request, storeSession, useAcademicData } from "./lib/api.js";
 import { useLocalNotifications } from "./lib/notify.js";
@@ -19,28 +19,35 @@ import History from "./pages/History.jsx";
 import Home from "./pages/Home.jsx";
 import Lessons from "./pages/Lessons.jsx";
 import Onboarding from "./pages/Onboarding.jsx";
+import Profile from "./pages/Profile.jsx";
+import Ranking from "./pages/Ranking.jsx";
 import Settings from "./pages/Settings.jsx";
 import StudyAI from "./pages/StudyAI.jsx";
 import Subjects from "./pages/Subjects.jsx";
 
-// Rótulos do menu são funcionais; os nomes da Grimiau aparecem no título de cada página.
+// Cinco seções fixas em todas as telas. Cada seção reúne as páginas que abre (group), para o menu marcar a certa.
 const nav = [
-  { id: "inicio", label: "Início", title: "Observatório", icon: HomeIcon, page: Home },
-  { id: "calendario", label: "Calendário", title: "Calendário", icon: CalendarDays, page: Calendar },
-  { id: "aulas", label: "Aulas", title: "Grimório Acadêmico", icon: BookOpen, page: Lessons },
-  { id: "conteudos", label: "Disciplinas", title: "Biblioteca Arcana", icon: Library, page: Subjects },
-  { id: "provas", label: "Provas", title: "Desafios Arcanos", icon: GraduationCap, page: Exams },
-  { id: "cartoes", label: "Cartas do Saber", title: "Cartas do Saber", icon: Layers, page: Cards },
-  { id: "ia", label: "Estudar com IA", title: "Estudar com IA", icon: Sparkles, page: StudyAI },
-  { id: "comunidade", label: "Quadro de Dúvidas", title: "Quadro de Dúvidas", icon: MessagesSquare, page: Community },
-  { id: "configuracoes", label: "Configurações", title: "Configurações", icon: SettingsIcon, page: Settings },
+  { id: "inicio", label: "Início", title: "Início", icon: HomeIcon, page: Home, group: ["inicio"] },
+  { id: "conteudos", label: "Grimório", title: "Meu Grimório", icon: BookOpen, page: Subjects, group: ["conteudos", "aulas", "provas"] },
+  { id: "ia", label: "Estudar", title: "Estudar", icon: Sparkles, page: StudyAI, group: ["ia", "cartoes", "comunidade", "ranking"] },
+  { id: "calendario", label: "Agenda", title: "Agenda", icon: CalendarDays, page: Calendar, group: ["calendario"] },
+  { id: "perfil", label: "Perfil", title: "Perfil", icon: UserRound, page: Profile, group: ["perfil", "configuracoes", "historico"] },
 ];
-// Páginas acessíveis por links, fora do menu principal.
-const extraPages = [{ id: "historico", label: "Histórico de estudos", title: "Histórico de estudos", page: History }];
+// Páginas abertas a partir das seções. Os endereços antigos (?abrir=aulas, provas, cartoes...) continuam valendo.
+const extraPages = [
+  { id: "aulas", label: "Registro de aulas", title: "Registro de aulas", icon: NotebookPen, page: Lessons },
+  { id: "provas", label: "Provas", title: "Provas", icon: GraduationCap, page: Exams },
+  { id: "cartoes", label: "Cartas do Saber", title: "Cartas do Saber", icon: Layers, page: Cards },
+  { id: "comunidade", label: "Conselho dos Bruxinhos", title: "Conselho dos Bruxinhos", icon: MessagesSquare, page: Community },
+  { id: "ranking", label: "Ranking", title: "Ranking dos Bruxinhos", icon: Trophy, page: Ranking },
+  { id: "configuracoes", label: "Configurações", title: "Configurações", icon: SettingsIcon, page: Settings },
+  { id: "historico", label: "Histórico de estudos", title: "Histórico de estudos", page: History },
+];
 const allPages = [...nav, ...extraPages];
-const mobileNav = ["inicio", "aulas", "provas", "cartoes"];
+const shortcuts = ["aulas", "provas", "cartoes", "comunidade", "ranking", "configuracoes"];
+const sectionOf = (page) => nav.find((item) => item.group.includes(page))?.id;
 // Endereços das versões anteriores continuam funcionando.
-const legacyPages = { central: "inicio", diario: "aulas", prova: "ia", estudos: "calendario", biblioteca: "conteudos", desempenho: "inicio", perfil: "configuracoes" };
+const legacyPages = { central: "inicio", diario: "aulas", prova: "ia", estudos: "calendario", biblioteca: "conteudos", desempenho: "perfil" };
 
 function readLocation() {
   const query = new URLSearchParams(window.location.search);
@@ -131,7 +138,6 @@ function TranscriptionChip() {
 function Shell({ session, setSession }) {
   const toast = useToast();
   const [location, setLocation] = useState(readLocation);
-  const [more, setMore] = useState(false);
   const expire = useCallback(() => {
     history.replaceState({}, "", "/");
     storeSession(null);
@@ -158,7 +164,6 @@ function Shell({ session, setSession }) {
     const query = new URLSearchParams(page === "inicio" ? clean : { abrir: page, ...clean }).toString();
     history.pushState({}, "", query ? `/?${query}` : "/");
     setLocation({ page, params: clean });
-    setMore(false);
     window.scrollTo(0, 0);
   }, []);
 
@@ -194,6 +199,7 @@ function Shell({ session, setSession }) {
   }
 
   const Page = current.page;
+  const section = sectionOf(location.page);
   const ready = !(academic.status === "loading" && academic.data.subjects.length === 0) && academic.status !== "error";
   return (
     <AppContext.Provider value={context}>
@@ -204,10 +210,21 @@ function Shell({ session, setSession }) {
           </button>
           <nav>
             {nav.map(({ id, label, icon: Icon }) => (
-              <button key={id} className={location.page === id ? "active" : ""} aria-current={location.page === id ? "page" : undefined} onClick={() => go(id)}>
+              <button key={id} className={section === id ? "active" : ""} aria-current={location.page === id ? "page" : undefined} onClick={() => go(id)}>
                 <Icon size={18} aria-hidden="true" /> {label}
               </button>
             ))}
+          </nav>
+          <nav className="sidebar-shortcuts" aria-label="Atalhos">
+            <p>Atalhos</p>
+            {shortcuts.map((id) => {
+              const { label, icon: Icon } = extraPages.find((item) => item.id === id);
+              return (
+                <button key={id} className={location.page === id ? "current" : ""} aria-current={location.page === id ? "page" : undefined} onClick={() => go(id)}>
+                  <Icon size={16} aria-hidden="true" /> {label}
+                </button>
+              );
+            })}
           </nav>
           <p className="sidebar-note">Conhecimento é magia.</p>
         </aside>
@@ -219,7 +236,7 @@ function Shell({ session, setSession }) {
             <SearchBox />
             <TranscriptionChip />
             {ready && <RitualButton />}
-            <button className="avatar" onClick={() => go("configuracoes")} aria-label="Abrir perfil e configurações">
+            <button className="avatar" onClick={() => go("perfil")} aria-label="Abrir seu perfil">
               <Avatar user={session.user} size={34} />
             </button>
           </header>
@@ -241,34 +258,13 @@ function Shell({ session, setSession }) {
           )}
         </div>
         <nav className="bottom-nav" aria-label="Navegação principal">
-          {mobileNav.map((id) => {
-            const { label, icon: Icon } = nav.find((item) => item.id === id);
-            return (
-              <button key={id} className={location.page === id ? "active" : ""} aria-current={location.page === id ? "page" : undefined} onClick={() => go(id)}>
-                <Icon size={20} aria-hidden="true" />
-                <span>{id === "cartoes" ? "Cartas" : label}</span>
-              </button>
-            );
-          })}
-          <button className={!mobileNav.includes(location.page) ? "active" : ""} aria-expanded={more} onClick={() => setMore(!more)}>
-            <MoreHorizontal size={20} aria-hidden="true" />
-            <span>Mais</span>
-          </button>
+          {nav.map(({ id, label, icon: Icon }) => (
+            <button key={id} className={section === id ? "active" : ""} aria-current={location.page === id ? "page" : undefined} onClick={() => go(id)}>
+              <Icon size={21} aria-hidden="true" />
+              <span>{label}</span>
+            </button>
+          ))}
         </nav>
-        {more && (
-          <div className="more-sheet" role="dialog" aria-label="Mais seções">
-            <button className="more-backdrop" aria-label="Fechar" onClick={() => setMore(false)} />
-            <div className="more-panel">
-              {nav
-                .filter((item) => !mobileNav.includes(item.id))
-                .map(({ id, label, icon: Icon }) => (
-                  <button key={id} className={location.page === id ? "active" : ""} onClick={() => go(id)}>
-                    <Icon size={19} aria-hidden="true" /> {label}
-                  </button>
-                ))}
-            </div>
-          </div>
-        )}
         {ready && <Ritual />}
         <PwaPrompt />
       </div>

@@ -36,6 +36,28 @@ export function formatClock(ms) {
   return [hours, minutes, seconds].map((part) => String(part).padStart(2, "0")).join(":");
 }
 
+// Meta do pomodoro escolhida por último neste aparelho (25 min na primeira vez).
+export const ritualGoals = [25, 50, 0];
+const goalKey = "grimiau.ritual.meta";
+export function readGoal() {
+  try {
+    const saved = localStorage.getItem(goalKey);
+    return saved !== null && ritualGoals.includes(Number(saved)) ? Number(saved) : 25;
+  } catch {
+    return 25;
+  }
+}
+export function saveGoal(value) {
+  try {
+    localStorage.setItem(goalKey, String(value));
+  } catch {
+    // Sem armazenamento, a meta escolhida vale só agora.
+  }
+}
+
+// Relógio do ritual: mm:ss abaixo de uma hora, como num pomodoro; acima disso, com as horas.
+export const formatTimer = (ms) => (ms >= 3_600_000 ? formatClock(ms) : formatClock(ms).slice(3));
+
 export function formatDuration(seconds) {
   const minutes = Math.round(seconds / 60);
   if (minutes < 1) return "menos de 1 min";
@@ -72,9 +94,10 @@ export function useRitual() {
   }, []);
 
   const start = useCallback(
-    (subjectId = "") => {
+    (subjectId = "", goalMinutes = readGoal()) => {
       const now = Date.now();
-      commit({ status: "running", id: newId(), startedAt: now, date: todayIso(), startTime: nowTime(), segmentStart: now, accumulatedMs: 0, subjectId });
+      // goalMs é a meta do pomodoro (0 = tempo livre). Só muda o que o relógio mostra; o tempo salvo é sempre o real.
+      commit({ status: "running", id: newId(), startedAt: now, date: todayIso(), startTime: nowTime(), segmentStart: now, accumulatedMs: 0, subjectId, goalMs: goalMinutes * 60_000 });
     },
     [commit],
   );

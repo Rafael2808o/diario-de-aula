@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Copy, Sparkles } from "lucide-react";
 import { useApp } from "../../context.js";
 import { FormError, Segmented } from "../../ui.jsx";
-import { BasisHint, SourceNote, SubjectTopicFields, buildContext, postAi } from "./shared.jsx";
+import { BasisHint, SourceNote, SubjectTopicFields, buildContext, postAi, AiProgress } from "./shared.jsx";
 
 const depths = [
   ["rapida", "Revisão rápida"],
@@ -17,6 +17,7 @@ export default function Summary({ preset = {} }) {
   const [depth, setDepth] = useState("rapida");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [stage, setStage] = useState(null);
   const [result, setResult] = useState(null);
   const plan = useMemo(() => buildContext(data, subjectId, topic), [data, subjectId, topic]);
   const subject = data.subjects.find((item) => item.id === subjectId);
@@ -26,8 +27,9 @@ export default function Summary({ preset = {} }) {
     if (!plan.sources.length) return setError("Registre ao menos uma aula desta disciplina: o resumo é feito a partir das suas anotações.");
     setLoading(true);
     setError("");
+    setStage(null);
     try {
-      const payload = await postAi(session, "/ai/study", { tool: "resumo", subject: subject.name, topic, depth, context: plan.context });
+      const payload = await postAi(session, "/ai/study", { tool: "resumo", subject: subject.name, topic, depth, context: plan.context }, setStage);
       setResult({ ...payload, sources: plan.sources, generic: plan.generic });
     } catch (failure) {
       setError(failure.message);
@@ -60,6 +62,7 @@ export default function Summary({ preset = {} }) {
           </button>
         </div>
       </form>
+      {Boolean(loading) && <AiProgress kind="resumo" stage={stage} />}
       {result && (
         <section className="ai-result" aria-live="polite">
           <header>

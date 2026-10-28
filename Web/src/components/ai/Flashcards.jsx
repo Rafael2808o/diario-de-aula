@@ -3,7 +3,8 @@ import { PenLine, Plus, Sparkles, Trash2 } from "lucide-react";
 import { useApp } from "../../context.js";
 import { todayIso } from "../../lib/dates.js";
 import { Confirm, Empty, FormError, Modal, Segmented, useSubmit } from "../../ui.jsx";
-import { BasisHint, SourceNote, SubjectTopicFields, buildContext, postAi } from "./shared.jsx";
+import { TarotBack } from "../Art.jsx";
+import { BasisHint, SourceNote, SubjectTopicFields, buildContext, postAi, AiProgress } from "./shared.jsx";
 
 // Ordem de revisão: o que pede revisão e as dúvidas antes; o que você já sabe vai para o fim.
 const order = { difícil: 0, dúvida: 1, nova: 2, fácil: 3 };
@@ -47,7 +48,7 @@ function CardForm({ card, subjectId, onClose }) {
   );
 }
 
-export const levelLabel = { nova: "Nova", difícil: "Revisar", dúvida: "Dúvida", fácil: "Sei" };
+export const levelLabel = { nova: "Nova", difícil: "Não sei", dúvida: "Revisar", fácil: "Dominei" };
 const shuffled = (ids) => {
   const copy = [...ids];
   for (let index = copy.length - 1; index > 0; index -= 1) {
@@ -61,14 +62,17 @@ const shuffled = (ids) => {
 function Review({ cards }) {
   const { update, toast } = useApp();
   const [onlyHard, setOnlyHard] = useState(false);
-  const [mixed, setMixed] = useState(false);
+  const [mixed, setMixed] = useState(true);
   const deckIds = (hard, mix) => {
     const ids = cards.filter((card) => !hard || card.level === "difícil" || card.level === "dúvida").sort((a, b) => order[a.level] - order[b.level]).map((card) => card.id);
     return mix ? shuffled(ids) : ids;
   };
-  const [deck, setDeck] = useState(() => deckIds(false, false));
+  const [deck, setDeck] = useState(() => deckIds(false, true));
   const [index, setIndex] = useState(0);
-  const [flipped, setFlipped] = useState(false);
+  // 0: carta fechada (verso do tarô), 1: pergunta, 2: resposta.
+  const [face, setFace] = useState(0);
+  const flipped = face > 0;
+  const setFlipped = (value) => setFace(value ? 1 : 0);
   const [tally, setTally] = useState({});
   const [busy, setBusy] = useState(false);
   const current = cards.find((card) => card.id === deck[index]);
@@ -105,7 +109,7 @@ function Review({ cards }) {
   const options = (
     <div className="deck-options">
       <label className="check">
-        <input type="checkbox" checked={onlyHard} onChange={(event) => { setOnlyHard(event.target.checked); restart(event.target.checked, mixed); }} /> Só dúvidas e “revisar”
+        <input type="checkbox" checked={onlyHard} onChange={(event) => { setOnlyHard(event.target.checked); restart(event.target.checked, mixed); }} /> Só “Não sei” e “Revisar”
       </label>
       <label className="check">
         <input type="checkbox" checked={mixed} onChange={(event) => { setMixed(event.target.checked); restart(onlyHard, event.target.checked); }} /> Embaralhar
@@ -118,7 +122,7 @@ function Review({ cards }) {
       <div className="flashcard-stage">
         {options}
         <Empty compact mood="happy" title="Nenhuma carta de dúvida ou para revisar.">
-          Tudo marcado como “Sei”. Desmarque o filtro para revisar tudo.
+          Tudo marcado como “Dominei”. Desmarque o filtro para revisar tudo.
         </Empty>
       </div>
     );
@@ -130,7 +134,7 @@ function Review({ cards }) {
       <div className="flashcard-stage">
         <Empty compact mood="happy" title="Feitiço lançado com sucesso. Rodada concluída!">
           {Object.keys(tally).length
-            ? `Sei: ${counts.fácil || 0} · Dúvida: ${counts.dúvida || 0} · Revisar: ${counts.difícil || 0}.`
+            ? `Dominei: ${counts.fácil || 0} · Revisar: ${counts.dúvida || 0} · Não sei: ${counts.difícil || 0}.`
             : "Você passou pelas cartas sem classificar nenhuma."}
           <span className="form-actions centered">
             <button className="btn small" onClick={() => move(-deck.length)}>
@@ -138,7 +142,7 @@ function Review({ cards }) {
             </button>
             {pending.length > 0 && (
               <button className="btn small primary" onClick={() => { setOnlyHard(true); restart(true, mixed); }}>
-                Revisar {pending.length} {pending.length === 1 ? "carta difícil" : "cartas difíceis"}
+                Revisar {pending.length} {pending.length === 1 ? "carta pendente" : "cartas pendentes"}
               </button>
             )}
             <button className="btn small" onClick={() => restart()}>
@@ -162,40 +166,45 @@ function Review({ cards }) {
         </div>
         <span className={`level-tag level-${current.level}`}>{levelLabel[current.level]}</span>
       </div>
-      <button type="button" className={`flashcard ${flipped ? "is-flipped" : ""}`} onClick={() => setFlipped((value) => !value)} aria-label={flipped ? "Resposta. Toque para voltar à pergunta." : "Pergunta. Toque para ver a resposta."}>
+      <button
+        type="button"
+        className={`flashcard tarot ${flipped ? "is-flipped" : ""}`}
+        onClick={() => setFace((value) => (value === 2 ? 1 : value + 1))}
+        aria-label={face === 0 ? "Carta fechada. Toque para ver a pergunta." : face === 1 ? "Pergunta. Toque para ver a resposta." : "Resposta. Toque para voltar à pergunta."}
+      >
         <span className="flashcard-inner">
-          <span className="flashcard-face front" aria-hidden={flipped}>
-            <span className="flashcard-side">Pergunta</span>
-            <strong>{current.front}</strong>
-            <small>Toque para ver a resposta</small>
+          <span className="flashcard-face tarot-back" aria-hidden={flipped}>
+            <TarotBack />
+            <span className="tarot-label">Carta do Saber</span>
           </span>
-          <span className="flashcard-face back" aria-hidden={!flipped}>
-            <span className="flashcard-side">Resposta</span>
-            <strong>{current.back}</strong>
-            <small>Toque para voltar à pergunta</small>
+          <span className="flashcard-face back tarot-front" aria-hidden={!flipped}>
+            <span className="tarot-frame" aria-hidden="true" />
+            <span className="flashcard-side">{face === 2 ? "Resposta" : "Pergunta"}</span>
+            <strong key={face}>{face === 2 ? current.back : current.front}</strong>
+            <small>{face === 2 ? "Toque para voltar à pergunta" : "Pense na resposta e toque para conferir"}</small>
           </span>
         </span>
       </button>
       <div className="deck-nav">
-        <button type="button" className="btn small ghost" onClick={() => move(-1)} disabled={index === 0}>
-          Anterior
+        <button type="button" className="icon-btn deck-arrow" aria-label="Carta anterior" onClick={() => move(-1)} disabled={index === 0}>
+          ‹
         </button>
         <div className="deck-grade" role="group" aria-label="Como foi esta carta?">
-          <button type="button" className="btn small grade-hard" disabled={busy || !flipped} onClick={() => mark("difícil")}>
+          <button type="button" className="btn small grade-hard" disabled={busy || face !== 2} onClick={() => mark("difícil")}>
+            Não sei
+          </button>
+          <button type="button" className="btn small grade-doubt" disabled={busy || face !== 2} onClick={() => mark("dúvida")}>
             Revisar
           </button>
-          <button type="button" className="btn small grade-doubt" disabled={busy || !flipped} onClick={() => mark("dúvida")}>
-            Dúvida
-          </button>
-          <button type="button" className="btn small primary" disabled={busy || !flipped} onClick={() => mark("fácil")}>
-            Sei
+          <button type="button" className="btn small primary" disabled={busy || face !== 2} onClick={() => mark("fácil")}>
+            Dominei
           </button>
         </div>
-        <button type="button" className="btn small ghost" onClick={() => move(1)}>
-          Próxima
+        <button type="button" className="icon-btn deck-arrow" aria-label="Próxima carta" onClick={() => move(1)}>
+          ›
         </button>
       </div>
-      {!flipped && <p className="hint centered">Vire a carta para classificar. Use as setas do teclado para navegar.</p>}
+      {face !== 2 && <p className="hint centered">{face === 0 ? "Toque na carta para revelar a pergunta." : "Vire de novo para ver a resposta e se avaliar."} As setas do teclado também navegam.</p>}
     </div>
   );
 }
@@ -207,6 +216,7 @@ export default function Flashcards({ preset = {} }) {
   const [topic, setTopic] = useState(preset.topic || "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [stage, setStage] = useState(null);
   const [draft, setDraft] = useState(null);
   const [modal, setModal] = useState(null);
   const plan = useMemo(() => buildContext(data, subjectId, topic), [data, subjectId, topic]);
@@ -220,8 +230,9 @@ export default function Flashcards({ preset = {} }) {
     if (!plan.sources.length) return setError("Registre ao menos uma aula desta disciplina para gerar cartões a partir dela.");
     setLoading(true);
     setError("");
+    setStage(null);
     try {
-      const payload = await postAi(session, "/ai/study", { tool: "flashcards", subject: subject.name, topic, quantity: 8, context: plan.context });
+      const payload = await postAi(session, "/ai/study", { tool: "flashcards", subject: subject.name, topic, quantity: 8, context: plan.context }, setStage);
       setDraft({ ...payload, keep: payload.cards.map(() => true), sources: plan.sources, generic: plan.generic });
     } catch (failure) {
       setError(failure.message);
@@ -301,6 +312,7 @@ export default function Flashcards({ preset = {} }) {
               </button>
             </div>
           </form>
+          {loading && !draft && <AiProgress kind="flashcards" stage={stage} />}
           {draft && (
             <section className="ai-result">
               <SourceNote sources={draft.sources} generic={draft.generic} />

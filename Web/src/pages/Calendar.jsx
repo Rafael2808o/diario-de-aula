@@ -88,7 +88,8 @@ export default function Calendar() {
     <div className="page">
       <header className="page-head">
         <div>
-          <h1>Calendário</h1>
+          <h1>Agenda</h1>
+          <p>Aulas, provas, entregas, compromissos e sessões de estudo no mesmo calendário.</p>
         </div>
         <div className="page-actions">
           <button className="btn soft" onClick={() => setModal({ type: "task", defaults: { date: cursor } })}>

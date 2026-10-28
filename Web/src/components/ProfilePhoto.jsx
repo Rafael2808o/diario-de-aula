@@ -97,7 +97,7 @@ export default function ProfilePhoto() {
           </>
         ) : (
           <>
-            <p className="hint">{user.avatarVersion ? "Sua foto aparece no topo, no Observatório e no Quadro de Dúvidas." : "Sem foto, mostramos suas iniciais."}</p>
+            <p className="hint">{user.avatarVersion ? "Sua foto aparece no topo, no Início, no seu perfil e no Conselho dos Bruxinhos." : "Sem foto, mostramos suas iniciais."}</p>
             <div className="form-actions">
               <label className="btn">
                 <Camera size={15} /> {user.avatarVersion ? "Trocar foto" : "Escolher foto"}

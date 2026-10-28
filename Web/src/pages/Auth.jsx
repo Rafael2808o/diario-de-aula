@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { request } from "../lib/api.js";
 import { FormError, Logo } from "../ui.jsx";
+import { CoverScene } from "../components/Art.jsx";
 
 const resetToken = () => new URLSearchParams(window.location.search).get("redefinir") || "";
 
@@ -56,8 +57,9 @@ export default function Auth({ onAuthenticated }) {
       <main className="welcome-screen">
         <div className="welcome-sky" aria-hidden="true" />
         <section className="welcome-card">
-          <Logo size={168} alive />
+          <CoverScene />
           <h1 className="wordmark">Grimiau</h1>
+          <p className="welcome-subtitle">seu grimório acadêmico</p>
           <p className="slogan">Conhecimento é magia.</p>
           <p className="welcome-text">Seu grimório acadêmico: aulas, provas, flashcards e sessões de estudo da faculdade, organizados num lugar só.</p>
           <div className="welcome-actions">
@@ -87,7 +89,7 @@ export default function Auth({ onAuthenticated }) {
           <h1>Olá, bruxinha. Vamos desvendar alguns conteúdos?</h1>
           <p>Registre as aulas, acompanhe as provas e estude com o Nox do seu lado. Conhecimento é magia.</p>
         </div>
-        <Logo size={170} alive />
+        <CoverScene />
       </section>
       <section className="auth-panel">
         <form className="form auth-form" onSubmit={submit} noValidate={false}>

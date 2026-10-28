@@ -3,8 +3,16 @@ import { ExternalLink, Hourglass, Minus, Music, Pause, Play, Square, X } from "l
 import { useApp } from "../context.js";
 import { todayIso } from "../lib/dates.js";
 import { focusPhrases, phraseBag, restPhrases } from "../lib/phrases.js";
-import { elapsedMs, formatClock, formatDuration } from "../lib/ritual.js";
+import { elapsedMs, formatClock, formatDuration, formatTimer, readGoal, saveGoal } from "../lib/ritual.js";
 import { Confirm, FormError, Nox } from "../ui.jsx";
+import { SleepingNox } from "./Art.jsx";
+
+const goals = [
+  [25, "25 min"],
+  [50, "50 min"],
+  [0, "Livre"],
+];
+
 
 const legacyPlaylistKey = "estuda.spotify.playlist";
 const spotifyPattern = /open\.spotify\.com\/(?:intl-[a-z-]+\/)?(?:embed\/)?(playlist|album|episode|show|track)\/([A-Za-z0-9]{8,40})/;
@@ -153,7 +161,7 @@ export function RitualButton() {
       type="button"
       className={`ritual-launch ${active ? "is-active" : ""}`}
       onClick={() => ritual.setView(ritual.view === "open" ? "closed" : "open")}
-      aria-label={active ? `Ritual de Concentração, ${formatClock(elapsedMs(ritual.state, now))}` : "Abrir Ritual de Concentração"}
+      aria-label={active ? `Ritual de Foco, ${formatClock(elapsedMs(ritual.state, now))}` : "Abrir Ritual de Foco"}
       aria-expanded={ritual.view === "open"}
     >
       <Hourglass size={17} aria-hidden="true" />
@@ -172,9 +180,17 @@ export default function Ritual() {
   const [error, setError] = useState("");
   const [discarding, setDiscarding] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
+  const [goal, setGoalState] = useState(readGoal);
+  const setGoal = (value) => {
+    setGoalState(value);
+    saveGoal(value);
+  };
   const now = useNow(state.status === "running");
   const [phrase, nextPhrase] = usePhrase(state.status);
   const elapsed = elapsedMs(state, now);
+  const goalMs = state.status === "idle" ? goal * 60_000 : state.goalMs || 0;
+  const remaining = goalMs - elapsed;
+  const display = goalMs ? (remaining >= 0 ? formatTimer(remaining) : `+${formatTimer(-remaining)}`) : formatTimer(elapsed);
   const today = todayIso();
   const todaySeconds = useMemo(() => data["study-sessions"].filter((session) => session.date === today).reduce((sum, session) => sum + session.durationSeconds, 0), [data, today]);
 
@@ -209,7 +225,7 @@ export default function Ritual() {
   };
 
   const mood = celebrate ? "happy" : state.status === "paused" ? "sleepy" : state.status === "running" ? "focused" : state.status === "finished" ? "happy" : "calm";
-  const statusText = { idle: "Pronto para começar", running: "Concentração em andamento", paused: "Pausado: o tempo parado não conta", finished: "Sessão finalizada" }[state.status];
+  const statusText = { idle: "Silencie o mundo. Concentre-se no que importa.", running: goalMs && remaining < 0 ? "Meta cumprida. O tempo extra também conta." : "Concentração em andamento", paused: "Pausado: o tempo parado não conta", finished: "Sessão finalizada" }[state.status];
   const subject = data.subjects.find((item) => item.id === state.subjectId);
 
   return (
@@ -219,7 +235,7 @@ export default function Ritual() {
           <header className="ritual-head">
             <Nox size={46} mood={mood} alive={state.status === "running"} />
             <div>
-              <h2 id="ritual-title">Ritual de Concentração</h2>
+              <h2 id="ritual-title">Ritual de Foco</h2>
               <p>{statusText}</p>
             </div>
             <button type="button" className="icon-btn" aria-label="Minimizar painel (a sessão continua)" title="Minimizar" onClick={() => setView("minimized")}>
@@ -230,9 +246,26 @@ export default function Ritual() {
             </button>
           </header>
 
-          <p className="ritual-clock" role="timer" aria-label={`Tempo de estudo: ${formatClock(elapsed)}`}>
-            {formatClock(elapsed)}
+          <div className={`ritual-scene status-${state.status}`}>
+            <SleepingNox />
+          </div>
+          <p className="ritual-clock" role="timer" aria-label={goalMs ? `Faltam ${display}. Tempo de estudo: ${formatClock(elapsed)}` : `Tempo de estudo: ${formatClock(elapsed)}`}>
+            {display}
           </p>
+          {goalMs > 0 && state.status !== "idle" && (
+            <div className="xp-track ritual-goal" aria-hidden="true">
+              <span style={{ width: `${Math.min(100, (elapsed / goalMs) * 100)}%` }} />
+            </div>
+          )}
+          {state.status === "idle" && (
+            <div className="ritual-goals" role="group" aria-label="Duração do ritual">
+              {goals.map(([value, label]) => (
+                <button key={value} type="button" className={goal === value ? "active" : ""} aria-pressed={goal === value} onClick={() => setGoal(value)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           <p className="ritual-phrase" key={phrase} aria-live="polite">
             <button type="button" onClick={nextPhrase} title="Outra frase">
               {phrase}
@@ -255,8 +288,8 @@ export default function Ritual() {
 
           <div className="ritual-controls">
             {state.status === "idle" && (
-              <button type="button" className="btn primary block" onClick={() => ritual.start()}>
-                <Play size={16} /> Iniciar ritual
+              <button type="button" className="btn primary block" onClick={() => ritual.start(state.subjectId || "", goal)}>
+                <Play size={16} /> Começar ritual
               </button>
             )}
             {state.status === "running" && (
@@ -323,7 +356,7 @@ export default function Ritual() {
       )}
 
       {view === "minimized" && (
-        <button type="button" className={`ritual-pill status-${state.status}`} onClick={() => setView("open")} aria-label="Abrir o Ritual de Concentração">
+        <button type="button" className={`ritual-pill status-${state.status}`} onClick={() => setView("open")} aria-label="Abrir o Ritual de Foco">
           <Nox size={30} mood={mood} />
           <span>{state.status === "idle" ? "Ritual" : formatClock(elapsed)}</span>
           {state.status === "paused" && <small>pausado</small>}

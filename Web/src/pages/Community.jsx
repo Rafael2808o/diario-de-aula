@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, MessageCircle, PenLine, Plus, Search, Trash2 } from "lucide-react";
 import { useApp } from "../context.js";
-import { Avatar, Confirm, Empty, FormError, Modal, Segmented, useSubmit } from "../ui.jsx";
+import { Avatar, Confirm, Empty, FormError, Modal, useSubmit } from "../ui.jsx";
 
-// Quadro de Dúvidas: um único mural para todas as contas. Cada publicação mostra só o nome público do autor.
-export const categories = ["Dúvida", "Ideia ou sugestão", "Erro encontrado", "Atualização", "Comentário geral"];
+// Conselho dos Bruxinhos (antigo Quadro de Dúvidas): um único mural para todas as contas. Cada publicação mostra só o nome público do autor.
+// A ordem acompanha a API: categorias novas entram no fim.
+export const categories = ["Dúvida", "Ideia ou sugestão", "Erro encontrado", "Atualização", "Comentário geral", "Material", "Dica de estudo"];
+const shortNames = { "Ideia ou sugestão": "Ideias", "Comentário geral": "Comentários", "Erro encontrado": "Erros", Atualização: "Atualizações", Dúvida: "Dúvidas", Material: "Materiais", "Dica de estudo": "Dicas" };
+const filterOrder = ["Dúvida", "Material", "Dica de estudo", "Ideia ou sugestão", "Erro encontrado", "Atualização", "Comentário geral"];
 
 const when = (iso) => {
   const date = new Date(iso);
@@ -291,8 +294,8 @@ export default function Community() {
     <div className="page community">
       <header className="page-head">
         <div>
-          <h1>Quadro de Dúvidas</h1>
-          <p>Um mural para toda a comunidade: dúvidas, ideias, erros encontrados e recados.</p>
+          <h1>Conselho dos Bruxinhos</h1>
+          <p>Um mural para toda a comunidade: dúvidas, respostas, materiais, dicas de estudo e ideias.</p>
         </div>
         <div className="page-actions">
           <button className="btn primary" onClick={() => setCreating(true)}>
@@ -304,7 +307,7 @@ export default function Community() {
       {params.id ? (
         <>
           <button className="link-btn back" onClick={() => go("comunidade")}>
-            <ArrowLeft size={15} /> Quadro
+            <ArrowLeft size={15} /> Conselho
           </button>
           <PostDetail key={params.id} id={params.id} />
         </>
@@ -313,9 +316,15 @@ export default function Community() {
           <div className="toolbar community-tools">
             <label className="search-field">
               <Search size={15} aria-hidden="true" />
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar no quadro" aria-label="Buscar no quadro" maxLength={80} />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar dúvida..." aria-label="Buscar no Conselho" maxLength={80} />
             </label>
-            <Segmented label="Categoria" value={category} onChange={setCategory} options={[["", "Todas"], ...categories.map((item) => [item, item === "Ideia ou sugestão" ? "Ideias" : item === "Comentário geral" ? "Comentários" : item === "Erro encontrado" ? "Erros" : item === "Atualização" ? "Atualizações" : "Dúvidas"])]} />
+            <div className="chip-row" role="group" aria-label="Categoria">
+              {[["", "Todas"], ...filterOrder.map((item) => [item, shortNames[item]])].map(([value, label]) => (
+                <button key={label} type="button" className={`chip ${category === value ? "active" : ""}`} aria-pressed={category === value} onClick={() => setCategory(value)}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
           {status === "loading" ? (
             <p className="quiet">Carregando o quadro...</p>

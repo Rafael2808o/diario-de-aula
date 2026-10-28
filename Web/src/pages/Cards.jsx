@@ -16,7 +16,7 @@ export default function Cards() {
       </header>
       {data.subjects.length ? (
         <section className="tool-panel">
-          <Flashcards preset={exam ? { subjectId: exam.subjectId, examId: exam.id } : {}} />
+          <Flashcards preset={exam ? { subjectId: exam.subjectId, examId: exam.id } : data.subjects.some((item) => item.id === params.subject) ? { subjectId: params.subject } : {}} />
         </section>
       ) : (
         <Empty title="Cadastre uma disciplina primeiro.">

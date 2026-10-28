@@ -25,7 +25,7 @@ export default function Exams() {
   return (
     <div className="page">
       <header className="page-head">
-        <h1>Desafios Arcanos</h1>
+        <h1>Provas</h1>
         <div className="page-actions">
           <button className="btn" onClick={() => go("ia", { tool: "socorro" })}>
             <LifeBuoy size={16} /> Socorro, tenho prova!
@@ -217,7 +217,7 @@ function ExamDetail({ exam }) {
   return (
     <div className="page exam-detail" style={{ "--subject": subject?.color }}>
       <button className="link-btn back" onClick={() => go("provas")}>
-        <ArrowLeft size={15} /> Desafios Arcanos
+        <ArrowLeft size={15} /> Provas
       </button>
       <header className="detail-head">
         <div>

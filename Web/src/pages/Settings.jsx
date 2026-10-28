@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bell, Download, LogOut, Plus, Printer } from "lucide-react";
 import { useApp } from "../context.js";
 import { applyAppearance, currentTheme, themes } from "../lib/theme.js";
@@ -69,8 +69,74 @@ function DeleteAccount({ onClose }) {
   );
 }
 
+// Situação das permissões do navegador. Só consulta; nada é pedido sem a pessoa tocar no recurso.
+function PermissionList() {
+  const [states, setStates] = useState({});
+  useEffect(() => {
+    let alive = true;
+    for (const name of ["microphone", "notifications"]) {
+      navigator.permissions
+        ?.query({ name })
+        .then((status) => alive && setStates((current) => ({ ...current, [name]: status.state })))
+        .catch(() => alive && setStates((current) => ({ ...current, [name]: "unknown" })));
+    }
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const label = { granted: "Permitido", denied: "Bloqueado", prompt: "Pergunta ao usar", unknown: "O navegador não informa" };
+  return (
+    <dl className="group stat-list">
+      <div className="row">
+        <dt>Microfone (gravar aulas)</dt>
+        <dd>{label[states.microphone] || "Verificando..."}</dd>
+      </div>
+      <div className="row">
+        <dt>Notificações</dt>
+        <dd>{label[states.notifications] || "Verificando..."}</dd>
+      </div>
+    </dl>
+  );
+}
+
+function RankingPrivacy() {
+  const { user, setUser, call, go } = useApp();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const on = user.preferences?.rankingPublic === true;
+  const toggle = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      setUser(await call("/me", { method: "PATCH", body: { preferences: { rankingPublic: !on } } }));
+    } catch (failure) {
+      setError(failure.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="panel-body settings-text">
+      <label className="check switch-row">
+        <input type="checkbox" checked={on} disabled={busy} onChange={toggle} />
+        <span>
+          Aparecer no Ranking dos Bruxinhos
+          <small>Mostra só o primeiro nome com a inicial do sobrenome, a foto, o nível, o XP, a sequência e as relíquias. Desligado por padrão.</small>
+        </span>
+      </label>
+      <FormError>{error}</FormError>
+      <p className="hint">
+        No Conselho dos Bruxinhos aparecem só o nome público e a foto. Seu e-mail nunca é mostrado.{" "}
+        <button type="button" className="link-btn" onClick={() => go("ranking")}>
+          Ver ranking
+        </button>
+      </p>
+    </div>
+  );
+}
+
 export default function Settings() {
-  const { user, data, setUser, call, signOut, toast } = useApp();
+  const { user, data, setUser, call, signOut, toast, go } = useApp();
   const [draft, setDraft] = useState(() => profileDraft(user));
   const [theme, setTheme] = useState(currentTheme);
   const saveSign = useSaveSign();
@@ -82,7 +148,7 @@ export default function Settings() {
   const { submit, busy, error, setError } = useSubmit(
     async () => {
       // Signo, playlist e comunicados são salvos em outros pontos; o formulário só envia o que ele edita.
-      const { sign: _sign, spotifyUrl: _spotify, announcementSeen: _seen, ...preferences } = draft.preferences;
+      const { sign: _sign, spotifyUrl: _spotify, announcementSeen: _seen, rankingPublic: _ranking, ...preferences } = draft.preferences;
       const saved = await call("/me", { method: "PATCH", body: { ...draft, preferences } });
       setUser(saved);
       return saved;
@@ -133,8 +199,24 @@ export default function Settings() {
       <header className="page-head">
         <h1>Configurações</h1>
       </header>
+      <nav className="chip-row settings-index" aria-label="Seções das configurações">
+        {[
+          ["conta", "Conta"],
+          ["notificacoes", "Notificações"],
+          ["aparencia", "Aparência"],
+          ["privacidade", "Privacidade"],
+          ["permissoes", "Permissões"],
+          ["gravacao", "Gravação"],
+          ["ia-config", "IA"],
+          ["sobre", "Sobre o Grimiau"],
+        ].map(([id, label]) => (
+          <a key={id} className="chip" href={`#${id}`}>
+            {label}
+          </a>
+        ))}
+      </nav>
 
-      <section>
+      <section id="conta">
         <h2 className="section-title">Foto de perfil</h2>
         <div className="group form-group">
           <ProfilePhoto />
@@ -188,7 +270,7 @@ export default function Settings() {
       </section>
 
       <div className="settings-columns">
-        <section>
+        <section id="aparencia">
           <h2 className="section-title">Aparência</h2>
           <div className="group form-group form">
             <fieldset>
@@ -254,11 +336,11 @@ export default function Settings() {
             <div className="form-actions">
               <button className="btn">Salvar playlist</button>
             </div>
-            <p className="hint">Aparece no Ritual de Concentração. Deixe vazio para remover.</p>
+            <p className="hint">Aparece no Ritual de Foco. Deixe vazio para remover.</p>
           </form>
         </section>
 
-        <section>
+        <section id="notificacoes">
           <h2 className="section-title">Notificações</h2>
           <div className="group form-group">
             <label className="check switch-row">
@@ -275,7 +357,7 @@ export default function Settings() {
           </div>
         </section>
 
-        <section>
+        <section id="ia-config">
           <h2 className="section-title">Inteligência artificial</h2>
           <div className="group form-group">
             <p>A IA roda no servidor e recebe só os registros da disciplina escolhida, no momento do pedido. A chave nunca passa pelo navegador. Áudios enviados para transcrição não ficam guardados.</p>
@@ -292,9 +374,30 @@ export default function Settings() {
           </div>
         </section>
 
-        <section>
+        <section id="permissoes">
+          <h2 className="section-title">Permissões</h2>
+          <PermissionList />
+        </section>
+
+        <section id="gravacao">
+          <h2 className="section-title">Gravação de aulas</h2>
+          <div className="panel-body settings-text">
+            <p>Só grave com autorização do professor e da instituição; a Grimiau pede essa confirmação antes de cada gravação.</p>
+            <p>Cada áudio pode ter até 3 MB (cerca de 15 minutos). Ele é enviado ao Gemini, apagado do servidor quando a transcrição termina e fica neste aparelho só até você salvar ou descartar o resultado.</p>
+            <button className="btn small soft" onClick={() => go("ia", { tool: "gravar" })}>
+              Gravar uma aula
+            </button>
+          </div>
+        </section>
+
+        <section id="sobre">
           <h2 className="section-title">Novidades da Grimiau</h2>
           <AnnouncementHistory />
+        </section>
+
+        <section id="privacidade">
+          <h2 className="section-title">Privacidade</h2>
+          <RankingPrivacy />
         </section>
 
         <section>

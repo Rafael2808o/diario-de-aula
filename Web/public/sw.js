@@ -1,4 +1,4 @@
-const CACHE = 'grimiau-shell-v6';
+const CACHE = 'grimiau-shell-v7';
 const SHELL = ['/', '/manifest.json', '/icons/grimiau-192.png', '/icons/grimiau-512.png', '/icons/grimiau-apple-180.png'];
 
 self.addEventListener('install', event => {

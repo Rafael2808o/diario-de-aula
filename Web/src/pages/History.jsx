@@ -128,7 +128,7 @@ export default function History() {
       </header>
 
       <section className="study-log">
-        <h2 className="section-title">Sessões do Ritual de Concentração</h2>
+        <h2 className="section-title">Sessões do Ritual de Foco</h2>
         {sessions.length ? (
           <>
             <dl className="observatory-stats">

@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowUp, BookOpen, ExternalLink, GraduationCap, PenLine, Plus, Search } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, BookOpen, ChevronRight, CircleHelp, ExternalLink, FileText, GraduationCap, Layers, NotebookPen, Paperclip, PenLine, Plus, Search } from "lucide-react";
 import { useApp } from "../context.js";
 import { countdown, formatFull, formatLong, todayIso, weekdayNames, weekdays } from "../lib/dates.js";
-import { lessonStatus } from "../lib/domain.js";
-import { Card, Confirm, Empty, Segmented, SubjectTag } from "../ui.jsx";
+import { lessonStatus, subjectProgress } from "../lib/domain.js";
+import { BookCover } from "../components/Art.jsx";
+import { Card, Confirm, Empty, Segmented } from "../ui.jsx";
 import { ExamForm, MaterialForm, MaterialLinks, NoteForm, SubjectForm, TaskForm } from "../components/forms.jsx";
 import { LessonForm } from "../components/LessonForm.jsx";
 
@@ -12,9 +13,10 @@ export const scheduleText = (subject) =>
     ? subject.schedule.map((slot) => `${weekdayNames[weekdays.indexOf(slot.day)].slice(0, 3)} ${slot.start}–${slot.end}${slot.room ? ` (${slot.room})` : ""}`).join(", ")
     : "Sem horário fixo";
 
-export function SubjectList({ onEdit }) {
-  const { data, call, replace, toast, go } = useApp();
+export function SubjectList({ onEdit, filter = "" }) {
+  const { data, user, call, replace, toast, go } = useApp();
   const today = todayIso();
+  const normalize = (value) => String(value || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
   const move = async (index, direction) => {
     const ids = data.subjects.map((subject) => subject.id);
     const target = index + direction;
@@ -27,26 +29,34 @@ export function SubjectList({ onEdit }) {
     }
   };
   return (
-    <div className="subject-grid">
+    <ul className="book-list">
       {data.subjects.map((subject, index) => {
-        const lessons = data.lessons.filter((lesson) => lesson.subjectId === subject.id && lesson.status === "presente").length;
+        if (filter && !normalize(subject.name).includes(normalize(filter))) return null;
+        const progress = subjectProgress(data, user, subject, today);
         const nextExam = data.exams.find((exam) => exam.subjectId === subject.id && exam.date >= today);
-        const pending = data.tasks.filter((task) => task.subjectId === subject.id && !task.done).length;
+        const pending = progress.pending + data.tasks.filter((task) => task.subjectId === subject.id && !task.done).length;
         return (
-          <article key={subject.id} className="subject-card" style={{ "--subject": subject.color }}>
-            <button type="button" className="subject-card-main" onClick={() => go("conteudos", { id: subject.id })}>
-              <span className="subject-icon" aria-hidden="true">
-                <BookOpen size={18} />
+          <li key={subject.id} className="book-item" style={{ "--subject": subject.color }}>
+            <button type="button" className="book-main" onClick={() => go("conteudos", { id: subject.id })}>
+              <BookCover color={subject.color} index={index} width={46} />
+              <span className="book-text">
+                <strong>{subject.name}</strong>
+                <span className="book-progress">
+                  {progress.percent === null ? "Sem aulas ainda" : `${progress.percent}% concluído`}
+                  {progress.percent !== null && (
+                    <span className="progress-track" aria-hidden="true">
+                      <span style={{ width: `${progress.percent}%` }} />
+                    </span>
+                  )}
+                </span>
+                <small>
+                  {[pending ? `${pending} ${pending === 1 ? "pendência" : "pendências"}` : "Nada pendente", nextExam && `prova ${countdown(nextExam.date, today)}`].filter(Boolean).join(" · ")}
+                </small>
               </span>
-              <strong>{subject.name}</strong>
-              <small>{subject.professor || "Professor não informado"}</small>
-              <span className="subject-meta">
-                <span>{lessons} {lessons === 1 ? "aula registrada" : "aulas registradas"}</span>
-                <span>{pending} {pending === 1 ? "tarefa pendente" : "tarefas pendentes"}</span>
-                <span>{nextExam ? `Próxima prova ${countdown(nextExam.date, today)}` : "Sem prova marcada"}</span>
-              </span>
+              {pending > 0 && <span className="book-pending" aria-hidden="true" />}
+              <ChevronRight size={17} className="chevron" aria-hidden="true" />
             </button>
-            <div className="subject-card-tools">
+            <div className="book-tools">
               <button className="icon-btn" aria-label={`Subir ${subject.name}`} disabled={index === 0} onClick={() => move(index, -1)}>
                 <ArrowUp size={15} />
               </button>
@@ -57,10 +67,10 @@ export function SubjectList({ onEdit }) {
                 <PenLine size={15} />
               </button>
             </div>
-          </article>
+          </li>
         );
       })}
-    </div>
+    </ul>
   );
 }
 
@@ -85,15 +95,17 @@ export function useSubjectEditing() {
 }
 
 export default function Subjects() {
-  const { data, params } = useApp();
+  const { data, params, go } = useApp();
   const editing = useSubjectEditing();
+  const [filter, setFilter] = useState("");
   const subject = params.id ? data.subjects.find((item) => item.id === params.id) : null;
   if (subject) return <SubjectDetail subject={subject} />;
   return (
     <div className="page">
       <header className="page-head">
         <div>
-          <h1>Biblioteca Arcana</h1>
+          <h1>Meu Grimório</h1>
+          <p>Cada disciplina é um livro: aulas, resumos, materiais, cartas, questões e provas ficam dentro dele.</p>
         </div>
         <div className="page-actions">
           <button className="btn primary" onClick={() => editing.open()}>
@@ -101,13 +113,41 @@ export default function Subjects() {
           </button>
         </div>
       </header>
+      {data.subjects.length > 3 && (
+        <label className="search-field grimoire-search">
+          <Search size={15} aria-hidden="true" />
+          <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Buscar disciplina..." aria-label="Buscar disciplina" />
+        </label>
+      )}
       {data.subjects.length ? (
-        <SubjectList onEdit={editing.open} />
+        <SubjectList onEdit={editing.open} filter={filter} />
       ) : (
         <Empty title="Nenhuma disciplina ainda" action={<button className="btn primary" onClick={() => editing.open()}>Cadastrar disciplina</button>}>
           Cadastre as matérias do semestre com cor e horários. Elas organizam o calendário, as aulas e as provas.
         </Empty>
       )}
+      <ul className="group grimoire-links">
+        <li>
+          <button type="button" className="row" onClick={() => go("aulas")}>
+            <NotebookPen size={18} className="row-icon" aria-hidden="true" />
+            <span className="row-main">
+              <strong>Registro de aulas</strong>
+              <small>Todas as aulas do semestre, dia a dia.</small>
+            </span>
+            <ChevronRight size={16} className="chevron" aria-hidden="true" />
+          </button>
+        </li>
+        <li>
+          <button type="button" className="row" onClick={() => go("provas")}>
+            <GraduationCap size={18} className="row-icon" aria-hidden="true" />
+            <span className="row-main">
+              <strong>Provas</strong>
+              <small>Assuntos, conteúdos das aulas e revisão.</small>
+            </span>
+            <ChevronRight size={16} className="chevron" aria-hidden="true" />
+          </button>
+        </li>
+      </ul>
       {editing.modal}
     </div>
   );
@@ -150,19 +190,39 @@ function SubjectDetail({ subject }) {
       ],
     ).values(),
   ];
+  const progress = subjectProgress(data, user, subject, today);
+  const subjectCards = data.flashcards.filter((card) => card.subjectId === subject.id);
+  const quizzes = data["quiz-results"].filter((quiz) => quiz.subjectId === subject.id);
+  const contentLessons = data.lessons.filter((lesson) => lesson.subjectId === subject.id && (lesson.taught || lesson.transcript));
+  const blocks = [
+    { id: "aulas", icon: BookOpen, title: "Aulas", text: `${data.lessons.filter((lesson) => lesson.subjectId === subject.id && lesson.status === "presente").length} registradas${progress.pending ? `, ${progress.pending} sem conteúdo` : ""}`, open: () => setTab("aulas") },
+    { id: "resumos", icon: FileText, title: "Resumos", text: contentLessons.length ? `Resumir ${contentLessons.length} ${contentLessons.length === 1 ? "aula" : "aulas"} com a IA` : "Registre aulas para resumir", open: () => go("ia", { tool: "resumo", subject: subject.id }) },
+    { id: "materiais", icon: Paperclip, title: "Materiais", text: `${materials.length} ${materials.length === 1 ? "material" : "materiais"}`, open: () => setTab("materiais") },
+    { id: "cartas", icon: Layers, title: "Cartas do Saber", text: subjectCards.length ? `${subjectCards.length} ${subjectCards.length === 1 ? "carta" : "cartas"}` : "Nenhuma carta ainda", open: () => go("cartoes", { subject: subject.id }) },
+    { id: "questoes", icon: CircleHelp, title: "Questões", text: quizzes.length ? `${quizzes.length} ${quizzes.length === 1 ? "simulado feito" : "simulados feitos"}` : "Praticar com questões", open: () => go("ia", { tool: "questoes", subject: subject.id }) },
+    { id: "provas", icon: GraduationCap, title: "Provas", text: exams.length ? `${exams.length} ${exams.length === 1 ? "prova" : "provas"}` : "Nenhuma prova cadastrada", open: () => setTab("provas") },
+  ];
   const openLesson = (lesson) =>
     setModal({ type: "lesson", occurrence: { subject, date: lesson.date, start: lesson.startTime, end: "", room: "", lesson } });
 
   return (
     <div className="page subject-detail" style={{ "--subject": subject.color }}>
       <button className="link-btn back" onClick={() => go("conteudos")}>
-        <ArrowLeft size={15} /> Disciplinas
+        <ArrowLeft size={15} /> Meu Grimório
       </button>
-      <header className="detail-head">
+      <header className="detail-head subject-hero">
+        <BookCover color={subject.color} index={Math.max(0, data.subjects.indexOf(subject))} width={74} className="subject-hero-book" />
         <div>
-          <SubjectTag subject={subject} />
           <h1>{subject.name}</h1>
           <p>{subject.professor || "Professor não informado"}, {scheduleText(subject)}</p>
+          {progress.percent !== null && (
+            <p className="subject-hero-progress">
+              <strong>{progress.percent}% concluído</strong>
+              <span className="progress-track" aria-hidden="true">
+                <span style={{ width: `${progress.percent}%` }} />
+              </span>
+            </p>
+          )}
         </div>
         <div className="page-actions">
           <button className="btn ghost" onClick={() => editing.open(subject)}>
@@ -173,6 +233,25 @@ function SubjectDetail({ subject }) {
       <div className="tabs-scroll">
         <Segmented label="Seções da disciplina" value={tab} onChange={setTab} options={tabs} />
       </div>
+
+      {tab === "geral" && (
+        <ul className="group subject-blocks">
+          {blocks.map(({ id, icon: Icon, title, text, open }) => (
+            <li key={id}>
+              <button type="button" className="row" onClick={open}>
+                <span className="block-icon" aria-hidden="true">
+                  <Icon size={17} />
+                </span>
+                <span className="row-main">
+                  <strong>{title}</strong>
+                  <small>{text}</small>
+                </span>
+                <ChevronRight size={16} className="chevron" aria-hidden="true" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {tab === "geral" && (
         <div className="detail-grid">

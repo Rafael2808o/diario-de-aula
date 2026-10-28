@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { useApp } from "../../context.js";
 import { FormError } from "../../ui.jsx";
-import { BasisHint, SourceNote, SubjectTopicFields, buildContext, postAi } from "./shared.jsx";
+import { BasisHint, SourceNote, SubjectTopicFields, buildContext, postAi, AiProgress } from "./shared.jsx";
 
 export default function Explain({ preset = {} }) {
   const { data, session } = useApp();
@@ -10,6 +10,7 @@ export default function Explain({ preset = {} }) {
   const [topic, setTopic] = useState(preset.topic || "");
   const [loading, setLoading] = useState("");
   const [error, setError] = useState("");
+  const [stage, setStage] = useState(null);
   const [result, setResult] = useState(null);
   const [revealed, setRevealed] = useState({});
   const plan = useMemo(() => buildContext(data, subjectId, topic), [data, subjectId, topic]);
@@ -19,9 +20,10 @@ export default function Explain({ preset = {} }) {
     if (!topic.trim()) return setError("Escreva o que você não entendeu.");
     setLoading(level);
     setError("");
+    setStage(null);
     setRevealed({});
     try {
-      const payload = await postAi(session, "/ai/study", { tool: "explicar", subject: subject.name, topic, level, context: plan.context });
+      const payload = await postAi(session, "/ai/study", { tool: "explicar", subject: subject.name, topic, level, context: plan.context }, setStage);
       setResult({ ...payload, level, notes: plan.sources, generic: plan.generic });
     } catch (failure) {
       setError(failure.message);
@@ -48,6 +50,7 @@ export default function Explain({ preset = {} }) {
           </button>
         </div>
       </form>
+      {Boolean(loading) && <AiProgress kind="explicar" stage={stage} />}
       {result && (
         <section className="ai-result" aria-live="polite">
           <SourceNote sources={result.notes} generic={result.generic} />

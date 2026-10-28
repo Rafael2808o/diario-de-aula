@@ -65,7 +65,7 @@ export default function Lessons() {
     <div className="page">
       <header className="page-head">
         <div>
-          <h1>Grimório Acadêmico</h1>
+          <h1>Registro de aulas</h1>
           <p>Cada aula da sua grade, com o que foi ensinado, faltas e materiais.</p>
         </div>
         <div className="page-actions">

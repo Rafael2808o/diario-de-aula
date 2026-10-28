@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useApp } from "../../context.js";
 import { apiBase } from "../../lib/api.js";
 import { formatFull } from "../../lib/dates.js";
-import { Empty } from "../../ui.jsx";
+import { Empty, Nox } from "../../ui.jsx";
 
 const normalize = (value) => String(value || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
@@ -111,12 +111,13 @@ export function BasisHint({ plan }) {
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Envia o pedido e acompanha o trabalho até a IA terminar. Transcrições podem levar alguns minutos.
-export async function postAi(session, path, body) {
+export async function postAi(session, path, body, onStage = () => {}) {
   const headers = { "Content-Type": "application/json", Authorization: `Bearer ${session.token}` };
   const response = await fetch(`${apiBase}${path}`, { method: "POST", headers, body: JSON.stringify(body) });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error || "A IA não respondeu agora.");
   if (!payload.jobId) return payload;
+  onStage("pendente");
   // Prazos acima do pior caso do servidor, que encerra trabalhos presos em 11 minutos.
   const deadline = Date.now() + (path.includes("transcribe") ? 11.5 * 60_000 : 4 * 60_000);
   let delay = 1200;
@@ -137,7 +138,55 @@ export async function postAi(session, path, body) {
     const job = await poll.json().catch(() => ({}));
     if (!poll.ok) throw new Error(job.error || "Não foi possível acompanhar o pedido.");
     if (job.status === "pronto") return job.result;
+    if (job.status === "executando") onStage("executando");
     if (job.status === "erro") throw new Error(job.error || "A IA não respondeu agora.");
   }
   throw new Error("A IA está demorando mais que o normal. Tente de novo em instantes.");
+}
+
+// Tempo típico de cada ferramenta, medido nos testes com o Gemini. Serve só para estimar a porcentagem e o tempo restante.
+const typical = { resumo: 22, flashcards: 20, explicar: 14, questoes: 28 };
+const outputs = { resumo: "o resumo", flashcards: "as cartas", explicar: "a explicação", questoes: "as questões" };
+
+// Progresso de um pedido à IA. As etapas são as reais do servidor (enviado, na fila, gerando);
+// a porcentagem é uma estimativa pelo tempo típico e para em 95% até a resposta chegar de fato.
+export function AiProgress({ kind, stage }) {
+  const [started] = useState(Date.now);
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(timer);
+  }, []);
+  const expected = typical[kind] || 20;
+  const elapsed = (now - started) / 1000;
+  const floor = stage === "executando" ? 30 : stage === "pendente" ? 12 : 3;
+  const percent = Math.min(95, Math.max(floor, Math.round(95 * (1 - Math.exp(-elapsed / (expected * 0.55))))));
+  const remaining = Math.round(expected - elapsed);
+  const steps = [
+    ["Pedido enviado", stage ? "done" : "current"],
+    ["Lendo suas aulas", stage === "executando" ? "done" : stage === "pendente" ? "current" : ""],
+    [`Escrevendo ${outputs[kind] || "a resposta"}`, stage === "executando" ? "current" : ""],
+  ];
+  return (
+    <div className="ai-progress" role="status" aria-live="polite">
+      <Nox size={54} mood="focused" alive />
+      <div className="ai-progress-main">
+        <div className="ai-progress-top">
+          <strong>{percent > 80 ? "Quase lá" : "Seu grimório está sendo preparado"}</strong>
+          <span>{percent}%</span>
+        </div>
+        <div className="xp-track" aria-hidden="true">
+          <span className="ai-progress-bar" style={{ width: `${percent}%` }} />
+        </div>
+        <ol className="ai-steps">
+          {steps.map(([label, state]) => (
+            <li key={label} className={state}>
+              {label}
+            </li>
+          ))}
+        </ol>
+        <small>{remaining > 2 ? `Cerca de ${remaining} s restantes (estimativa).` : "Está levando um pouco mais que o normal. Pode continuar nesta tela."}</small>
+      </div>
+    </div>
+  );
 }

@@ -1,15 +1,14 @@
 import { useMemo, useState } from "react";
-import { AlarmClock, BookOpen, ChevronRight, ClipboardPlus, GraduationCap, Hourglass, LifeBuoy, PenLine, Sparkles } from "lucide-react";
+import { AlarmClock, BookOpen, ChevronRight, ClipboardPlus, Flame, GraduationCap, LifeBuoy } from "lucide-react";
 import { useApp } from "../context.js";
-import { addDays, countdown, formatFull, formatLong, formatShort, nowTime, startOfWeek, todayIso } from "../lib/dates.js";
-import { agendaItems, itemKinds, lessonStatus, pendingLessons, subjectById, topicProgress } from "../lib/domain.js";
-import { formatDuration } from "../lib/ritual.js";
-import { Avatar, Empty } from "../ui.jsx";
+import { addDays, countdown, formatFull, formatShort, nowTime, todayIso } from "../lib/dates.js";
+import { agendaItems, itemKinds, lessonStatus, pendingLessons, progressOf, subjectById, subjectProgress } from "../lib/domain.js";
+import { Empty } from "../ui.jsx";
+import { NoxPose, ProgressRing } from "../components/Art.jsx";
 import { ExamForm, TaskForm } from "../components/forms.jsx";
 import { LessonForm, saveLesson } from "../components/LessonForm.jsx";
 import { AnnouncementBanner } from "../components/Announcements.jsx";
 import Horoscope from "../components/Horoscope.jsx";
-import { PostRow, usePosts } from "./Community.jsx";
 
 // Linha de agenda usada no Início e no Calendário. Tipo sempre aparece em texto e ícone, não só pela cor.
 export function AgendaRow({ item, onOpen, showDate = false }) {
@@ -66,7 +65,7 @@ const pendingLabel = {
 function PendingLessons({ items, onOpen, onStatus }) {
   const [all, setAll] = useState(false);
   const bySubject = items.reduce((map, item) => map.set(item.subject.id, (map.get(item.subject.id) || 0) + 1), new Map());
-  const shown = all ? items : items.slice(0, 5);
+  const shown = all ? items : items.slice(0, 3);
   return (
     <section aria-labelledby="pendentes-title">
       <div className="section-head">
@@ -112,7 +111,7 @@ function PendingLessons({ items, onOpen, onStatus }) {
               </li>
             ))}
           </ul>
-          {items.length > 5 && (
+          {items.length > 3 && (
             <button className="link-btn" onClick={() => setAll(!all)}>
               {all ? "Mostrar menos" : `Ver todas as ${items.length}`}
             </button>
@@ -127,60 +126,55 @@ function PendingLessons({ items, onOpen, onStatus }) {
   );
 }
 
-function CommunityPreview() {
-  const { go } = useApp();
-  const { status, posts } = usePosts();
-  return (
-    <section aria-labelledby="quadro-title">
-      <div className="section-head">
-        <h2 className="section-title" id="quadro-title">
-          Quadro de Dúvidas
-        </h2>
-        <button className="link-btn" onClick={() => go("comunidade")}>
-          Abrir quadro <ChevronRight size={14} />
-        </button>
-      </div>
-      {status === "loading" ? (
-        <p className="quiet">Carregando...</p>
-      ) : status === "error" ? (
-        <p className="quiet">O quadro não abriu agora. Tente de novo mais tarde.</p>
-      ) : posts.length ? (
-        <ul className="group">
-          {posts.slice(0, 3).map((post) => (
-            <PostRow key={post.id} post={post} onOpen={(item) => go("comunidade", { id: item.id })} />
-          ))}
-        </ul>
-      ) : (
-        <p className="quiet">
-          Ninguém publicou ainda.{" "}
-          <button className="link-btn" onClick={() => go("comunidade")}>
-            Deixe a primeira dúvida ou ideia
-          </button>
-        </p>
-      )}
-    </section>
-  );
+// O que estudar agora: a prova mais próxima com assunto ainda não revisado; sem prova à vista,
+// a disciplina da próxima aula, revisando o tema da última aula registrada dela.
+function nextRitual(data, user, today) {
+  const exam = data.exams.find((item) => item.date >= today && item.date <= addDays(today, 21) && item.topics.some((topic) => topic.status !== "Dominado"));
+  if (exam) {
+    const subject = subjectById(data.subjects, exam.subjectId);
+    const topic = exam.topics.find((item) => item.status === "Não iniciado" || item.status === "Em estudo") || exam.topics.find((item) => item.status !== "Dominado");
+    return { subject, title: subject?.name || exam.title, detail: `Revisar ${topic.title}`, when: `${exam.title} ${countdown(exam.date, today)}` };
+  }
+  const upcoming = agendaItems(data, user, today, addDays(today, 7)).find((item) => item.kind === "aula" && (item.date > today || !item.start || item.start >= nowTime()));
+  const subject = upcoming?.subject || data.subjects[0];
+  if (!subject) return null;
+  const last = data.lessons.filter((lesson) => lesson.subjectId === subject.id && lesson.theme).sort((x, y) => y.date.localeCompare(x.date))[0];
+  return {
+    subject,
+    title: subject.name,
+    detail: last ? `Revisar ${last.theme}` : "Revisar a última aula",
+    when: upcoming ? `Próxima aula ${upcoming.date === today ? "hoje" : formatShort(upcoming.date)}${upcoming.start ? `, ${upcoming.start}` : ""}` : "",
+  };
 }
+
+const whenLabel = (item, today) => {
+  const day = item.date === today ? "Hoje" : item.date === addDays(today, 1) ? "Amanhã" : formatShort(item.date);
+  return item.start ? `${day}, ${item.start}` : day;
+};
 
 export default function Home() {
   const app = useApp();
-  const { data, user, go, update, toast, ritual } = app;
+  const { data, user, go, toast, ritual } = app;
   const today = todayIso();
   const [modal, setModal] = useState(null);
-  const todays = agendaItems(data, user, today, today);
-  const exams = data.exams.filter((exam) => exam.date >= today).slice(0, 3);
-  const tasks = data.tasks.filter((task) => !task.done).slice(0, 4);
   const reminders = useReminders(data, user, today);
   const pending = useMemo(() => pendingLessons(data, user, today, nowTime()), [data, user, today]);
-  const progress = topicProgress(data.exams);
-  const totalTopics = Object.values(progress).reduce((sum, value) => sum + value, 0);
-  const registered = data.lessons.filter((lesson) => lesson.status === "presente" && !lesson.draft).length;
-  const weekStart = startOfWeek(today);
-  const sessions = data["study-sessions"];
-  const todaySeconds = sessions.filter((session) => session.date === today).reduce((sum, session) => sum + session.durationSeconds, 0);
-  const weekSeconds = sessions.filter((session) => session.date >= weekStart && session.date <= today).reduce((sum, session) => sum + session.durationSeconds, 0);
+  const progress = useMemo(() => progressOf(data, today), [data, today]);
+  const overall = useMemo(() => {
+    const parts = data.subjects.map((subject) => subjectProgress(data, user, subject, today));
+    const done = parts.reduce((sum, part) => sum + part.registered + part.topicsDone, 0);
+    const total = parts.reduce((sum, part) => sum + part.occurred + part.topics, 0);
+    return total ? Math.round((done / total) * 100) : null;
+  }, [data, user, today]);
+  const upcoming = useMemo(
+    () => agendaItems(data, user, today, addDays(today, 14)).filter((item) => !item.done && item.status !== "cancelada" && (item.date > today || !item.start || item.start >= nowTime())).slice(0, 4),
+    [data, user, today],
+  );
+  const next = useMemo(() => nextRitual(data, user, today), [data, user, today]);
   const first = user.name.split(" ")[0];
   const ritualActive = ritual.state.status === "running" || ritual.state.status === "paused";
+  const lateTasks = data.tasks.filter((task) => !task.done && task.dueDate < today);
+  const reviewCards = data.flashcards.filter((card) => card.level === "difícil" || card.level === "dúvida");
 
   const quickStatus = async (occurrence, status) => {
     try {
@@ -191,19 +185,67 @@ export default function Home() {
     }
   };
 
+  const startRitual = () => {
+    if (!ritualActive && ritual.state.status !== "finished") ritual.start(next?.subject?.id || "");
+    ritual.setView("open");
+  };
+
+  // Uma recomendação por vez, sempre baseada em algo concreto dos registros.
+  const advice = pending.length
+    ? { pose: "reading", text: `${pending.length === 1 ? "Uma aula está" : `${pending.length} aulas estão`} sem conteúdo. Completar ${pending[0].subject.name} leva poucos minutos.`, label: "Completar agora", action: () => setModal({ type: "lesson", occurrence: pending[0] }) }
+    : reviewCards.length
+      ? { pose: "tarot", text: `${reviewCards.length} ${reviewCards.length === 1 ? "carta pede" : "cartas pedem"} revisão nas Cartas do Saber.`, label: "Revisar cartas", action: () => go("cartoes") }
+      : lateTasks.length
+        ? { pose: "waiting", text: lateTasks.length === 1 ? "Uma atividade passou do prazo." : `${lateTasks.length} atividades passaram do prazo.`, label: "Ver na agenda", action: () => go("calendario") }
+        : { pose: "star", text: "Tudo em dia por aqui. Algumas questões ajudam a fixar o que você já registrou.", label: "Praticar questões", action: () => go("ia", { tool: "questoes" }) };
+
   return (
     <div className="page home">
-      <header className="home-head">
-        <Avatar user={user} size={56} className="home-avatar" />
+      <header className="home-hero">
         <div>
-          <p className="today-date">{formatLong(today)}</p>
-          <h1>Olá, {first}. Vamos desvendar alguns conteúdos?</h1>
+          <h1>Olá, {first}.</h1>
+          <p>{ritualActive ? "Seu ritual está em andamento." : pending.length ? "Vamos colocar o grimório em dia?" : "Que tal continuar seu ritual hoje?"}</p>
         </div>
+        <NoxPose pose="reading" size={92} className="home-nox" />
       </header>
+
+      <AnnouncementBanner />
+
+      <section className="focus-card" aria-label="Seu progresso e próximo ritual">
+        <div className="focus-progress">
+          <h2>Seu progresso</h2>
+          <ProgressRing value={overall ?? 0} size={92} label={overall === null ? "Progresso ainda sem dados" : `${overall}% das aulas e assuntos em dia`}>
+            {overall === null ? "–" : `${overall}%`}
+          </ProgressRing>
+          <button type="button" className="focus-level" onClick={() => go("perfil")}>
+            Nível {progress.level}
+            {progress.streak > 0 && (
+              <span>
+                <Flame size={13} aria-hidden="true" /> {progress.streak} {progress.streak === 1 ? "dia" : "dias"}
+              </span>
+            )}
+          </button>
+        </div>
+        <div className="focus-next">
+          <h2>Próximo ritual</h2>
+          {next ? (
+            <>
+              <strong style={{ "--subject": next.subject?.color }}>
+                <span className="subject-dot" aria-hidden="true" /> {next.title}
+              </strong>
+              <p>{next.detail}</p>
+              {next.when && <small>{next.when}</small>}
+            </>
+          ) : (
+            <p>Cadastre suas disciplinas para receber sugestões.</p>
+          )}
+          <button className="btn primary" onClick={startRitual}>
+            {ritualActive ? "Voltar ao ritual" : "Começar"}
+          </button>
+        </div>
+      </section>
+
       <div className="quick-actions">
-        <button className="btn primary" onClick={() => ritual.setView("open")}>
-          <Hourglass size={16} /> {ritualActive ? "Voltar ao ritual" : "Iniciar ritual de estudo"}
-        </button>
         <button className="btn" onClick={() => go("aulas")}>
           <BookOpen size={16} /> Registrar aula
         </button>
@@ -211,39 +253,12 @@ export default function Home() {
           <GraduationCap size={16} /> Adicionar prova
         </button>
         <button className="btn" onClick={() => setModal({ type: "task" })}>
-          <ClipboardPlus size={16} /> Cadastrar atividade
+          <ClipboardPlus size={16} /> Nova atividade
         </button>
         <button className="btn sos" onClick={() => go("ia", { tool: "socorro" })}>
           <LifeBuoy size={16} /> Socorro, tenho prova!
         </button>
       </div>
-
-      <AnnouncementBanner />
-
-      <dl className="observatory-stats" aria-label="Seu progresso">
-        <div>
-          <dt>Estudo hoje</dt>
-          <dd>{todaySeconds ? formatDuration(todaySeconds) : "0 min"}</dd>
-        </div>
-        <div>
-          <dt>Nesta semana</dt>
-          <dd>{weekSeconds ? formatDuration(weekSeconds) : "0 min"}</dd>
-        </div>
-        <div>
-          <dt>Aulas registradas</dt>
-          <dd>{registered}</dd>
-        </div>
-        <div>
-          <dt>Conteúdos revisados</dt>
-          <dd>{totalTopics ? `${progress.Revisado + progress.Dominado} de ${totalTopics}` : "–"}</dd>
-        </div>
-      </dl>
-      <p className="footnote">
-        Tempo de estudo vem das sessões salvas no Ritual. Conteúdos revisados são os que você marcou nas provas.{" "}
-        <button className="link-btn" onClick={() => go("historico")}>
-          Ver histórico
-        </button>
-      </p>
 
       {reminders.length > 0 && (
         <ul className="group reminders" aria-label="Avisos">
@@ -261,6 +276,45 @@ export default function Home() {
 
       <div className="home-columns">
         <div className="home-main">
+          <section aria-labelledby="compromissos-title">
+            <div className="section-head">
+              <h2 className="section-title" id="compromissos-title">
+                Próximos compromissos
+              </h2>
+              <button className="link-btn" onClick={() => go("calendario")}>
+                Agenda <ChevronRight size={14} />
+              </button>
+            </div>
+            {upcoming.length ? (
+              <ul className="group commitments">
+                {upcoming.map((item) => {
+                  const Icon = itemKinds[item.kind].icon;
+                  return (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        className={`row commitment kind-${item.kind}`}
+                        style={{ "--subject": item.subject?.color || "var(--accent)" }}
+                        onClick={() => (item.kind === "aula" ? setModal({ type: "lesson", occurrence: item.occurrence }) : item.kind === "prova" ? go("provas", { id: item.record.id }) : go("calendario", { date: item.date, view: "dia" }))}
+                      >
+                        <span className="commitment-icon" aria-hidden="true">
+                          <Icon size={16} />
+                        </span>
+                        <span className="row-main">
+                          <strong>{item.title}</strong>
+                          <small>{[whenLabel(item, today), item.kind !== "aula" && item.subject?.name].filter(Boolean).join(" · ")}</small>
+                        </span>
+                        <span className={`row-tag tag-${item.kind}`}>{itemKinds[item.kind].label}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="quiet">Nada marcado para as próximas duas semanas.</p>
+            )}
+          </section>
+
           {data.subjects.length ? (
             <PendingLessons items={pending} onOpen={(item) => setModal({ type: "lesson", occurrence: item })} onStatus={quickStatus} />
           ) : (
@@ -271,112 +325,20 @@ export default function Home() {
               </button>
             </Empty>
           )}
-
-          <section>
-            <div className="section-head">
-              <h2 className="section-title">Hoje</h2>
-              <button className="link-btn" onClick={() => go("calendario")}>
-                Calendário <ChevronRight size={14} />
-              </button>
-            </div>
-            {todays.length ? (
-              <div className="group">
-                {todays.map((item) => (
-                  <AgendaRow
-                    key={item.id}
-                    item={item}
-                    onOpen={(entry) => (entry.kind === "aula" ? setModal({ type: "lesson", occurrence: entry.occurrence }) : entry.kind === "prova" ? go("provas", { id: entry.record.id }) : go("calendario", { date: today, view: "dia" }))}
-                  />
-                ))}
-              </div>
-            ) : (
-              <p className="quiet">Nada marcado para hoje. Bom dia para adiantar uma revisão.</p>
-            )}
-          </section>
-
-          <CommunityPreview />
         </div>
 
         <aside className="home-side">
-          <section>
-            <div className="section-head">
-              <h2 className="section-title">Próximas provas e entregas</h2>
-              {data.exams.length > 0 && (
-                <button className="link-btn" onClick={() => go("provas")}>
-                  Ver provas
-                </button>
-              )}
+          <section className="advice" aria-labelledby="conselho-title">
+            <NoxPose pose={advice.pose} size={72} />
+            <div>
+              <h2 id="conselho-title">O Grimiau recomenda</h2>
+              <p>{advice.text}</p>
+              <button className="btn small soft" onClick={advice.action}>
+                {advice.label}
+              </button>
             </div>
-            {exams.length || tasks.length ? (
-              <ul className="group">
-                {exams.map((exam) => {
-                  const subject = subjectById(data.subjects, exam.subjectId);
-                  return (
-                    <li key={exam.id}>
-                      <button type="button" className="row exam-row" style={{ "--subject": subject?.color }} onClick={() => go("provas", { id: exam.id })}>
-                        <span className="subject-dot" aria-hidden="true" />
-                        <span className="row-main">
-                          <strong>{exam.title}</strong>
-                          <small>
-                            {subject?.name}, {formatShort(exam.date)}
-                            {exam.time ? ` às ${exam.time}` : ""}
-                          </small>
-                        </span>
-                        <span className="countdown">{countdown(exam.date, today)}</span>
-                      </button>
-                    </li>
-                  );
-                })}
-                {tasks.map((task) => {
-                  const subject = subjectById(data.subjects, task.subjectId);
-                  const late = task.dueDate < today;
-                  return (
-                    <li key={task.id} className="row task-row" style={{ "--subject": subject?.color || "var(--text-3)" }}>
-                      <input
-                        type="checkbox"
-                        className="round-check"
-                        aria-label={`Concluir ${task.title}`}
-                        checked={task.done}
-                        onChange={async () => {
-                          try {
-                            await update("tasks", task.id, { done: !task.done });
-                            toast("Atividade concluída. Mais um feitiço riscado da lista!");
-                          } catch (error) {
-                            toast(error.message);
-                          }
-                        }}
-                      />
-                      <span className="row-main">
-                        <strong>{task.title}</strong>
-                        <small className={late ? "late" : ""}>
-                          {task.kind}, {late ? "atrasada " : ""}
-                          {countdown(task.dueDate, today)}
-                          {subject ? `, ${subject.name}` : ""}
-                        </small>
-                      </span>
-                      <button className="icon-btn" aria-label={`Editar ${task.title}`} onClick={() => setModal({ type: "task", task })}>
-                        <PenLine size={15} />
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p className="quiet">Nenhuma prova ou entrega à vista. Quando o professor marcar uma avaliação, cadastre aqui.</p>
-            )}
           </section>
-
           <Horoscope />
-
-          <section className="ritual-invite">
-            <Sparkles size={18} aria-hidden="true" />
-            <p>
-              {ritualActive ? "Seu ritual está em andamento. O tempo continua contando mesmo com o painel fechado." : "Seu ritual de concentração começa com um clique. Dá para fechar o painel e o tempo continua contando."}
-            </p>
-            <button className="btn small" onClick={() => ritual.setView("open")}>
-              {ritualActive ? "Abrir painel" : "Abrir ritual"}
-            </button>
-          </section>
         </aside>
       </div>
 
