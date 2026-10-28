@@ -6,7 +6,7 @@ Especificação: prompt mestre "Grimiau" enviado pelo Rafael em 28/10/2026. Evol
 - [x] Backup JSON completo do Neon: `D:\Codes\_backups_grimiau\neon-20261028-1102.json` (users 3, subjects 10, lessons 12, exams 3, materials 7, study_files 6, teacher_notes 3, tasks 1, sessions 11, ai_jobs 1).
 - [x] Branch de backup no Neon: `backup-pre-grimiau-20261028` (br-muddy-math-aruwwpqo).
 - [x] Migrações testadas num branch descartável do Neon antes do deploy.
-- [ ] Depois do deploy: contagens iguais ao backup, token antigo continua válido, login novo funciona.
+- [x] Depois do deploy: contagens iguais ao backup, token antigo continua válido, login novo funciona.
 
 ## API (um único deploy no Render)
 - [x] `initEntities`: cria todas as tabelas antes dos ALTER (permite referência de aulas para provas).
