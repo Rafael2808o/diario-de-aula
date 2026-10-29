@@ -186,7 +186,7 @@ test('atividade compartilhada: código de convite, status individual e acesso s�
   await request(app).get('/api/v1/notifications').set(owner.auth);
   const ownerInbox = (await request(app).get('/api/v1/notifications').set(owner.auth)).body.items;
   assert.ok(ownerInbox.some(item => item.title.includes('entrou')));
-  assert.ok(ownerInbox.some(item => item.title.includes('concluiu')));
+  assert.ok(ownerInbox.some(item => item.title.includes('como concluída')));
   const edited = await request(app).patch(`/api/v1/shared/${created.body.id}`).set(owner.auth).send({ dueDate: '2026-11-12' });
   assert.equal(edited.body.dueDate, '2026-11-12');
   const mateInbox = (await request(app).get('/api/v1/notifications').set(mate.auth)).body.items;
