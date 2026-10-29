@@ -22,7 +22,8 @@ function initFiles() {
       CREATE INDEX IF NOT EXISTS study_files_user_idx ON study_files(user_id);
       CREATE TABLE IF NOT EXISTS file_tickets (
         ticket TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        file_id TEXT NOT NULL REFERENCES study_files(id) ON DELETE CASCADE, expires_at TIMESTAMPTZ NOT NULL)`);
+        file_id TEXT NOT NULL REFERENCES study_files(id) ON DELETE CASCADE, expires_at TIMESTAMPTZ NOT NULL);
+      ALTER TABLE study_files ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`);
   })().catch(error => {
     ready = null;
     throw error;
@@ -31,7 +32,15 @@ function initFiles() {
 }
 
 const memoryFiles = () => (memory.files ||= []);
-const publicFile = ({ id, materialId, name, mime, size }) => ({ id, materialId, name, mime, size });
+const publicFile = ({ id, materialId, name, mime, size, deletedAt }) => ({ id, materialId, name, mime, size, ...(deletedAt ? { deletedAt: new Date(deletedAt).toISOString() } : {}) });
+// Arquivo excluído vai para a lixeira por 30 dias: some das listas e dos links, mas pode ser restaurado.
+const trashDays = 30;
+const alive = file => !file.deletedAt;
+
+async function purgeTrash(userId) {
+  if (pool) await pool.query(`DELETE FROM study_files WHERE user_id=$1 AND deleted_at < NOW() - INTERVAL '${trashDays} days'`, [userId]);
+  else memory.files = memoryFiles().filter(file => !(file.userId === userId && file.deletedAt && Date.now() - file.deletedAt > trashDays * 86_400_000));
+}
 
 async function usedBytes(userId) {
   if (pool) return Number((await pool.query('SELECT COALESCE(SUM(size),0) AS total FROM study_files WHERE user_id=$1', [userId])).rows[0].total);
@@ -69,8 +78,8 @@ async function useTicket(ticket) {
 }
 
 async function readFile(userId, id) {
-  if (pool) return (await pool.query('SELECT name, mime, data FROM study_files WHERE id=$1 AND user_id=$2', [id, userId])).rows[0];
-  return memoryFiles().find(item => item.id === id && item.userId === userId);
+  if (pool) return (await pool.query('SELECT name, mime, data FROM study_files WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL', [id, userId])).rows[0];
+  return memoryFiles().find(item => item.id === id && item.userId === userId && alive(item));
 }
 
 function sendFile(res, file) {
@@ -109,10 +118,12 @@ export function registerFileRoutes(app, requireAuth) {
     try {
       await initFiles();
       if (pool) {
-        const rows = (await pool.query('SELECT id, material_id AS "materialId", name, mime, size FROM study_files WHERE user_id=$1 ORDER BY created_at DESC', [req.user.id])).rows;
+        await purgeTrash(req.user.id);
+        const rows = (await pool.query('SELECT id, material_id AS "materialId", name, mime, size FROM study_files WHERE user_id=$1 AND deleted_at IS NULL ORDER BY created_at DESC', [req.user.id])).rows;
         return res.json(rows);
       }
-      return res.json(memoryFiles().filter(file => file.userId === req.user.id).map(publicFile));
+      await purgeTrash(req.user.id);
+      return res.json(memoryFiles().filter(file => file.userId === req.user.id && alive(file)).map(publicFile));
     } catch (error) {
       return next(error);
     }
@@ -143,6 +154,37 @@ export function registerFileRoutes(app, requireAuth) {
     }
   });
 
+  // Lixeira: arquivos excluídos nos últimos 30 dias, com o material de origem (se ainda existir).
+  app.get('/api/v1/files/trash', requireAuth, async (req, res, next) => {
+    try {
+      await initFiles();
+      await purgeTrash(req.user.id);
+      if (pool) {
+        const rows = (await pool.query('SELECT id, material_id AS "materialId", name, mime, size, deleted_at AS "deletedAt" FROM study_files WHERE user_id=$1 AND deleted_at IS NOT NULL ORDER BY deleted_at DESC', [req.user.id])).rows;
+        return res.json(rows.map(publicFile));
+      }
+      return res.json(memoryFiles().filter(file => file.userId === req.user.id && !alive(file)).map(publicFile));
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  app.post('/api/v1/files/:id/restore', requireAuth, async (req, res, next) => {
+    try {
+      await initFiles();
+      if (pool) {
+        const row = (await pool.query('UPDATE study_files SET deleted_at=NULL WHERE id=$1 AND user_id=$2 AND deleted_at IS NOT NULL RETURNING id, material_id AS "materialId", name, mime, size', [req.params.id, req.user.id])).rows[0];
+        return row ? res.json(row) : res.status(404).json({ error: 'Arquivo não está na lixeira.' });
+      }
+      const file = memoryFiles().find(item => item.id === req.params.id && item.userId === req.user.id && !alive(item));
+      if (!file) return res.status(404).json({ error: 'Arquivo não está na lixeira.' });
+      file.deletedAt = null;
+      return res.json(publicFile(file));
+    } catch (error) {
+      return next(error);
+    }
+  });
+
   app.get('/api/v1/files/:id', requireAuth, async (req, res, next) => {
     try {
       await initFiles();
@@ -154,16 +196,19 @@ export function registerFileRoutes(app, requireAuth) {
     }
   });
 
+  // Excluir um arquivo não mexe no material nem na aula; ele fica na lixeira por 30 dias.
   app.delete('/api/v1/files/:id', requireAuth, async (req, res, next) => {
     try {
       await initFiles();
       if (pool) {
-        const removed = (await pool.query('DELETE FROM study_files WHERE id=$1 AND user_id=$2', [req.params.id, req.user.id])).rowCount;
+        const removed = (await pool.query('UPDATE study_files SET deleted_at=NOW() WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL', [req.params.id, req.user.id])).rowCount;
+        if (removed) await pool.query('DELETE FROM file_tickets WHERE file_id=$1', [req.params.id]);
         return removed ? res.status(204).end() : res.status(404).json({ error: 'Arquivo não encontrado.' });
       }
-      const before = memoryFiles().length;
-      memory.files = memoryFiles().filter(item => !(item.id === req.params.id && item.userId === req.user.id));
-      return memory.files.length < before ? res.status(204).end() : res.status(404).json({ error: 'Arquivo não encontrado.' });
+      const file = memoryFiles().find(item => item.id === req.params.id && item.userId === req.user.id && alive(item));
+      if (!file) return res.status(404).json({ error: 'Arquivo não encontrado.' });
+      file.deletedAt = Date.now();
+      return res.status(204).end();
     } catch (error) {
       return next(error);
     }

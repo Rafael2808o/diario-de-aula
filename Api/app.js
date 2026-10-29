@@ -21,6 +21,7 @@ import {
   reorderSubjects,
   resetPassword,
   saveDiary,
+  subjectSuggestions,
   updateSubject,
   updateUser,
   userFromToken
@@ -31,6 +32,9 @@ import { registerFileRoutes } from './files.js';
 import { registerSocialRoutes } from './social.js';
 import { registerHoroscopeRoutes } from './horoscope.js';
 import { registerRankingRoutes } from './ranking.js';
+import { registerLunarRoutes } from './lunar.js';
+import { registerNotificationRoutes } from './notifications.js';
+import { registerSharedRoutes } from './shared.js';
 
 const app = express();
 const corsOrigins = (process.env.CORS_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean);
@@ -38,7 +42,10 @@ app.use(cors({ origin: corsOrigins.length ? corsOrigins : true }));
 // Arquivos e áudio usam um limite maior, aplicado na própria rota.
 const smallJson = express.json({ limit: '120kb' });
 const largeBodyRoutes = new Set(['POST /api/v1/files', 'POST /api/v1/ai/transcribe', 'PUT /api/v1/me/avatar']);
-app.use((req, res, next) => (largeBodyRoutes.has(`${req.method} ${req.path}`) ? next() : smallJson(req, res, next)));
+// Registros de aula levam transcrição e caderno: aceitam até 600 kb.
+const lessonJson = express.json({ limit: '600kb' });
+const isLessonWrite = req => ['POST', 'PATCH'].includes(req.method) && /^\/api\/v1\/lessons(\/[\w-]+)?$/.test(req.path);
+app.use((req, res, next) => (largeBodyRoutes.has(`${req.method} ${req.path}`) ? next() : isLessonWrite(req) ? lessonJson(req, res, next) : smallJson(req, res, next)));
 
 
 const cleanText = (value, max) =>
@@ -52,6 +59,8 @@ const bearerToken = req => req.headers.authorization?.match(/^Bearer\s+(.+)$/i)?
 const weekdays = new Set(['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']);
 const shifts = new Set(['', 'Manhã', 'Tarde', 'Noite', 'Integral']);
 const organizationModes = new Set(['', 'Por disciplina', 'Por prazo', 'Por prioridade']);
+// Vazio = não informado (disciplinas antigas continuam assim até a pessoa escolher).
+const subjectModalities = new Set(['Presencial', 'EAD', 'Híbrida']);
 const isTime = value => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 const isDate = value => /^\d{4}-\d{2}-\d{2}$/.test(value);
 const isMonth = value => /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
@@ -88,7 +97,11 @@ function cleanPreferences(value, current = {}) {
     spotifyUrl: input.spotifyUrl !== undefined ? cleanSpotifyUrl(input.spotifyUrl) : current.spotifyUrl || '',
     announcementSeen: input.announcementSeen !== undefined ? cleanText(input.announcementSeen, 20) : current.announcementSeen || '',
     // Ranking é opcional: começa desligado e só muda quando a própria pessoa escolhe.
-    rankingPublic: input.rankingPublic !== undefined ? input.rankingPublic === true : current.rankingPublic === true
+    rankingPublic: input.rankingPublic !== undefined ? input.rankingPublic === true : current.rankingPublic === true,
+    // Fases da Lua: aparecer na Constelação também é opcional; apelido e foto valem só lá e na Rádio.
+    lunarPublic: input.lunarPublic !== undefined ? input.lunarPublic === true : current.lunarPublic === true,
+    lunarShowPhoto: input.lunarShowPhoto !== undefined ? input.lunarShowPhoto !== false : current.lunarShowPhoto !== false,
+    nickname: input.nickname !== undefined ? cleanText(input.nickname, 30) : current.nickname || ''
   };
 }
 
@@ -108,7 +121,9 @@ function subjectInput(body) {
   if (!isColor(color)) return { error: 'Escolha uma cor válida para a disciplina.' };
   if ((startDate && !isDate(startDate)) || (endDate && !isDate(endDate))) return { error: 'Use datas válidas para o período.' };
   if (startDate && endDate && startDate > endDate) return { error: 'O início do período precisa vir antes do fim.' };
-  return { subject: { name, professor: cleanText(body.professor, 100), color, schedule: cleanSlots(body.schedule, true), startDate, endDate } };
+  const modality = cleanText(body.modality, 20);
+  if (modality && !subjectModalities.has(modality)) return { error: 'Escolha uma modalidade válida.' };
+  return { subject: { name, professor: cleanText(body.professor, 100), color, schedule: cleanSlots(body.schedule, true), startDate, endDate, modality } };
 }
 
 async function sendResetEmail({ name, email, link }) {
@@ -503,6 +518,14 @@ app.post('/api/v1/subjects', requireAuth, async (req, res, next) => {
   }
 });
 
+app.get('/api/v1/subjects/suggestions', requireAuth, async (req, res, next) => {
+  try {
+    return res.json(await subjectSuggestions(req.user));
+  } catch (error) {
+    return next(error);
+  }
+});
+
 app.put('/api/v1/subjects/order', requireAuth, async (req, res, next) => {
   try {
     const ids = Array.isArray(req.body.ids) ? req.body.ids.filter(id => typeof id === 'string').slice(0, 60) : null;
@@ -614,6 +637,9 @@ registerAiRoutes(app, requireAuth, aiRateLimit);
 registerSocialRoutes(app, requireAuth);
 registerHoroscopeRoutes(app, requireAuth);
 registerRankingRoutes(app, requireAuth);
+registerLunarRoutes(app, requireAuth);
+registerNotificationRoutes(app, requireAuth);
+registerSharedRoutes(app, requireAuth);
 
 app.get('/api/v1/integrations/spotify/status', (_req, res) =>
   res.json({

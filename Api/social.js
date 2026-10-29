@@ -1,5 +1,6 @@
 import express from 'express';
 import { randomUUID } from 'node:crypto';
+import { notify } from './notifications.js';
 import { initStore, memory, pool } from './store.js';
 
 // Foto de perfil e quadro global de dúvidas.
@@ -283,11 +284,20 @@ export function registerSocialRoutes(app, requireAuth) {
       const body = clean(req.body?.body, 2000);
       if (!body) return res.status(400).json({ error: 'Escreva o comentário.' });
       await initSocial();
-      const exists = pool ? (await pool.query('SELECT 1 FROM community_posts WHERE id=$1', [req.params.id])).rowCount : memoryPosts().some(post => post.id === req.params.id);
-      if (!exists) return res.status(404).json({ error: 'Publicação não encontrada.' });
+      const post = pool
+        ? (await pool.query('SELECT user_id AS "userId", title FROM community_posts WHERE id=$1', [req.params.id])).rows[0]
+        : memoryPosts().find(item => item.id === req.params.id);
+      if (!post) return res.status(404).json({ error: 'Publicação não encontrada.' });
       const id = randomUUID();
       if (pool) await pool.query('INSERT INTO community_comments (id,post_id,user_id,body) VALUES ($1,$2,$3,$4)', [id, req.params.id, req.user.id, body]);
       else memoryComments().push({ id, postId: req.params.id, userId: req.user.id, body, edited: false, createdAt: Date.now() });
+      // Avisa o autor da publicação (nunca quem comentou na própria).
+      if (post.userId !== req.user.id) {
+        await notify(post.userId, {
+          kind: 'comunidade', key: `comentario:${id}`, title: `${publicName(req.user.name)} comentou na sua publicação`,
+          body: post.title, link: { page: 'comunidade', params: { id: req.params.id } }
+        }).catch(error => console.error('aviso de comentário', error));
+      }
       return res.status(201).json(await getPost(req.user.id, req.params.id));
     } catch (error) {
       return next(error);

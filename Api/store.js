@@ -87,6 +87,7 @@ export function initStore() {
       schedule TEXT DEFAULT '[]', start_date TEXT DEFAULT '', end_date TEXT DEFAULT '',
       position INTEGER DEFAULT 0, created_at TIMESTAMPTZ DEFAULT NOW()
     );
+    ALTER TABLE subjects ADD COLUMN IF NOT EXISTS modality TEXT DEFAULT '';
     CREATE TABLE IF NOT EXISTS sessions (
       token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       expires_at TIMESTAMPTZ NOT NULL
@@ -223,8 +224,8 @@ export async function resetPassword(token, newPassword) {
   return true;
 }
 
-const subjectColumns = 'id,name,professor,color,schedule,start_date AS "startDate",end_date AS "endDate",position';
-const publicSubject = ({ userId: _userId, ...subject }) => ({ ...subject, schedule: parseJson(subject.schedule, []) });
+const subjectColumns = 'id,name,professor,color,schedule,start_date AS "startDate",end_date AS "endDate",position,modality';
+const publicSubject = ({ userId: _userId, ...subject }) => ({ ...subject, modality: subject.modality || '', schedule: parseJson(subject.schedule, []) });
 
 export async function listSubjects(userId) {
   await initStore();
@@ -238,8 +239,8 @@ export async function addSubject(userId, subject) {
     ? (await pool.query('SELECT COALESCE(MAX(position),-1)+1 AS next FROM subjects WHERE user_id=$1', [userId])).rows[0].next
     : memory.subjects.filter(item => item.userId === userId).length;
   const item = { id: randomUUID(), ...subject, position };
-  if (pool) await pool.query('INSERT INTO subjects (id,user_id,name,professor,color,schedule,start_date,end_date,position) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
-    [item.id, userId, item.name, item.professor, item.color, JSON.stringify(item.schedule), item.startDate, item.endDate, item.position]);
+  if (pool) await pool.query('INSERT INTO subjects (id,user_id,name,professor,color,schedule,start_date,end_date,position,modality) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+    [item.id, userId, item.name, item.professor, item.color, JSON.stringify(item.schedule), item.startDate, item.endDate, item.position, item.modality || '']);
   else memory.subjects.push({ ...item, userId });
   return item;
 }
@@ -247,8 +248,8 @@ export async function addSubject(userId, subject) {
 export async function updateSubject(userId, id, subject) {
   await initStore();
   if (pool) {
-    const row = (await pool.query(`UPDATE subjects SET name=$3,professor=$4,color=$5,schedule=$6,start_date=$7,end_date=$8 WHERE id=$1 AND user_id=$2 RETURNING ${subjectColumns}`,
-      [id, userId, subject.name, subject.professor, subject.color, JSON.stringify(subject.schedule), subject.startDate, subject.endDate])).rows[0];
+    const row = (await pool.query(`UPDATE subjects SET name=$3,professor=$4,color=$5,schedule=$6,start_date=$7,end_date=$8,modality=$9 WHERE id=$1 AND user_id=$2 RETURNING ${subjectColumns}`,
+      [id, userId, subject.name, subject.professor, subject.color, JSON.stringify(subject.schedule), subject.startDate, subject.endDate, subject.modality || ''])).rows[0];
     return row ? publicSubject(row) : null;
   }
   const item = memory.subjects.find(entry => entry.id === id && entry.userId === userId);
@@ -362,4 +363,41 @@ export async function deleteUser(userId, password) {
   if (memory.posts) memory.posts = memory.posts.filter(post => post.userId !== userId);
   if (memory.comments) memory.comments = memory.comments.filter(comment => comment.userId !== userId && (memory.posts || []).some(post => post.id === comment.postId));
   return true;
+}
+
+// Sugestões de disciplinas para quem está montando a grade: nomes que outras contas do mesmo curso e da mesma
+// instituição já cadastraram. Só entra o nome usado por pelo menos duas outras contas, para não expor a grade de
+// uma pessoa específica; quem usou cada nome nunca é enviado.
+const looseKey = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+const sameGroup = (a, b) => a.length >= 4 && b.length >= 4 && (a.includes(b) || b.includes(a));
+
+export async function subjectSuggestions(user, minAccounts = 2) {
+  await initStore();
+  const course = looseKey(user.course);
+  const institution = looseKey(user.institution);
+  if (!course || !institution) return { needsProfile: true, items: [] };
+  const people = pool
+    ? (await pool.query('SELECT id, course, institution FROM users WHERE id<>$1', [user.id])).rows
+    : memory.users.filter(item => item.id !== user.id);
+  const peers = new Set(people.filter(item => sameGroup(looseKey(item.course), course) && sameGroup(looseKey(item.institution), institution)).map(item => item.id));
+  if (!peers.size) return { needsProfile: false, items: [] };
+  const rows = pool
+    ? (await pool.query('SELECT user_id AS "userId", name FROM subjects WHERE user_id = ANY($1)', [[...peers]])).rows
+    : memory.subjects.filter(item => peers.has(item.userId));
+  const own = new Set((await listSubjects(user.id)).map(item => looseKey(item.name)));
+  const groups = new Map();
+  for (const row of rows) {
+    const key = looseKey(row.name);
+    if (!key || own.has(key)) continue;
+    const group = groups.get(key) || { accounts: new Set(), spellings: new Map() };
+    group.accounts.add(row.userId);
+    group.spellings.set(row.name.trim(), (group.spellings.get(row.name.trim()) || 0) + 1);
+    groups.set(key, group);
+  }
+  const items = [...groups.values()]
+    .filter(group => group.accounts.size >= minAccounts)
+    .map(group => ({ name: [...group.spellings].sort((a, b) => b[1] - a[1] || b[0].localeCompare(a[0], 'pt-BR'))[0][0], accounts: group.accounts.size }))
+    .sort((a, b) => b.accounts - a.accounts || a.name.localeCompare(b.name, 'pt-BR'))
+    .slice(0, 20);
+  return { needsProfile: false, items: items.map(({ name }) => ({ name })) };
 }

@@ -1,5 +1,4 @@
-import { entities, listEntity } from './entities.js';
-import { computeProgress } from './progress.js';
+import { progressFor } from './notifications.js';
 import { publicName } from './social.js';
 import { memory, pool } from './store.js';
 
@@ -25,13 +24,6 @@ async function participants() {
     ? (await pool.query('SELECT id, name, avatar_version, course, institution, preferences FROM users')).rows
     : memory.users;
   return rows.filter(row => parse(row.preferences).rankingPublic === true).slice(0, maxListed);
-}
-
-async function progressFor(userId, today) {
-  const [lessons, studySessions, flashcards, quizResults, exams, tasks] = await Promise.all(
-    ['lessons', 'study-sessions', 'flashcards', 'quiz-results', 'exams', 'tasks'].map(key => listEntity(entities[key], userId))
-  );
-  return computeProgress({ lessons, studySessions, flashcards, quizResults, exams, tasks }, today);
 }
 
 export function registerRankingRoutes(app, requireAuth) {

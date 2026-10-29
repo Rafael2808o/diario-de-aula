@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { initStore, memory, pool } from './store.js';
+import { sanitizeHtml } from './richtext.js';
 
 // Entidades acadêmicas descritas por configuração: a mesma definição gera a tabela, valida a entrada,
 // monta as consultas e as rotas REST. Toda linha pertence a um usuário e referências a outras entidades
@@ -65,7 +66,11 @@ export const entities = {
       recovered: bool('recovered'),
       draft: bool('draft'),
       // Vínculo manual com uma prova; sem ele, a prova reúne as aulas da disciplina pelo período.
-      examId: ref('exam_id', 'exams', 'SET NULL')
+      examId: ref('exam_id', 'exams', 'SET NULL'),
+      // Marcado pela pessoa: o professor não disponibilizou material nesta aula (diferente de "ainda não anexado").
+      noMaterial: bool('no_material'),
+      // Caderno da aula, escrito durante a explicação (HTML limpo pelo editor; ver richtext.js).
+      annotations: { column: 'annotations', type: 'html', max: 60000 }
     }
   },
   exams: {
@@ -227,6 +232,7 @@ export async function cleanEntity(config, userId, input) {
     let value = input[key];
     if (field.type === 'json') value = field.clean(value);
     else if (field.type === 'bool') value = Boolean(value);
+    else if (field.type === 'html') value = sanitizeHtml(value, field.max);
     else if (field.type === 'int') {
       const number = Number.parseInt(value, 10);
       value = Number.isFinite(number) ? Math.max(field.min, Math.min(field.max, number)) : 0;
@@ -412,6 +418,7 @@ export function entitySchemas() {
     time: { type: 'string', example: '19:00' },
     enum: { type: 'string', enum: field.values },
     url: { type: 'string', format: 'uri' },
+    html: { type: 'string', description: 'HTML simples (p, h2, h3, strong, em, u, ul, ol, li, blockquote), sem atributos' },
     ref: { type: 'string', format: 'uuid', nullable: true, description: `Id em ${field.table}` }
   }[field.type] || { type: 'string', maxLength: field.max });
   const schemas = {};
