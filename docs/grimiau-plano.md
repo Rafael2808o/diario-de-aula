@@ -34,3 +34,23 @@ Especificação: prompt mestre "Grimiau" enviado pelo Rafael em 28/10/2026. Evol
 - Cinzel não tem itálico no Google Fonts: frases decorativas usam Cormorant Garamond Italic.
 - APK (WebView) recebe o novo visual sozinho; nome e ícone do app só mudam com novo build.
 - Recuperação de senha depende de RESEND_API_KEY (não configurado).
+
+# Atualização completa — 29/10/2026
+
+## Proteção de dados
+- [x] Backup JSON: `D:\Codes\_backups_grimiau\neon-pre-atualizacao-20261029.json`; branch `backup-pre-atualizacao-20261029` (br-crimson-lake-arnfwaxe).
+- [x] Migrações (só aditivas) testadas no branch descartável `qa-atualizacao-20261029`, já apagado.
+- [x] XP e relíquias recalculados para todas as contas reais: XP idêntico, nenhuma relíquia perdida, histórico de XP soma o total.
+- [x] Depois do deploy: nenhuma tabela com menos linhas que o backup.
+
+## Entregue
+- Fases da Lua (mood do dia, histórico lunar, Constelação da Semana opcional, Rádio das Estrelinhas).
+- Sino de avisos (fora da Lua), Histórico de XP, novas relíquias com comemoração.
+- Gravação contínua entre páginas, disciplina escolhida antes de gravar, caderno da aula com salvamento automático.
+- Atividades compartilhadas com status individual, disciplinas sugeridas, EAD, aula sem material, lixeira de arquivos.
+- Ritual redimensionável, frases novas, animações com opção "Discretas".
+
+## Pendências
+- SPOTIFY_CLIENT_ID e SPOTIFY_CLIENT_SECRET vazios no Render e no `.env`: a Rádio salva título e capa, mas sem nome do artista.
+- Aula 169bb9f7 (Design e Produção Gráfica, 28/10) tem tema "Fundamentos de Marketing…" vindo do bug antigo; corrigir pelo botão "Corrigir disciplina ou data" ou editar o tema.
+- Render não fez deploy automático no push: usar `render deploys create srv-dafnrgf40ujc73c3urd0 --wait`.
