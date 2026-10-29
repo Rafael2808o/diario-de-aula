@@ -136,8 +136,8 @@
 .moon-dark { fill: var(--fill); }
 .moon-lit { fill: var(--page); }
 .moon-rim { fill: none; stroke: var(--line-strong); stroke-width: 1; }
-:root[data-theme="light"] .moon-lit { fill: var(--gold); }
-:root[data-theme="light"] .moon-dark { fill: var(--surface-2); }
+:root[data-theme="light"] .moon-lit { fill: color-mix(in srgb, var(--gold) 45%, #f3d98f); }
+:root[data-theme="light"] .moon-dark { fill: var(--fill); }
 .moon-phase.is-glowing { filter: drop-shadow(0 0 10px rgba(229, 199, 123, 0.35)); }
 .moon-picker { display: grid; gap: 18px; }
 .moon-hero h1 { font-size: clamp(25px, 3.4vw, 32px); text-wrap: balance; }
@@ -342,4 +342,10 @@
   .xp-gain, .relic-burst { animation-duration: 0.01s; animation-delay: 0s; opacity: 1; }
   .xp-gain { animation: none; }
   .relic-burst { animation: none; }
+}
+
+/* Celular gravando: o controle da gravação ocupa o lugar da busca, que volta quando a gravação termina. */
+@media (max-width: 760px) {
+  .topbar:has(.recording-bar:not(.is-done)) .searchbox { display: none; }
+  .topbar:has(.recording-bar) .recording-bar { margin-left: auto; }
 }

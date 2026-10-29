@@ -231,7 +231,7 @@ export function registerSharedRoutes(app, requireAuth) {
     if (status === 'Concluída' && found.me.status !== 'Concluída') {
       await notifyOthers(found, req.user.id, {
         kind: 'compartilhada', key: `compartilhada-concluiu:${found.activity.id}:${req.user.id}`,
-        title: `${publicName(req.user.name)} concluiu a parte dele(a)`, body: found.activity.title
+        title: `${publicName(req.user.name)} marcou a parte como concluída`, body: found.activity.title
       });
     }
     return res.json(present(await visibleActivity(found.activity.id, req.user.id), req.user.id));
