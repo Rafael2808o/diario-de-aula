@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, BookOpen, CircleHelp, Layers, Link2, LifeBuoy, PenLine, Plus, Route, Search, Unlink } from "lucide-react";
+import { ArrowLeft, BookOpen, CircleHelp, Layers, Link2, LifeBuoy, ListPlus, PenLine, Plus, Route, Search, Unlink } from "lucide-react";
 import { useApp } from "../context.js";
 import { countdown, formatFull, formatLong, monthShort, todayIso } from "../lib/dates.js";
 import { examLessons, lessonHasContent, lessonsMentioning, subjectById } from "../lib/domain.js";
@@ -106,6 +106,17 @@ function LessonContents({ exam }) {
   const shown = term ? items.filter(({ lesson }) => normalize([lesson.theme, lessonText(lesson)].join(" ")).includes(term)) : items;
   const included = new Set(items.map(({ lesson }) => lesson.id));
   const candidates = data.lessons.filter((lesson) => lesson.subjectId === exam.subjectId && !included.has(lesson.id) && lessonHasContent(lesson)).sort((a, b) => b.date.localeCompare(a.date));
+  // Tema da aula vira assunto da prova, sem repetir assunto que já existe (comparação sem acento e sem caixa).
+  const topicKeys = new Set(exam.topics.map((topic) => normalize(topic.title).trim()));
+  const missingThemes = items.map(({ lesson }) => lesson.theme?.trim()).filter((theme, index, list) => theme && !topicKeys.has(normalize(theme)) && list.findIndex((other) => normalize(other) === normalize(theme)) === index);
+  const addTopics = async (themes) => {
+    try {
+      await update("exams", exam.id, { topics: [...exam.topics, ...themes.map((title) => ({ title: title.slice(0, 160), status: "Não iniciado" }))] });
+      toast(themes.length === 1 ? "Assunto incluído na prova." : `${themes.length} assuntos incluídos na prova.`);
+    } catch (failure) {
+      toast(failure.message);
+    }
+  };
   const link = async (lesson, examId) => {
     try {
       await update("lessons", lesson.id, { examId });
@@ -118,9 +129,16 @@ function LessonContents({ exam }) {
     <section>
       <div className="section-head">
         <h2 className="section-title">Conteúdos das aulas</h2>
-        <button className="link-btn" onClick={() => setLinking(true)} disabled={!candidates.length}>
-          <Link2 size={14} /> Vincular outra aula
-        </button>
+        <span className="section-actions">
+          {missingThemes.length > 0 && (
+            <button className="link-btn" onClick={() => addTopics(missingThemes)}>
+              <ListPlus size={14} /> Incluir {missingThemes.length === 1 ? "o tema" : `os ${missingThemes.length} temas`} nos assuntos
+            </button>
+          )}
+          <button className="link-btn" onClick={() => setLinking(true)} disabled={!candidates.length}>
+            <Link2 size={14} /> Vincular outra aula
+          </button>
+        </span>
       </div>
       {items.length ? (
         <>
@@ -156,6 +174,11 @@ function LessonContents({ exam }) {
                       <button className="link-btn" onClick={() => go("aulas", { lesson: lesson.id })}>
                         Abrir aula
                       </button>
+                      {lesson.theme && !topicKeys.has(normalize(lesson.theme).trim()) && (
+                        <button className="link-btn" onClick={() => addTopics([lesson.theme.trim()])}>
+                          <ListPlus size={13} /> Incluir nos assuntos
+                        </button>
+                      )}
                       {origin === "vinculada" && (
                         <button className="link-btn" onClick={() => link(lesson, null)}>
                           <Unlink size={13} /> Desvincular

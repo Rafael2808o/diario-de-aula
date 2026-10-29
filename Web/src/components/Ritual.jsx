@@ -1,11 +1,71 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ExternalLink, Hourglass, Minus, Music, Pause, Play, Square, X } from "lucide-react";
+import { ExternalLink, GripHorizontal, Hourglass, Minus, Music, Pause, Play, Square, X } from "lucide-react";
 import { useApp } from "../context.js";
 import { todayIso } from "../lib/dates.js";
 import { focusPhrases, phraseBag, restPhrases } from "../lib/phrases.js";
 import { elapsedMs, formatClock, formatDuration, formatTimer, readGoal, saveGoal } from "../lib/ritual.js";
 import { Confirm, FormError, Nox } from "../ui.jsx";
 import { SleepingNox } from "./Art.jsx";
+
+// Tamanho do painel do Ritual: arrastando o canto (mouse, dedo ou caneta) ou com as setas do teclado.
+// É só visual: mudar o tamanho não pausa, reinicia nem altera a sessão. Fica guardado neste aparelho.
+const sizeKey = "grimiau.ritual.tamanho";
+const minSize = { width: 300, height: 320 };
+function readSize() {
+  try {
+    const value = JSON.parse(localStorage.getItem(sizeKey) || "null");
+    return value && Number.isFinite(value.width) && Number.isFinite(value.height) ? value : null;
+  } catch {
+    return null;
+  }
+}
+const clampSize = ({ width, height }) => ({
+  width: Math.round(Math.max(minSize.width, Math.min(width, window.innerWidth - 24))),
+  height: Math.round(Math.max(minSize.height, Math.min(height, window.innerHeight - 100))),
+});
+
+function useResizable(panel) {
+  const [size, setSize] = useState(readSize);
+  const store = (next) => {
+    const value = next && clampSize(next);
+    setSize(value);
+    try {
+      if (value) localStorage.setItem(sizeKey, JSON.stringify(value));
+      else localStorage.removeItem(sizeKey);
+    } catch {
+      // Sem armazenamento, o tamanho vale até fechar a aba.
+    }
+  };
+  const start = (event) => {
+    event.preventDefault();
+    const box = panel.current.getBoundingClientRect();
+    const origin = { x: event.clientX, y: event.clientY, width: box.width, height: box.height };
+    const move = (moveEvent) => {
+      // O painel fica preso no canto inferior direito: puxar para a esquerda e para cima aumenta.
+      setSize(clampSize({ width: origin.width + origin.x - moveEvent.clientX, height: origin.height + origin.y - moveEvent.clientY }));
+    };
+    const end = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      setSize((value) => {
+        if (value) store(value);
+        return value;
+      });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+  };
+  const key = (event) => {
+    const box = panel.current.getBoundingClientRect();
+    const step = event.shiftKey ? 60 : 20;
+    const delta = { ArrowLeft: [step, 0], ArrowRight: [-step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] }[event.key];
+    if (!delta) return;
+    event.preventDefault();
+    store({ width: box.width + delta[0], height: box.height + delta[1] });
+  };
+  const style = size ? { "--ritual-width": `${size.width}px`, "--ritual-height": `${size.height}px` } : undefined;
+  return { style, start, key, reset: () => store(null), resized: Boolean(size) };
+}
 
 const goals = [
   [25, "25 min"],
@@ -180,6 +240,8 @@ export default function Ritual() {
   const [error, setError] = useState("");
   const [discarding, setDiscarding] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
+  const panelRef = useRef(null);
+  const resizable = useResizable(panelRef);
   const [goal, setGoalState] = useState(readGoal);
   const setGoal = (value) => {
     setGoalState(value);
@@ -231,7 +293,18 @@ export default function Ritual() {
   return (
     <>
       {mounted && (
-        <section className={`ritual-panel ${celebrate ? "is-celebrating" : ""}`} hidden={view !== "open"} aria-labelledby="ritual-title">
+        <section ref={panelRef} className={`ritual-panel ${celebrate ? "is-celebrating" : ""} ${resizable.resized ? "is-resized" : ""}`} style={resizable.style} hidden={view !== "open"} aria-labelledby="ritual-title">
+          <button
+            type="button"
+            className="ritual-resize"
+            aria-label="Redimensionar o painel: arraste o canto ou use as setas. Duplo clique volta ao tamanho padrão."
+            title="Arraste para mudar o tamanho (duplo clique volta ao padrão)"
+            onPointerDown={resizable.start}
+            onKeyDown={resizable.key}
+            onDoubleClick={resizable.reset}
+          >
+            <GripHorizontal size={14} aria-hidden="true" />
+          </button>
           <header className="ritual-head">
             <Nox size={46} mood={mood} alive={state.status === "running"} />
             <div>

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { AlarmClock, BookOpen, ChevronRight, ClipboardPlus, Flame, GraduationCap, LifeBuoy } from "lucide-react";
 import { useApp } from "../context.js";
 import { addDays, countdown, formatFull, formatShort, nowTime, todayIso } from "../lib/dates.js";
-import { agendaItems, itemKinds, lessonStatus, pendingLessons, progressOf, subjectById, subjectProgress } from "../lib/domain.js";
+import { agendaItems, itemKinds, lessonStatus, lessonsWithoutMaterial, pendingLessons, progressOf, subjectById, subjectProgress } from "../lib/domain.js";
 import { Empty } from "../ui.jsx";
 import { NoxPose, ProgressRing } from "../components/Art.jsx";
 import { ExamForm, TaskForm } from "../components/forms.jsx";
@@ -121,6 +121,66 @@ function PendingLessons({ items, onOpen, onStatus }) {
         <Empty compact mood="happy" title="Tudo em dia! Todas as aulas possuem conteúdo cadastrado.">
           As aulas das últimas semanas estão registradas, com falta anotada ou canceladas.
         </Empty>
+      )}
+    </section>
+  );
+}
+
+// Aulas com registro, mas sem material anexado. É outra pendência, separada de "sem conteúdo":
+// uma aula pode ter caderno completo e nenhum arquivo do professor.
+function MaterialPending({ data, onOpen, onNoMaterial }) {
+  const today = todayIso();
+  const { missing, marked } = useMemo(() => lessonsWithoutMaterial(data, today), [data, today]);
+  const [all, setAll] = useState(false);
+  if (!missing.length && !marked.length) return null;
+  const shown = all ? missing : missing.slice(0, 3);
+  return (
+    <section aria-labelledby="sem-material-title">
+      <div className="section-head">
+        <h2 className="section-title" id="sem-material-title">
+          Aulas sem material anexado {missing.length > 0 && <span className="count-badge">{missing.length}</span>}
+        </h2>
+      </div>
+      {missing.length ? (
+        <ul className="group">
+          {shown.map((lesson) => {
+            const subject = subjectById(data.subjects, lesson.subjectId);
+            if (!subject) return null;
+            return (
+              <li key={lesson.id} className="row pending-row" style={{ "--subject": subject.color }}>
+                <span className="subject-dot" aria-hidden="true" />
+                <span className="row-main">
+                  <strong>{subject.name}</strong>
+                  <small>
+                    {lesson.date === today ? "Hoje" : formatFull(lesson.date)}
+                    {lesson.theme ? `, ${lesson.theme}` : ""}
+                  </small>
+                </span>
+                <span className="pending-tag pending-material">Material ainda não anexado</span>
+                <span className="row-actions">
+                  <button className="btn small" onClick={() => onOpen(lesson, subject)}>
+                    Anexar
+                  </button>
+                  <button className="btn small ghost" onClick={() => onNoMaterial(lesson)}>
+                    Não teve material
+                  </button>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="hint">Todas as aulas recentes têm material ou foram marcadas como sem material.</p>
+      )}
+      {missing.length > 3 && (
+        <button className="link-btn" onClick={() => setAll(!all)}>
+          {all ? "Mostrar menos" : `Ver todas as ${missing.length}`}
+        </button>
+      )}
+      {marked.length > 0 && (
+        <p className="hint">
+          {marked.length === 1 ? "1 aula foi marcada" : `${marked.length} aulas foram marcadas`} como “sem material disponibilizado” e não contam como pendência.
+        </p>
       )}
     </section>
   );
@@ -316,7 +376,14 @@ export default function Home() {
           </section>
 
           {data.subjects.length ? (
+            <>
             <PendingLessons items={pending} onOpen={(item) => setModal({ type: "lesson", occurrence: item })} onStatus={quickStatus} />
+            <MaterialPending
+              data={data}
+              onOpen={(lesson, subject) => setModal({ type: "lesson", occurrence: { subject, date: lesson.date, start: lesson.startTime, end: "", room: "", lesson } })}
+              onNoMaterial={(lesson) => app.update("lessons", lesson.id, { noMaterial: true }).then(() => toast("Aula marcada como sem material disponibilizado.")).catch((failure) => toast(failure.message))}
+            />
+            </>
           ) : (
             <Empty title="Cadastre suas disciplinas para começar.">
               Com os dias e horários de cada matéria, a Grimiau monta as aulas do semestre e mostra o que falta registrar.

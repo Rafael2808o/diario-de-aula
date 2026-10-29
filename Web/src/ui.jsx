@@ -202,6 +202,7 @@ export function SubjectTag({ subject, small = false }) {
     <span className={`subject-tag ${small ? "small" : ""}`} style={{ "--subject": subject.color }}>
       <i aria-hidden="true" />
       {subject.name}
+      {(subject.modality === "EAD" || subject.modality === "Híbrida") && <span className="modality-badge">{subject.modality}</span>}
     </span>
   );
 }

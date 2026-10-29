@@ -1,10 +1,10 @@
-import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArchiveRestore, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useApp } from "../context.js";
 import { fileToBase64, openStoredFile } from "../lib/api.js";
 import { formatFull, todayIso, weekdayNames, weekdays } from "../lib/dates.js";
 import { nextPaletteColor, subjectPalette } from "../lib/domain.js";
-import { FormError, Modal, useSubmit } from "../ui.jsx";
+import { Confirm, FormError, Modal, useSubmit } from "../ui.jsx";
 
 export const formValues = (form) => Object.fromEntries(new FormData(form));
 
@@ -25,12 +25,12 @@ export function SubjectSelect({ name = "subjectId", value, onChange, required = 
   );
 }
 
-function FormActions({ busy, label = "Salvar", onCancel, onDelete }) {
+function FormActions({ busy, label = "Salvar", onCancel, onDelete, deleteLabel = "Excluir" }) {
   return (
     <div className="form-actions">
       {onDelete && (
         <button type="button" className="btn ghost danger-text" onClick={onDelete} disabled={busy}>
-          <Trash2 size={15} /> Excluir
+          <Trash2 size={15} /> {deleteLabel}
         </button>
       )}
       <span className="spacer" />
@@ -45,11 +45,13 @@ function FormActions({ busy, label = "Salvar", onCancel, onDelete }) {
 }
 
 const emptySlot = () => ({ day: "Seg", start: "19:00", end: "20:40", room: "" });
+export const subjectModalities = ["Presencial", "EAD", "Híbrida"];
 
 export function SubjectForm({ subject, onClose, onDelete }) {
   const { data, create, update, user } = useApp();
   const [color, setColor] = useState(subject?.color || nextPaletteColor(data.subjects));
-  const [slots, setSlots] = useState(subject?.schedule?.length ? subject.schedule : [emptySlot()]);
+  const [modality, setModality] = useState(subject?.modality || "");
+  const [slots, setSlots] = useState(subject?.schedule?.length ? subject.schedule : subject?.modality === "EAD" ? [] : [emptySlot()]);
   const { submit, busy, error, setError } = useSubmit(
     (body) => (subject ? update("subjects", subject.id, body) : create("subjects", body)),
     { success: subject ? "Disciplina atualizada." : "Disciplina cadastrada.", onDone: onClose },
@@ -68,7 +70,7 @@ export function SubjectForm({ subject, onClose, onDelete }) {
           const values = formValues(event.currentTarget);
           const invalid = slots.find((slot) => slot.start >= slot.end);
           if (invalid) return setError("O horário de término precisa ser depois do início.");
-          submit({ name: values.name, professor: values.professor, color, schedule: slots, startDate: values.startDate, endDate: values.endDate });
+          submit({ name: values.name, professor: values.professor, color, schedule: slots, startDate: values.startDate, endDate: values.endDate, modality });
         }}
       >
         <div className="form-row">
@@ -81,6 +83,16 @@ export function SubjectForm({ subject, onClose, onDelete }) {
             <input name="professor" maxLength={100} defaultValue={subject?.professor} />
           </label>
         </div>
+        <label>
+          Modalidade
+          <select value={modality} onChange={(event) => setModality(event.target.value)}>
+            <option value="">Não informada</option>
+            {subjectModalities.map((option) => (
+              <option key={option}>{option}</option>
+            ))}
+          </select>
+          {modality === "EAD" && <small className="hint">Disciplina EAD pode ficar sem horário fixo: aulas, materiais, atividades e prazos continuam organizados por ela.</small>}
+        </label>
         <fieldset>
           <legend>Cor</legend>
           <div className="swatches">
@@ -386,7 +398,7 @@ export function NoteForm({ note, defaults = {}, onClose, onDelete }) {
     success: note ? "Informação atualizada." : "Informação guardada no cofre.",
     onDone: onClose,
   });
-  const lessons = data.lessons.filter((lesson) => lesson.subjectId === subjectId);
+  const lessons = data.lessons.filter((lesson) => lesson.subjectId === subjectId).sort((a, b) => b.date.localeCompare(a.date));
   const exams = data.exams.filter((exam) => exam.subjectId === subjectId);
   return (
     <Modal title={note ? "Editar informação do professor" : "Nova informação do professor"} onClose={onClose} wide>
@@ -462,22 +474,30 @@ const kindFromFile = (file) =>
   file.type === "application/pdf" ? "PDF" : file.type.startsWith("image/") ? "Foto" : file.type.startsWith("audio/") ? "Áudio" : /presentation|powerpoint/.test(file.type) ? "Slides" : "Documento";
 
 export function MaterialForm({ material, defaults = {}, onClose, onDelete }) {
-  const { data, session, create, update, call, replace, remove } = useApp();
+  const { data, session, create, update, call, replace, remove, toast } = useApp();
+  const uploadId = `upload-${material?.id || "novo"}`;
   const [subjectId, setSubjectId] = useState(material?.subjectId || defaults.subjectId || "");
   const [file, setFile] = useState(null);
   const [type, setType] = useState(material?.type || "Link");
+  // Arquivo a excluir (com confirmação) ou a substituir pelo novo envio.
+  const [removing, setRemoving] = useState(null);
+  const [replacing, setReplacing] = useState(null);
   const attached = material ? data.files.filter((item) => item.materialId === material.id) : [];
   const { submit, busy, error, setError } = useSubmit(
     async (body) => {
       const saved = material ? await update("materials", material.id, body) : await create("materials", body);
       if (file) {
+        let uploaded;
         try {
-          const uploaded = await call("/files", { method: "POST", body: { materialId: saved.id, name: file.name, mime: file.type || "application/octet-stream", data: await fileToBase64(file) } });
-          replace("files", [uploaded, ...data.files]);
+          uploaded = await call("/files", { method: "POST", body: { materialId: saved.id, name: file.name, mime: file.type || "application/octet-stream", data: await fileToBase64(file) } });
         } catch (failure) {
           // O material já foi salvo; avisamos que só o arquivo falhou para a pessoa tentar de novo.
           throw new Error(`O material foi salvo, mas o arquivo não foi enviado: ${failure.message}`);
         }
+        // Substituição: o antigo só sai depois que o novo chegou (e vai para a lixeira, não some de vez).
+        const old = replacing && attached.find((item) => item.id === replacing);
+        replace("files", [uploaded, ...data.files.filter((item) => item.id !== old?.id)]);
+        if (old) await call(`/files/${old.id}`, { method: "DELETE" }).catch(() => {});
       }
       return saved;
     },
@@ -514,6 +534,7 @@ export function MaterialForm({ material, defaults = {}, onClose, onDelete }) {
         <label>
           Arquivo
           <input
+            id={uploadId}
             type="file"
             name="upload"
             accept="application/pdf,image/*,audio/*,text/plain,.doc,.docx,.ppt,.pptx,.xls,.xlsx"
@@ -538,8 +559,14 @@ export function MaterialForm({ material, defaults = {}, onClose, onDelete }) {
                 <button type="button" className="link-btn" onClick={() => openStoredFile(session.token, item).catch((failure) => setError(failure.message))}>
                   {item.name}
                 </button>
-                <small>{Math.max(1, Math.round(item.size / 1024))} KB</small>
-                <button type="button" className="icon-btn" aria-label={`Remover arquivo ${item.name}`} onClick={() => remove("files", item.id).catch((failure) => setError(failure.message))}>
+                <small>{Math.max(1, Math.round(item.size / 1024))} KB{replacing === item.id ? " · será substituído pelo novo arquivo" : ""}</small>
+                <button type="button" className="icon-btn" aria-label={`Substituir arquivo ${item.name}`} title="Substituir por outro arquivo" onClick={() => {
+                  setReplacing(item.id);
+                  document.getElementById(uploadId)?.click();
+                }}>
+                  <RefreshCw size={15} />
+                </button>
+                <button type="button" className="icon-btn" aria-label={`Excluir arquivo ${item.name}`} title="Excluir só este arquivo" onClick={() => setRemoving(item)}>
                   <Trash2 size={15} />
                 </button>
               </li>
@@ -553,13 +580,15 @@ export function MaterialForm({ material, defaults = {}, onClose, onDelete }) {
         <label>
           Aula relacionada
           <select name="lessonId" defaultValue={material?.lessonId || defaults.lessonId || ""}>
-            <option value="">Nenhuma</option>
+            <option value="">Nenhuma (só na disciplina)</option>
             {lessons.map((lesson) => (
               <option key={lesson.id} value={lesson.id}>
-                {formatFull(lesson.date)} {lesson.theme ? `– ${lesson.theme}` : ""}
+                {formatFull(lesson.date)}
+                {lesson.startTime ? `, ${lesson.startTime}` : ""} {lesson.theme ? `– ${lesson.theme}` : ""}
               </option>
             ))}
           </select>
+          <small className="hint">Enviou na aula ou na data errada? Troque aqui: o material e os arquivos mudam de aula sem precisar enviar de novo.</small>
         </label>
         <input type="hidden" name="examId" value={material?.examId || defaults.examId || ""} />
         <label>
@@ -567,8 +596,21 @@ export function MaterialForm({ material, defaults = {}, onClose, onDelete }) {
           <textarea name="notes" rows={3} maxLength={2000} defaultValue={material?.notes} />
         </label>
         <FormError>{error}</FormError>
-        <FormActions busy={busy} label={file ? "Salvar e enviar" : "Salvar"} onCancel={onClose} onDelete={onDelete} />
+        <FormActions busy={busy} label={file ? (replacing ? "Salvar e substituir" : "Salvar e enviar") : "Salvar"} onCancel={onClose} onDelete={onDelete} deleteLabel="Excluir material" />
+        {onDelete && <p className="hint">“Excluir material” apaga o material e os arquivos dele. A aula continua como está.</p>}
       </form>
+      {removing && (
+        <Confirm
+          title="Excluir arquivo"
+          message={`“${removing.name}” sai deste material e vai para a lixeira por 30 dias. O material e a aula continuam como estão.`}
+          confirmLabel="Excluir arquivo"
+          onClose={() => setRemoving(null)}
+          onConfirm={async () => {
+            await remove("files", removing.id);
+            toast("Arquivo excluído. Dá para restaurar pela lixeira em Materiais.");
+          }}
+        />
+      )}
     </Modal>
   );
 }
@@ -591,5 +633,53 @@ export function MaterialLinks({ material }) {
       ))}
       {!material.url && !files.length && <span>{material.title}</span>}
     </span>
+  );
+}
+
+// Arquivos excluídos nos últimos 30 dias, com a opção de restaurar no mesmo material.
+export function FileTrash({ onClose }) {
+  const { call, data, replace, toast } = useApp();
+  const [items, setItems] = useState(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    call("/files/trash").then(setItems).catch((failure) => setError(failure.message));
+  }, [call]);
+  const restore = async (file) => {
+    try {
+      const restored = await call(`/files/${file.id}/restore`, { method: "POST" });
+      replace("files", [restored, ...data.files]);
+      setItems((list) => list.filter((item) => item.id !== file.id));
+      toast(`“${file.name}” voltou para o material.`);
+    } catch (failure) {
+      setError(failure.message);
+    }
+  };
+  return (
+    <Modal title="Lixeira de arquivos" onClose={onClose}>
+      <p className="hint">Arquivos excluídos ficam aqui por 30 dias. Depois disso, saem de vez.</p>
+      <FormError>{error}</FormError>
+      {items === null ? (
+        <p className="quiet">Abrindo a lixeira...</p>
+      ) : items.length ? (
+        <ul className="attached">
+          {items.map((file) => {
+            const material = data.materials.find((item) => item.id === file.materialId);
+            return (
+              <li key={file.id}>
+                <span>
+                  {file.name}
+                  <small> · {material ? material.title : "material excluído"} · excluído em {formatFull(file.deletedAt.slice(0, 10))}</small>
+                </span>
+                <button type="button" className="btn ghost small" disabled={!material} onClick={() => restore(file)}>
+                  <ArchiveRestore size={14} /> Restaurar
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="quiet">A lixeira está vazia.</p>
+      )}
+    </Modal>
   );
 }

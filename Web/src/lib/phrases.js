@@ -40,6 +40,13 @@ export const focusPhrases = [
   "Até as estrelas levam tempo para brilhar. Continua.",
   "Escreve com suas palavras. É assim que o conteúdo vira seu.",
   "Seu potencial está carregando… 87%… quase lá.",
+  "Um passinho de cada vez também leva longe, estrelinha.",
+  "Seu futuro está sendo construído até nos dias mais lentos.",
+  "Respira, organiza as ideias e começa pelo possível.",
+  "Até a Lua passa por fases. Você também pode ir no seu ritmo.",
+  "Estrelinha, o caderno aberto já é meio caminho andado.",
+  "Hoje não precisa ser perfeito. Só precisa ser feito.",
+  "Devagar e com constância: é assim que as constelações se formam.",
 ];
 
 export const restPhrases = [

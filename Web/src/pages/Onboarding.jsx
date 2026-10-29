@@ -5,6 +5,7 @@ import { applyAppearance, currentTheme, themes } from "../lib/theme.js";
 import { FormError, Logo, Nox, Segmented, useSubmit } from "../ui.jsx";
 import { AcademicFields, RoutineFields, profileDraft, validProfile } from "../components/ProfileFields.jsx";
 import { SubjectList, useSubjectEditing } from "./Subjects.jsx";
+import SubjectSuggestions from "../components/SubjectSuggestions.jsx";
 
 const steps = ["Conta", "Perfil acadêmico", "Disciplinas", "Rotina"];
 
@@ -94,6 +95,7 @@ export default function Onboarding() {
         )}
         {step === 2 && (
           <div>
+            <SubjectSuggestions compact />
             {data.subjects.length > 0 && <SubjectList onEdit={editing.open} />}
             <button className="btn soft" onClick={() => editing.open()}>
               <Plus size={16} /> {data.subjects.length ? "Adicionar outra disciplina" : "Adicionar disciplina"}

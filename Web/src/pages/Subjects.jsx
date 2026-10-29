@@ -5,7 +5,8 @@ import { countdown, formatFull, formatLong, todayIso, weekdayNames, weekdays } f
 import { lessonStatus, subjectProgress } from "../lib/domain.js";
 import { BookCover } from "../components/Art.jsx";
 import { Card, Confirm, Empty, Segmented } from "../ui.jsx";
-import { ExamForm, MaterialForm, MaterialLinks, NoteForm, SubjectForm, TaskForm } from "../components/forms.jsx";
+import { ExamForm, FileTrash, MaterialForm, MaterialLinks, NoteForm, SubjectForm, TaskForm, subjectModalities } from "../components/forms.jsx";
+import SubjectSuggestions from "../components/SubjectSuggestions.jsx";
 import { LessonForm } from "../components/LessonForm.jsx";
 
 export const scheduleText = (subject) =>
@@ -13,7 +14,7 @@ export const scheduleText = (subject) =>
     ? subject.schedule.map((slot) => `${weekdayNames[weekdays.indexOf(slot.day)].slice(0, 3)} ${slot.start}–${slot.end}${slot.room ? ` (${slot.room})` : ""}`).join(", ")
     : "Sem horário fixo";
 
-export function SubjectList({ onEdit, filter = "" }) {
+export function SubjectList({ onEdit, filter = "", modality = "" }) {
   const { data, user, call, replace, toast, go } = useApp();
   const today = todayIso();
   const normalize = (value) => String(value || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -32,6 +33,7 @@ export function SubjectList({ onEdit, filter = "" }) {
     <ul className="book-list">
       {data.subjects.map((subject, index) => {
         if (filter && !normalize(subject.name).includes(normalize(filter))) return null;
+        if (modality && (subject.modality || "") !== (modality === "nao-informada" ? "" : modality)) return null;
         const progress = subjectProgress(data, user, subject, today);
         const nextExam = data.exams.find((exam) => exam.subjectId === subject.id && exam.date >= today);
         const pending = progress.pending + data.tasks.filter((task) => task.subjectId === subject.id && !task.done).length;
@@ -40,7 +42,10 @@ export function SubjectList({ onEdit, filter = "" }) {
             <button type="button" className="book-main" onClick={() => go("conteudos", { id: subject.id })}>
               <BookCover color={subject.color} index={index} width={46} />
               <span className="book-text">
-                <strong>{subject.name}</strong>
+                <strong>
+                  {subject.name}
+                  {subject.modality && <span className="modality-badge">{subject.modality}</span>}
+                </strong>
                 <span className="book-progress">
                   {progress.percent === null ? "Sem aulas ainda" : `${progress.percent}% concluído`}
                   {progress.percent !== null && (
@@ -98,6 +103,7 @@ export default function Subjects() {
   const { data, params, go } = useApp();
   const editing = useSubjectEditing();
   const [filter, setFilter] = useState("");
+  const [modality, setModality] = useState("");
   const subject = params.id ? data.subjects.find((item) => item.id === params.id) : null;
   if (subject) return <SubjectDetail subject={subject} />;
   return (
@@ -119,8 +125,17 @@ export default function Subjects() {
           <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Buscar disciplina..." aria-label="Buscar disciplina" />
         </label>
       )}
+      {data.subjects.some((item) => item.modality) && (
+        <Segmented
+          label="Filtrar por modalidade"
+          value={modality}
+          onChange={setModality}
+          options={[["", "Todas"], ...subjectModalities.filter((option) => data.subjects.some((item) => item.modality === option)).map((option) => [option, option]), ...(data.subjects.some((item) => !item.modality) ? [["nao-informada", "Sem modalidade"]] : [])]}
+        />
+      )}
+      {data.subjects.length < 4 && <SubjectSuggestions />}
       {data.subjects.length ? (
-        <SubjectList onEdit={editing.open} filter={filter} />
+        <SubjectList onEdit={editing.open} filter={filter} modality={modality} />
       ) : (
         <Empty title="Nenhuma disciplina ainda" action={<button className="btn primary" onClick={() => editing.open()}>Cadastrar disciplina</button>}>
           Cadastre as matérias do semestre com cor e horários. Elas organizam o calendário, as aulas e as provas.
@@ -181,6 +196,11 @@ function SubjectDetail({ subject }) {
   const exams = data.exams.filter((exam) => exam.subjectId === subject.id);
   const tasks = data.tasks.filter((task) => task.subjectId === subject.id);
   const materials = data.materials.filter((material) => material.subjectId === subject.id);
+  // Cada material mostra a aula e a data a que está ligado, para achar o que foi enviado no lugar errado.
+  const materialLesson = (material) => {
+    const lesson = data.lessons.find((item) => item.id === material.lessonId);
+    return lesson ? `Aula de ${formatFull(lesson.date)}${lesson.theme ? `, ${lesson.theme}` : ""}` : "Sem aula ligada";
+  };
   const notes = data["teacher-notes"].filter((note) => note.subjectId === subject.id);
   const themes = [
     ...new Map(
@@ -401,7 +421,15 @@ function SubjectDetail({ subject }) {
       )}
 
       {tab === "materiais" && (
-        <Card title="Materiais" action={<button className="link-btn" onClick={() => setModal({ type: "material" })}><Plus size={14} /> Novo</button>}>
+        <Card
+          title="Materiais"
+          action={
+            <span className="section-actions">
+              <button className="link-btn" onClick={() => setModal({ type: "trash" })}>Lixeira</button>
+              <button className="link-btn" onClick={() => setModal({ type: "material" })}><Plus size={14} /> Novo</button>
+            </span>
+          }
+        >
           {materials.length ? (
             <ul className="material-list">
               {materials.map((material) => (
@@ -409,6 +437,7 @@ function SubjectDetail({ subject }) {
                   <span className="badge">{material.type}</span>
                   <span>
                     <MaterialLinks material={material} />
+                    <small>{materialLesson(material)}</small>
                     {material.notes && <small>{material.notes}</small>}
                   </span>
                   <button className="icon-btn" aria-label={`Editar ${material.title}`} onClick={() => setModal({ type: "material", material })}>
@@ -453,6 +482,7 @@ function SubjectDetail({ subject }) {
       {modal?.type === "task" && (
         <TaskForm task={modal.task} defaults={{ subjectId: subject.id }} onClose={() => setModal(null)} onDelete={modal.task && (() => setModal({ type: "confirm", name: "tasks", record: modal.task, label: modal.task.title }))} />
       )}
+      {modal?.type === "trash" && <FileTrash onClose={() => setModal(null)} />}
       {modal?.type === "material" && (
         <MaterialForm material={modal.material} defaults={{ subjectId: subject.id }} onClose={() => setModal(null)} onDelete={modal.material && (() => setModal({ type: "confirm", name: "materials", record: modal.material, label: modal.material.title }))} />
       )}

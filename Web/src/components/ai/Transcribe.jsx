@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, Layers, Mic, NotebookPen, Pause, Play, RotateCcw, Square, Upload } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertCircle, CheckCircle2, Download, Layers, Mic, NotebookPen, Pause, Play, RotateCcw, Square, Trash2, Upload } from "lucide-react";
 import { useApp } from "../../context.js";
 import { todayIso, weekdayOf } from "../../lib/dates.js";
+import { formatElapsed } from "../../lib/recorder.js";
 import { activeStatuses } from "../../lib/transcription.js";
 import { FormError, Nox, Segmented } from "../../ui.jsx";
 import { saveLesson } from "../LessonForm.jsx";
 
 const maxBytes = 3 * 1024 * 1024;
-const pickMime = () => ["audio/webm;codecs=opus", "audio/mp4", "audio/ogg;codecs=opus", "audio/webm"].find((type) => window.MediaRecorder?.isTypeSupported?.(type)) || "";
 
 // Etapas reais do pedido no servidor. O serviço não informa progresso: a porcentagem e o tempo restante
 // são estimativas pelo tamanho do áudio e pela etapa atual, e param em 95% até a resposta chegar.
@@ -93,85 +93,91 @@ export function TranscriptionStatus({ job, onRetry, onClear, compact = false }) 
   );
 }
 
+// Uma parte de áudio pronta (gravada ou importada): ouvir, baixar ou mandar transcrever.
+function AudioPart({ part, label, sent, disabled, onTranscribe }) {
+  const url = useMemo(() => URL.createObjectURL(part.blob), [part.blob]);
+  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  const extension = part.blob.type.includes("mp4") ? "m4a" : part.blob.type.includes("ogg") ? "ogg" : "webm";
+  return (
+    <li className="audio-part">
+      <div className="audio-part-head">
+        <strong>{label}</strong>
+        <small>
+          {Math.max(1, Math.round(part.size / 1024))} KB{sent ? " · já enviada para transcrição" : ""}
+        </small>
+      </div>
+      <audio controls src={url} className="audio-preview" />
+      <div className="form-actions">
+        <a className="btn ghost small" href={url} download={`${part.name}.${extension}`}>
+          <Download size={14} /> Baixar áudio
+        </a>
+        <button type="button" className="btn primary small" disabled={disabled} onClick={onTranscribe}>
+          {sent ? "Transcrever de novo" : "Transcrever e resumir"}
+        </button>
+      </div>
+    </li>
+  );
+}
+
 export default function Transcribe() {
   const app = useApp();
-  const { data, toast, transcription } = app;
+  const { data, toast, transcription, recorder, params } = app;
   const job = transcription.job;
   const [consent, setConsent] = useState(false);
-  const [recording, setRecording] = useState(false);
-  const [paused, setPaused] = useState(false);
   const [view, setView] = useState("resumo");
-  const [seconds, setSeconds] = useState(0);
-  const [audio, setAudio] = useState(null);
+  const [imported, setImported] = useState(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState("");
   const [error, setError] = useState("");
+  const [sent, setSent] = useState([]);
   const result = job?.status === "pronto" ? job.result : null;
-  const [subjectId, setSubjectId] = useState(job?.subjectId || data.subjects[0]?.id || "");
-  const [date, setDate] = useState(job?.date || todayIso());
-  const recorder = useRef(null);
-  const timer = useRef(null);
-  const audioUrl = useMemo(() => (audio ? URL.createObjectURL(audio.blob) : ""), [audio]);
-  useEffect(() => () => audioUrl && URL.revokeObjectURL(audioUrl), [audioUrl]);
+  // Disciplina e data vêm do que a pessoa escolheu (ou do link da aula); nunca da primeira disciplina da lista.
+  const knownSubject = (id) => (data.subjects.some((item) => item.id === id) ? id : "");
+  const [subjectId, setSubjectId] = useState(() => knownSubject(params.subject || recorder.context?.subjectId || ""));
+  const [date, setDate] = useState(() => (/^\d{4}-\d{2}-\d{2}$/.test(params.date || "") ? params.date : recorder.context?.date || todayIso()));
+  const [resultSubjectId, setResultSubjectId] = useState(() => knownSubject(job?.subjectId || ""));
+  const [resultDate, setResultDate] = useState(job?.date || todayIso());
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!recorder.active) return undefined;
+    const timer = setInterval(() => tick((value) => value + 1), 1000);
+    return () => clearInterval(timer);
+  }, [recorder.active]);
+  // Quando um resultado chega, o formulário de destino começa no contexto da gravação.
+  useEffect(() => {
+    if (job?.status !== "pronto") return;
+    setResultSubjectId(knownSubject(job.subjectId || ""));
+    setResultDate(job.date || todayIso());
+  }, [job?.status, job?.jobId]);
 
-  useEffect(() => () => {
-    clearInterval(timer.current);
-    recorder.current?.stream?.getTracks().forEach((track) => track.stop());
-  }, []);
+  const subjectOf = (id) => data.subjects.find((item) => item.id === id);
+  const context = { subjectId, date, subjectName: subjectOf(subjectId)?.name || "" };
+  const changeContext = (next) => {
+    if (next.subjectId !== undefined) setSubjectId(next.subjectId);
+    if (next.date !== undefined) setDate(next.date);
+    // Com gravação em andamento, a correção vale para ela também.
+    if (recorder.status !== "idle") recorder.setContext({ ...context, ...next, subjectName: subjectOf(next.subjectId ?? subjectId)?.name || "" });
+  };
 
   const start = async () => {
     setError("");
-    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return setError("Este navegador não grava áudio. Importe um arquivo gravado no celular.");
+    setSent([]);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mime = pickMime();
-      const media = new MediaRecorder(stream, { ...(mime ? { mimeType: mime } : {}), audioBitsPerSecond: 24_000 });
-      const chunks = [];
-      media.ondataavailable = (event) => event.data.size && chunks.push(event.data);
-      media.onstop = () => {
-        stream.getTracks().forEach((track) => track.stop());
-        const blob = new Blob(chunks, { type: (media.mimeType || mime || "audio/webm").split(";")[0] });
-        if (blob.size > maxBytes) setError("A gravação passou de 3 MB. Grave trechos menores (cerca de 15 minutos cada).");
-        else setAudio({ blob, name: `gravacao-${todayIso()}`, size: blob.size });
-      };
-      media.start(1000);
-      recorder.current = media;
-      setRecording(true);
-      setPaused(false);
-      setSeconds(0);
-      timer.current = setInterval(() => setSeconds((value) => value + 1), 1000);
-    } catch {
-      setError("O navegador não liberou o microfone. Verifique a permissão do site.");
+      await recorder.start(context);
+    } catch (failure) {
+      setError(failure.message);
     }
   };
 
-  const stop = () => {
-    recorder.current?.stop();
-    clearInterval(timer.current);
-    setRecording(false);
-    setPaused(false);
-  };
-
-  const togglePause = () => {
-    const media = recorder.current;
-    if (!media) return;
-    if (paused) {
-      media.resume();
-      timer.current = setInterval(() => setSeconds((value) => value + 1), 1000);
-    } else {
-      media.pause();
-      clearInterval(timer.current);
-    }
-    setPaused(!paused);
-  };
-
-  const transcribe = async () => {
+  const transcribe = async (part, key) => {
     setBusy(true);
     setError("");
     try {
-      const subject = data.subjects.find((item) => item.id === subjectId);
-      await transcription.submit({ blob: audio.blob, name: audio.name, subjectId, date, subjectName: subject?.name || "" });
-      setAudio(null);
+      const subject = subjectOf(subjectId);
+      // Sem disciplina escolhida, a IA não recebe nome de matéria nenhum: o assunto sai só do áudio.
+      await transcription.submit({ blob: part.blob, name: part.name, subjectId: subject ? subjectId : "", date, subjectName: subject?.name || "" });
+      setSent((list) => [...new Set([...list, key])]);
+      if (key === "importado") setImported(null);
     } catch (failure) {
       setError(failure.message);
     } finally {
@@ -180,9 +186,9 @@ export default function Transcribe() {
   };
 
   const saveToLesson = async () => {
-    const subject = data.subjects.find((item) => item.id === subjectId);
-    if (!subject) return setError("Escolha a disciplina da aula.");
-    const lesson = data.lessons.find((item) => item.subjectId === subjectId && item.date === date);
+    const subject = subjectOf(resultSubjectId);
+    if (!subject) return setError("Escolha a disciplina desta aula antes de salvar.");
+    const lesson = data.lessons.find((item) => item.subjectId === resultSubjectId && item.date === resultDate);
     const summary = result.summary;
     const lines = [
       summary.concepts.length && `Conceitos: ${summary.concepts.join("; ")}`,
@@ -190,20 +196,21 @@ export default function Transcribe() {
       summary.guidance.length && `Orientações: ${summary.guidance.join("; ")}`,
     ].filter(Boolean);
     setBusy(true);
+    setError("");
     try {
-      await saveLesson(app, { subject, date, start: lesson?.startTime || subject.schedule.find((slot) => slot.day === weekdayOf(date))?.start || "", lesson: lesson || null }, {
+      await saveLesson(app, { subject, date: resultDate, start: lesson?.startTime || subject.schedule.find((slot) => slot.day === weekdayOf(resultDate))?.start || "", lesson: lesson || null }, {
         status: "presente",
         theme: lesson?.theme || summary.subject,
         taught: [lesson?.taught, lines.join("\n")].filter(Boolean).join("\n\n"),
         examInfo: [lesson?.examInfo, summary.exam.join("\n")].filter(Boolean).join("\n"),
         notes: [lesson?.notes, summary.doubts.length && `Dúvidas e pontos a revisar: ${summary.doubts.join("; ")}`].filter(Boolean).join("\n"),
-        transcript: result.transcript,
+        // Uma aula pode ter várias partes: a transcrição nova entra depois da que já existia.
+        transcript: [lesson?.transcript, result.transcript].filter(Boolean).join("\n\n"),
         draft: true,
       });
-      toast("Aula salva no Grimório, como rascunho para você revisar.");
-      setSaved(subjectId);
+      toast(`Aula salva em ${subject.name}, como rascunho para você revisar.`);
+      setSaved(resultSubjectId);
       await transcription.clear();
-      setAudio(null);
     } catch (failure) {
       setError(failure.message);
     } finally {
@@ -212,7 +219,8 @@ export default function Transcribe() {
   };
 
   const running = job && activeStatuses.includes(job.status);
-  const savedSubject = data.subjects.find((item) => item.id === saved);
+  const savedSubject = subjectOf(saved);
+  const recordingSubject = subjectOf(recorder.context?.subjectId);
 
   return (
     <div className="tool-body">
@@ -227,69 +235,111 @@ export default function Transcribe() {
         </label>
       </div>
 
-      {!job && (
-        <>
-          <div className={`recorder ${recording ? "is-recording" : ""} ${paused ? "is-paused" : ""}`}>
-            {recording ? (
-              <>
-                <p className="recorder-state">
-                  <span className="rec-dot" aria-hidden="true" /> {paused ? "Pausado" : "Gravando"}
-                </p>
-                <p className="recorder-clock" role="timer">
-                  {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
-                </p>
-                <Nox size={64} mood={paused ? "sleepy" : "focused"} alive={!paused} />
-                <div className="recorder-actions">
-                  <button className="btn" onClick={togglePause}>
-                    {paused ? <Play size={16} /> : <Pause size={16} />} {paused ? "Continuar" : "Pausar"}
-                  </button>
-                  <button className="btn danger" onClick={stop}>
-                    <Square size={14} /> Finalizar
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <button className="mic-button" disabled={!consent} onClick={start} aria-label="Começar a gravar">
-                  <Mic size={30} aria-hidden="true" />
-                </button>
-                <p className="hint">{consent ? "Toque para começar" : "Marque a autorização para liberar o microfone"}</p>
-                <label className={`btn ghost small ${!consent ? "is-disabled" : ""}`}>
-                  <Upload size={15} /> Importar áudio gravado
-                  <input
-                    type="file"
-                    accept="audio/*"
-                    className="sr-only"
-                    disabled={!consent}
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      event.target.value = "";
-                      if (!file) return;
-                      if (file.size > maxBytes) return setError("O arquivo precisa ter até 3 MB. Divida a gravação em partes menores.");
-                      setError("");
-                      setAudio({ blob: file, name: file.name, size: file.size });
-                    }}
-                  />
-                </label>
-              </>
-            )}
-          </div>
-          {audio && !recording && (
-            <p className="hint">
-              {audio.name}, {Math.round(audio.size / 1024)} KB
-            </p>
-          )}
-          {audio && !recording && <audio controls src={audioUrl} className="audio-preview" />}
-        </>
-      )}
-      <FormError>{error}</FormError>
-      {audio && !recording && !job && (
-        <div className="form-actions">
-          <button className="btn primary" disabled={busy || !consent} onClick={transcribe}>
-            {busy ? "Enviando..." : "Transcrever e resumir"}
-          </button>
+      <fieldset className="record-context">
+        <legend>De qual aula é este áudio?</legend>
+        <div className="form-row">
+          <label className="form">
+            Disciplina
+            <select value={subjectId} onChange={(event) => changeContext({ subjectId: event.target.value })}>
+              <option value="">Escolher depois</option>
+              {data.subjects.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="form">
+            Data da aula
+            <input type="date" value={date} onChange={(event) => changeContext({ date: event.target.value })} />
+          </label>
         </div>
+        <small className="hint">{subjectId ? "A transcrição já sai ligada a esta disciplina. Dá para corrigir antes de salvar." : "Sem disciplina, a transcrição fica aguardando você confirmar a aula antes de salvar."}</small>
+      </fieldset>
+
+      {recorder.active ? (
+        <div className={`recorder is-recording ${recorder.status === "paused" ? "is-paused" : ""}`}>
+          <p className="recorder-state">
+            <span className="rec-dot" aria-hidden="true" /> {recorder.status === "paused" ? "Pausado" : "Gravando"}
+            {recordingSubject ? ` · ${recordingSubject.name}` : ""}
+          </p>
+          <p className="recorder-clock" role="timer">
+            {formatElapsed(recorder.elapsed())}
+          </p>
+          <Nox size={64} mood={recorder.status === "paused" ? "sleepy" : "focused"} alive={recorder.status !== "paused"} />
+          <div className="recorder-actions">
+            <button className="btn" onClick={recorder.status === "paused" ? recorder.resume : recorder.pause}>
+              {recorder.status === "paused" ? <Play size={16} /> : <Pause size={16} />} {recorder.status === "paused" ? "Continuar" : "Pausar"}
+            </button>
+            <button className="btn danger" onClick={recorder.stop}>
+              <Square size={14} /> Finalizar
+            </button>
+          </div>
+          <p className="hint">Pode navegar pela Grimiau, abrir materiais e anotar: a gravação continua e o controle fica no topo da tela. Não feche esta aba.</p>
+        </div>
+      ) : (
+        recorder.status !== "done" && (
+          <div className="recorder">
+            <button className="mic-button" disabled={!consent} onClick={start} aria-label="Começar a gravar">
+              <Mic size={30} aria-hidden="true" />
+            </button>
+            <p className="hint">{consent ? "Toque para começar" : "Marque a autorização para liberar o microfone"}</p>
+            <label className={`btn ghost small ${!consent ? "is-disabled" : ""}`}>
+              <Upload size={15} /> Importar áudio gravado
+              <input
+                type="file"
+                accept="audio/*"
+                className="sr-only"
+                disabled={!consent}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (!file) return;
+                  if (file.size > maxBytes) return setError("O arquivo precisa ter até 3 MB. Divida a gravação em partes menores.");
+                  setError("");
+                  setImported({ blob: file, name: file.name.replace(/\.[^.]+$/, ""), size: file.size });
+                }}
+              />
+            </label>
+          </div>
+        )
       )}
+
+      {recorder.status === "done" && recorder.parts.length > 0 && (
+        <section className="recorded-parts">
+          <h3>{recorder.recovered ? "Gravação recuperada deste aparelho" : "Gravação finalizada"}</h3>
+          <p className="hint">
+            {recorder.recovered ? "Uma gravação foi interrompida antes de terminar (aba fechada, sessão expirada ou falha do navegador). O áudio que chegou a ser gravado está aqui." : "O áudio fica guardado neste aparelho até você descartar."}
+            {recorder.parts.length > 1 ? " A aula foi dividida em partes de até 3 MB para caber na transcrição: envie uma de cada vez." : ""}
+          </p>
+          <ul className="audio-parts">
+            {recorder.parts.map((part, index) => (
+              <AudioPart
+                key={part.name}
+                part={part}
+                label={recorder.parts.length > 1 ? `Parte ${index + 1}` : "Áudio da aula"}
+                sent={sent.includes(part.name)}
+                disabled={busy || !consent || running}
+                onTranscribe={() => transcribe(part, part.name)}
+              />
+            ))}
+          </ul>
+          {!consent && <p className="hint">Marque a autorização acima para transcrever.</p>}
+          {running && <p className="hint">Aguarde a transcrição em andamento terminar para enviar outra parte.</p>}
+          <div className="form-actions">
+            <button type="button" className="btn ghost" onClick={() => recorder.discard()}>
+              <Trash2 size={14} /> Descartar gravação
+            </button>
+          </div>
+        </section>
+      )}
+
+      {imported && (
+        <ul className="audio-parts">
+          <AudioPart part={imported} label={imported.name} disabled={busy || !consent || running} onTranscribe={() => transcribe(imported, "importado")} />
+        </ul>
+      )}
+      <FormError>{error || recorder.error}</FormError>
       {job && job.status !== "pronto" && (
         <TranscriptionStatus job={job} onClear={() => transcription.clear()} onRetry={() => transcription.retry().catch((failure) => setError(failure.message))} />
       )}
@@ -331,26 +381,28 @@ export default function Transcribe() {
             </label>
           )}
           {view === "resumo" && (
-          <dl className="summary-grid">
-            {[
-              ["Assunto principal", result.summary.subject ? [result.summary.subject] : []],
-              ["Conceitos", result.summary.concepts],
-              ["Exemplos do professor", result.summary.examples],
-              ["Atividades e orientações", result.summary.guidance],
-              ["Sobre provas", result.summary.exam],
-              ["Dúvidas e pontos a revisar", result.summary.doubts],
-            ].map(([label, items]) => (
-              <div key={label}>
-                <dt>{label}</dt>
-                <dd>{items.length ? items.join("; ") : "Não aparece no áudio."}</dd>
-              </div>
-            ))}
-          </dl>
+            <dl className="summary-grid">
+              {[
+                ["Assunto identificado no áudio", result.summary.subject ? [result.summary.subject] : []],
+                ["Conceitos", result.summary.concepts],
+                ["Exemplos do professor", result.summary.examples],
+                ["Atividades e orientações", result.summary.guidance],
+                ["Sobre provas", result.summary.exam],
+                ["Dúvidas e pontos a revisar", result.summary.doubts],
+              ].map(([label, items]) => (
+                <div key={label}>
+                  <dt>{label}</dt>
+                  <dd>{items.length ? items.join("; ") : "Não aparece no áudio."}</dd>
+                </div>
+              ))}
+            </dl>
           )}
+          <p className="hint">O assunto acima é o que a IA ouviu na aula. A disciplina é a que você confirma aqui embaixo.</p>
           <div className="form-row">
             <label className="form">
-              Disciplina
-              <select value={subjectId} onChange={(event) => setSubjectId(event.target.value)}>
+              Disciplina da aula
+              <select value={resultSubjectId} onChange={(event) => setResultSubjectId(event.target.value)}>
+                <option value="">Escolha a disciplina</option>
                 {data.subjects.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
@@ -360,14 +412,14 @@ export default function Transcribe() {
             </label>
             <label className="form">
               Data da aula
-              <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+              <input type="date" value={resultDate} onChange={(event) => setResultDate(event.target.value)} />
             </label>
           </div>
           <div className="form-actions">
             <button className="btn" onClick={() => transcription.clear()}>
               Descartar
             </button>
-            <button className="btn primary" disabled={busy || !data.subjects.length} onClick={saveToLesson}>
+            <button className="btn primary" disabled={busy || !resultSubjectId} onClick={saveToLesson}>
               Salvar no Grimório
             </button>
           </div>

@@ -1,14 +1,21 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { BookOpen, CalendarDays, GraduationCap, Home as HomeIcon, Layers, MessagesSquare, NotebookPen, Settings as SettingsIcon, Sparkles, Trophy, UserRound, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BookOpen, CalendarDays, GraduationCap, Home as HomeIcon, Layers, MessagesSquare, Moon as MoonIcon, NotebookPen, NotebookText, ScrollText, Settings as SettingsIcon, Sparkles, Trophy, UserRound, Users, X } from "lucide-react";
 import { AppContext, useApp } from "./context.js";
 import { readSession, request, storeSession, useAcademicData } from "./lib/api.js";
 import { useLocalNotifications } from "./lib/notify.js";
 import { useRitual } from "./lib/ritual.js";
 import { activeStatuses, useTranscription } from "./lib/transcription.js";
+import { useRecorder } from "./lib/recorder.js";
+import { progressOf } from "./lib/domain.js";
+import { todayIso } from "./lib/dates.js";
 import { Avatar, Logo, Nox, ToastProvider, useToast } from "./ui.jsx";
 import SearchBox from "./components/SearchBox.jsx";
 import Ritual, { RitualButton } from "./components/Ritual.jsx";
 import { stageText } from "./components/ai/Transcribe.jsx";
+import RecordingBar from "./components/RecordingBar.jsx";
+import NotificationBell, { useNotifications } from "./components/NotificationBell.jsx";
+import Sky from "./components/Sky.jsx";
+import Celebrations, { useCelebrations } from "./components/Celebrate.jsx";
 import Auth from "./pages/Auth.jsx";
 import Calendar from "./pages/Calendar.jsx";
 import Cards from "./pages/Cards.jsx";
@@ -18,6 +25,10 @@ import Exams from "./pages/Exams.jsx";
 import History from "./pages/History.jsx";
 import Home from "./pages/Home.jsx";
 import Lessons from "./pages/Lessons.jsx";
+import Moon from "./pages/Moon.jsx";
+import Notebook from "./pages/Notebook.jsx";
+import Shared from "./pages/Shared.jsx";
+import XpHistory from "./pages/XpHistory.jsx";
 import Onboarding from "./pages/Onboarding.jsx";
 import Profile from "./pages/Profile.jsx";
 import Ranking from "./pages/Ranking.jsx";
@@ -28,10 +39,10 @@ import Subjects from "./pages/Subjects.jsx";
 // Cinco seções fixas em todas as telas. Cada seção reúne as páginas que abre (group), para o menu marcar a certa.
 const nav = [
   { id: "inicio", label: "Início", title: "Início", icon: HomeIcon, page: Home, group: ["inicio"] },
-  { id: "conteudos", label: "Grimório", title: "Meu Grimório", icon: BookOpen, page: Subjects, group: ["conteudos", "aulas", "provas"] },
-  { id: "ia", label: "Estudar", title: "Estudar", icon: Sparkles, page: StudyAI, group: ["ia", "cartoes", "comunidade", "ranking"] },
+  { id: "conteudos", label: "Grimório", title: "Meu Grimório", icon: BookOpen, page: Subjects, group: ["conteudos", "aulas", "provas", "caderno"] },
+  { id: "ia", label: "Estudar", title: "Estudar", icon: Sparkles, page: StudyAI, group: ["ia", "cartoes", "comunidade", "ranking", "lua", "compartilhadas"] },
   { id: "calendario", label: "Agenda", title: "Agenda", icon: CalendarDays, page: Calendar, group: ["calendario"] },
-  { id: "perfil", label: "Perfil", title: "Perfil", icon: UserRound, page: Profile, group: ["perfil", "configuracoes", "historico"] },
+  { id: "perfil", label: "Perfil", title: "Perfil", icon: UserRound, page: Profile, group: ["perfil", "configuracoes", "historico", "historico-xp"] },
 ];
 // Páginas abertas a partir das seções. Os endereços antigos (?abrir=aulas, provas, cartoes...) continuam valendo.
 const extraPages = [
@@ -42,9 +53,13 @@ const extraPages = [
   { id: "ranking", label: "Ranking", title: "Ranking dos Bruxinhos", icon: Trophy, page: Ranking },
   { id: "configuracoes", label: "Configurações", title: "Configurações", icon: SettingsIcon, page: Settings },
   { id: "historico", label: "Histórico de estudos", title: "Histórico de estudos", page: History },
+  { id: "lua", label: "Fases da Lua", title: "Fases da Lua — seu mood de estudante", icon: MoonIcon, page: Moon },
+  { id: "compartilhadas", label: "Atividades compartilhadas", title: "Atividades compartilhadas", icon: Users, page: Shared },
+  { id: "historico-xp", label: "Histórico de XP", title: "Histórico de XP", icon: ScrollText, page: XpHistory },
+  { id: "caderno", label: "Caderno da aula", title: "Caderno da aula", icon: NotebookText, page: Notebook },
 ];
 const allPages = [...nav, ...extraPages];
-const shortcuts = ["aulas", "provas", "cartoes", "comunidade", "ranking", "configuracoes"];
+const shortcuts = ["aulas", "provas", "cartoes", "lua", "compartilhadas", "comunidade", "ranking", "configuracoes"];
 const sectionOf = (page) => nav.find((item) => item.group.includes(page))?.id;
 // Endereços das versões anteriores continuam funcionando.
 const legacyPages = { central: "inicio", diario: "aulas", prova: "ia", estudos: "calendario", biblioteca: "conteudos", desempenho: "perfil" };
@@ -146,6 +161,18 @@ function Shell({ session, setSession }) {
   const academic = useAcademicData(session, expire);
   const ritual = useRitual();
   const transcription = useTranscription(session);
+  const recorder = useRecorder();
+  const celebrations = useCelebrations();
+  const notifications = useNotifications(academic.call, academic.data, celebrations.celebrateRelic);
+
+  // "+N XP" só depois que a API confirmou a mudança (os dados locais mudam só com a resposta).
+  const xp = useMemo(() => (academic.status === "ready" ? progressOf(academic.data, todayIso()).xp : null), [academic.status, academic.data]);
+  const lastXp = useRef(null);
+  useEffect(() => {
+    if (xp === null) return;
+    if (lastXp.current !== null && xp > lastXp.current) celebrations.celebrateXp(xp - lastXp.current);
+    lastXp.current = xp;
+  }, [xp, celebrations]);
 
   useEffect(() => {
     const sync = () => setLocation(readLocation());
@@ -178,16 +205,19 @@ function Shell({ session, setSession }) {
   );
 
   const signOut = useCallback(async ({ skipServer = false } = {}) => {
+    // Com gravação em andamento, confirma antes: o áudio já gravado fica no aparelho, mas a captura para.
+    if (recorder.active && !window.confirm("Há uma gravação em andamento. Sair agora para a gravação (o que já foi gravado fica salvo neste aparelho). Sair mesmo assim?")) return;
+    if (recorder.active) await recorder.stop();
     // Invalida o token no servidor; a saída local acontece mesmo sem conexão.
     if (!skipServer) await request("/auth/logout", { method: "POST", token: session.token }).catch(() => {});
     history.replaceState({}, "", "/");
     storeSession(null);
     setSession(null);
-  }, [session.token, setSession]);
+  }, [session.token, setSession, recorder]);
 
   const context = useMemo(
-    () => ({ ...academic, session, user: session.user, setUser, signOut, go, params: location.params, page: location.page, toast, ritual, transcription }),
-    [academic, session, setUser, signOut, go, location, toast, ritual, transcription],
+    () => ({ ...academic, session, user: session.user, setUser, signOut, go, params: location.params, page: location.page, toast, ritual, transcription, recorder, notifications, celebrations }),
+    [academic, session, setUser, signOut, go, location, toast, ritual, transcription, recorder, notifications, celebrations],
   );
 
   if (!session.user.onboardingDone) {
@@ -204,6 +234,7 @@ function Shell({ session, setSession }) {
   return (
     <AppContext.Provider value={context}>
       <div className="shell">
+        <Sky />
         <aside className="sidebar" aria-label="Menu principal">
           <button className="brand-mark" onClick={() => go("inicio")} aria-label="Grimiau, ir para o Início">
             <Logo size={40} /> <span>Grimiau</span>
@@ -234,8 +265,10 @@ function Shell({ session, setSession }) {
               <Logo size={34} />
             </button>
             <SearchBox />
+            <RecordingBar />
             <TranscriptionChip />
             {ready && <RitualButton />}
+            <NotificationBell />
             <button className="avatar" onClick={() => go("perfil")} aria-label="Abrir seu perfil">
               <Avatar user={session.user} size={34} />
             </button>
@@ -252,8 +285,8 @@ function Shell({ session, setSession }) {
               <button className="btn primary" onClick={academic.load}>Tentar de novo</button>
             </div>
           ) : (
-            <main id="conteudo">
-              <Page key={`${location.page}-${location.params.id || ""}`} />
+            <main id="conteudo" key={location.page} className="page-enter">
+              <Page key={`${location.page}-${location.params.id || ""}-${location.params.lesson || ""}`} />
             </main>
           )}
         </div>
@@ -266,6 +299,7 @@ function Shell({ session, setSession }) {
           ))}
         </nav>
         {ready && <Ritual />}
+        <Celebrations state={celebrations} />
         <PwaPrompt />
       </div>
     </AppContext.Provider>

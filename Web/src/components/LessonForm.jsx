@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Link2, Plus, Vault } from "lucide-react";
+import { ArrowRightLeft, Link2, NotebookText, Pencil, Plus, Vault } from "lucide-react";
 import { useApp } from "../context.js";
 import { formatLong, formatShort } from "../lib/dates.js";
 import { lessonStatus } from "../lib/domain.js";
-import { FormError, Modal, Segmented, SubjectTag, useSubmit } from "../ui.jsx";
+import { htmlToText } from "../lib/richtext.js";
+import { Confirm, FormError, Modal, Segmented, SubjectTag, useSubmit } from "../ui.jsx";
 import { MaterialForm, MaterialLinks, NoteForm } from "./forms.jsx";
 
 // Cria o registro da ocorrência na primeira gravação e atualiza nas seguintes.
@@ -20,8 +21,9 @@ export function LessonForm({ occurrence, onClose }) {
   const [mastery, setMastery] = useState(lesson?.mastery || 0);
   const [extra, setExtra] = useState(null);
   const [current, setCurrent] = useState(occurrence);
+  const [noMaterial, setNoMaterial] = useState(Boolean(lesson?.noMaterial));
   const { submit, busy, error } = useSubmit(async ({ values, draft }) => {
-    const saved = await saveLesson(app, current, { ...values, status, mastery, draft, recovered: values.recovered === "on" });
+    const saved = await saveLesson(app, current, { ...values, status, mastery, draft, recovered: values.recovered === "on", noMaterial });
     setCurrent((previous) => ({ ...previous, lesson: saved }));
     return { saved, draft };
   }, {
@@ -148,6 +150,29 @@ export function LessonForm({ occurrence, onClose }) {
             )}
           </>
         )}
+        {status !== "cancelada" && (
+          <section className="lesson-notebook">
+            <div>
+              <strong>Caderno da aula</strong>
+              <p className="hint">
+                {htmlToText(current.lesson?.annotations).trim()
+                  ? `${htmlToText(current.lesson.annotations).slice(0, 160)}${htmlToText(current.lesson.annotations).length > 160 ? "…" : ""}`
+                  : "Escreva durante a explicação, com títulos, listas e negrito. Salva sozinho."}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn soft small"
+              disabled={busy}
+              onClick={async (event) => {
+                const saved = await ensureSaved(event.currentTarget.form);
+                if (saved) app.go("caderno", { lesson: saved.id });
+              }}
+            >
+              <NotebookText size={15} /> {htmlToText(current.lesson?.annotations).trim() ? "Abrir caderno" : "Escrever no caderno"}
+            </button>
+          </section>
+        )}
         <section className="lesson-links">
           <div>
             <strong>Materiais da aula</strong>
@@ -157,11 +182,21 @@ export function LessonForm({ occurrence, onClose }) {
                   <li key={material.id}>
                     <Link2 size={14} />
                     <MaterialLinks material={material} />
+                    <button type="button" className="icon-btn" aria-label={`Editar, mover ou excluir ${material.title}`} title="Editar, mover para outra aula ou excluir" onClick={() => setExtra({ type: "edit-material", material })}>
+                      <Pencil size={14} />
+                    </button>
                   </li>
                 ))}
               </ul>
+            ) : noMaterial ? (
+              <p className="hint">Marcada como aula sem material do professor.</p>
             ) : (
-              <p className="hint">Nenhum material ligado a esta aula.</p>
+              <p className="hint">Nenhum material ligado a esta aula ainda.</p>
+            )}
+            {status !== "cancelada" && (
+              <label className="check">
+                <input type="checkbox" checked={noMaterial} onChange={(event) => setNoMaterial(event.target.checked)} /> Esta aula não teve material disponibilizado
+              </label>
             )}
             <button
               type="button"
@@ -203,6 +238,11 @@ export function LessonForm({ occurrence, onClose }) {
         </section>
         <FormError>{error}</FormError>
         <div className="form-actions">
+          {current.lesson && (
+            <button type="button" className="btn ghost small" disabled={busy} onClick={() => setExtra("move")}>
+              <ArrowRightLeft size={14} /> Corrigir disciplina ou data
+            </button>
+          )}
           <span className="spacer" />
           <button
             type="button"
@@ -222,9 +262,94 @@ export function LessonForm({ occurrence, onClose }) {
       {extra === "material" && current.lesson && (
         <MaterialForm defaults={{ subjectId: occurrence.subject.id, lessonId: current.lesson.id }} onClose={() => setExtra(null)} />
       )}
+      {extra?.type === "edit-material" && (
+        <MaterialForm
+          material={extra.material}
+          onClose={() => setExtra(null)}
+          onDelete={() => setExtra({ type: "delete-material", material: extra.material })}
+        />
+      )}
+      {extra?.type === "delete-material" && (
+        <Confirm
+          title="Excluir material"
+          message={`“${extra.material.title}” e os arquivos dele serão excluídos. A aula, o caderno e os outros materiais continuam.`}
+          confirmLabel="Excluir material"
+          onClose={() => setExtra(null)}
+          onConfirm={async () => {
+            await app.remove("materials", extra.material.id);
+            app.toast("Material excluído.");
+          }}
+        />
+      )}
+      {extra === "move" && current.lesson && <MoveLesson lesson={current.lesson} onClose={() => setExtra(null)} onMoved={onClose} />}
       {extra === "note" && current.lesson && (
         <NoteForm defaults={{ subjectId: occurrence.subject.id, lessonId: current.lesson.id, informedOn: occurrence.date }} onClose={() => setExtra(null)} />
       )}
+    </Modal>
+  );
+}
+
+// Corrige um registro salvo na disciplina ou na data errada (por exemplo, gravação ligada à matéria errada).
+// Leva junto o caderno, a transcrição e os materiais, porque eles apontam para o registro, não para a data.
+function MoveLesson({ lesson, onClose, onMoved }) {
+  const app = useApp();
+  const { submit, busy, error } = useSubmit((values) => app.update("lessons", lesson.id, values), {
+    success: "Registro movido.",
+    onDone: () => {
+      onClose();
+      onMoved();
+    },
+  });
+  const materials = app.data.materials.filter((material) => material.lessonId === lesson.id);
+  return (
+    <Modal title="Corrigir disciplina ou data" onClose={onClose}>
+      <form
+        className="form"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          const values = Object.fromEntries(new FormData(event.currentTarget));
+          const saved = await submit({ subjectId: values.subjectId, date: values.date, startTime: values.startTime || "", examId: values.subjectId === lesson.subjectId ? lesson.examId : null });
+          // Os materiais da aula acompanham a nova disciplina.
+          if (saved && values.subjectId !== lesson.subjectId) {
+            const subject = app.data.subjects.find((item) => item.id === values.subjectId);
+            await Promise.all(materials.map((material) => app.update("materials", material.id, { subjectId: values.subjectId, subject: subject?.name || "" }).catch(() => {})));
+          }
+        }}
+      >
+        <label>
+          Disciplina
+          <select name="subjectId" defaultValue={lesson.subjectId} required>
+            {app.data.subjects.map((subject) => (
+              <option key={subject.id} value={subject.id}>
+                {subject.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="form-row">
+          <label>
+            Data
+            <input type="date" name="date" required defaultValue={lesson.date} />
+          </label>
+          <label>
+            Horário
+            <input type="time" name="startTime" defaultValue={lesson.startTime} />
+          </label>
+        </div>
+        <p className="hint">
+          O texto, o caderno, a transcrição{materials.length ? ` e ${materials.length === 1 ? "o material" : `os ${materials.length} materiais`}` : ""} vão juntos. Nada é apagado. Se já existir um registro nesta disciplina, data e horário, nada muda e aparece um aviso.
+        </p>
+        <FormError>{error}</FormError>
+        <div className="form-actions">
+          <span className="spacer" />
+          <button type="button" className="btn ghost" onClick={onClose}>
+            Cancelar
+          </button>
+          <button className="btn primary" disabled={busy}>
+            {busy ? "Movendo..." : "Mover registro"}
+          </button>
+        </div>
+      </form>
     </Modal>
   );
 }

@@ -1,5 +1,6 @@
 import { BookOpen, CalendarClock, ClipboardCheck, GraduationCap, Sparkles } from "lucide-react";
 import { computeProgress } from "./progress.js";
+import { htmlToText } from "./richtext.js";
 import { addDays, classOccurrences, formatFull } from "./dates.js";
 
 export const subjectPalette = ["#6f8cf6", "#9b7cf4", "#c084e8", "#5aa9d6", "#e07fa8", "#58b39a", "#e59a6b", "#7d8aa6"];
@@ -178,7 +179,7 @@ export function lessonsMentioning(lessons, subjectId, term) {
   );
 }
 
-export const lessonHasContent = (lesson) => Boolean([lesson.theme, lesson.taught, lesson.notes, lesson.transcript, lesson.missedContent].some((text) => String(text || "").trim()));
+export const lessonHasContent = (lesson) => Boolean([lesson.theme, lesson.taught, lesson.notes, lesson.transcript, lesson.missedContent, htmlToText(lesson.annotations)].some((text) => String(text || "").trim()));
 
 // Aulas que precisam de atenção, só a partir do que já aconteceu (nunca cria nem apaga registros).
 // "vazia": aula da grade sem registro ou marcada como presente sem conteúdo. "revisar": rascunho.
@@ -193,11 +194,24 @@ export function pendingLessons(data, user, today, now, days = 45) {
       let kind = "";
       if (!lesson || lesson.status === "pendente") kind = "vazia";
       else if (lesson.draft) kind = "revisar";
-      else if (lesson.status === "presente" && !String(lesson.taught || "").trim() && !String(lesson.transcript || "").trim()) kind = "vazia";
+      else if (lesson.status === "presente" && !String(lesson.taught || "").trim() && !String(lesson.transcript || "").trim() && !htmlToText(lesson.annotations)) kind = "vazia";
       else if (lesson.status === "falta" && !lesson.recovered && !String(lesson.missedContent || "").trim()) kind = "perdida";
       return kind ? [{ ...occurrence, kind }] : [];
     })
     .sort((a, b) => `${b.date}${b.start}`.localeCompare(`${a.date}${a.start}`));
+}
+
+// Aulas que já aconteceram (presente) sem nenhum material anexado. As marcadas pela pessoa como
+// "sem material disponibilizado" ficam fora da pendência e são contadas à parte: não ter arquivo do professor
+// é diferente de ainda não ter anexado, e nenhuma das duas coisas diz se a aula tem conteúdo.
+export function lessonsWithoutMaterial(data, today, days = 45) {
+  const from = addDays(today, -days);
+  const withMaterial = new Set(data.materials.map((material) => material.lessonId).filter(Boolean));
+  const recent = data.lessons.filter((lesson) => lesson.status === "presente" && lesson.date >= from && lesson.date <= today && !withMaterial.has(lesson.id));
+  return {
+    missing: recent.filter((lesson) => !lesson.noMaterial).sort((a, b) => b.date.localeCompare(a.date)),
+    marked: recent.filter((lesson) => lesson.noMaterial),
+  };
 }
 
 // Aulas que alimentam a revisão de uma prova, sempre por referência ao registro original.
@@ -226,7 +240,7 @@ export function subjectProgress(data, user, subject, today) {
   const occurrences = classOccurrences([subject], data.lessons, user, "0000-01-01", today).filter((occurrence) => occurrence.lesson?.status !== "cancelada" && (occurrence.date < today || occurrence.lesson));
   // Mesmo critério das aulas pendentes do Início: presente com conteúdo, ou falta com o conteúdo perdido anotado.
   const filled = (text) => Boolean(String(text || "").trim());
-  const registered = occurrences.filter(({ lesson }) => lesson && !lesson.draft && ((lesson.status === "presente" && (filled(lesson.taught) || filled(lesson.transcript))) || (lesson.status === "falta" && (lesson.recovered || filled(lesson.missedContent))))).length;
+  const registered = occurrences.filter(({ lesson }) => lesson && !lesson.draft && ((lesson.status === "presente" && (filled(lesson.taught) || filled(lesson.transcript) || filled(htmlToText(lesson.annotations)))) || (lesson.status === "falta" && (lesson.recovered || filled(lesson.missedContent))))).length;
   const topics = data.exams.filter((exam) => exam.subjectId === subject.id).flatMap((exam) => exam.topics);
   const topicsDone = topics.filter((topic) => topic.status === "Revisado" || topic.status === "Dominado").length;
   const total = occurrences.length + topics.length;

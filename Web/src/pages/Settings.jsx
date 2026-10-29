@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Bell, Download, LogOut, Plus, Printer } from "lucide-react";
 import { useApp } from "../context.js";
 import { applyAppearance, currentTheme, themes } from "../lib/theme.js";
+import { applyMotion, currentMotion, motionModes } from "../lib/motion.js";
 import ProfilePhoto from "../components/ProfilePhoto.jsx";
 import { zodiac, useSaveSign } from "../components/Horoscope.jsx";
 import { canonicalSpotify } from "../components/Ritual.jsx";
@@ -139,6 +140,7 @@ export default function Settings() {
   const { user, data, setUser, call, signOut, toast, go } = useApp();
   const [draft, setDraft] = useState(() => profileDraft(user));
   const [theme, setTheme] = useState(currentTheme);
+  const [motion, setMotion] = useState(currentMotion);
   const saveSign = useSaveSign();
   const [spotifyError, setSpotifyError] = useState("");
   const [notify, setNotify] = useState(notificationsEnabled);
@@ -285,7 +287,19 @@ export default function Settings() {
                 }}
               />
             </fieldset>
-            <p className="hint">A aparência vale para este aparelho.</p>
+            <fieldset>
+              <legend>Animações</legend>
+              <Segmented
+                label="Animações"
+                value={motion}
+                options={motionModes}
+                onChange={(value) => {
+                  setMotion(value);
+                  applyMotion(value);
+                }}
+              />
+            </fieldset>
+            <p className="hint">A aparência vale para este aparelho. “Discretas” tira estrelas, partículas e brilhos; se o sistema pede menos movimento, eles já ficam desligados.</p>
           </div>
         </section>
 

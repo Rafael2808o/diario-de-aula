@@ -247,6 +247,16 @@ export function registerLunarRoutes(app, requireAuth) {
     }
   });
 
+  // Moods e indicações da própria conta, carregados junto com o resto dos dados (relíquias e histórico).
+  app.get('/api/v1/lunar/mine', requireAuth, async (req, res, next) => {
+    try {
+      const [items, songs] = await Promise.all([listMoods(req.user.id), listOwnSongs(req.user.id)]);
+      return res.json({ today: todayInBrazil(), moods: items, songs });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
   // Só o dia de hoje pode ser registrado ou trocado; os dias anteriores ficam como estão.
   app.put('/api/v1/lunar/moods/today', requireAuth, async (req, res, next) => {
     try {

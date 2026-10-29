@@ -66,7 +66,7 @@ export function useTranscription(session) {
     async ({ blob, name, subjectId, date, subjectName }) => {
       if (activeStatuses.includes(readState()?.status)) throw new Error("Já existe uma transcrição em andamento. Aguarde ela terminar.");
       await keepAudio({ blob, name, type: blob.type });
-      commit({ status: "enviando", fileName: name, size: blob.size, subjectId, date, startedAt: Date.now() });
+      commit({ status: "enviando", fileName: name, size: blob.size, subjectId, date, subjectName: subjectName || "", startedAt: Date.now() });
       try {
         const response = await fetch(`${apiBase}/ai/transcribe`, {
           method: "POST",

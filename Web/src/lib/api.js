@@ -56,15 +56,19 @@ export const collections = ["subjects", "lessons", "exams", "tasks", "events", "
 // Carrega todas as coleções da conta e expõe operações que só alteram o estado local depois que a API confirma.
 export function useAcademicData(session, onExpired) {
   const token = session?.token;
-  const [data, setData] = useState(() => Object.fromEntries(collections.map((name) => [name, []])));
+  const [data, setData] = useState(() => ({ ...Object.fromEntries(collections.map((name) => [name, []])), moods: [], songs: [], lunarToday: "" }));
   const [status, setStatus] = useState("idle");
 
   const load = useCallback(async () => {
     if (!token) return;
     setStatus("loading");
     try {
-      const results = await Promise.all(collections.map((name) => request(`/${name}`, { token })));
-      setData(Object.fromEntries(collections.map((name, index) => [name, results[index]])));
+      // Fases da Lua é opcional: se falhar, o resto da conta abre normalmente.
+      const [results, lunar] = await Promise.all([
+        Promise.all(collections.map((name) => request(`/${name}`, { token }))),
+        request("/lunar/mine", { token }).catch((error) => (error.status === 401 ? Promise.reject(error) : { moods: [], songs: [], today: "" })),
+      ]);
+      setData({ ...Object.fromEntries(collections.map((name, index) => [name, results[index]])), moods: lunar.moods, songs: lunar.songs, lunarToday: lunar.today });
       setStatus("ready");
     } catch (error) {
       if (error.status === 401) onExpired();
@@ -121,8 +125,12 @@ export function useAcademicData(session, onExpired) {
   );
 
   const replace = useCallback((name, items) => setData((current) => ({ ...current, [name]: items })), []);
+  const reloadLunar = useCallback(async () => {
+    const lunar = await call("/lunar/mine");
+    setData((current) => ({ ...current, moods: lunar.moods, songs: lunar.songs, lunarToday: lunar.today }));
+  }, [call]);
 
-  return { data, status, load, call, create, update, remove, replace };
+  return { data, status, load, call, create, update, remove, replace, reloadLunar };
 }
 
 // Lê um arquivo do aparelho como base64 (sem o prefixo data:) para enviar à API.

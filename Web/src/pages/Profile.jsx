@@ -1,7 +1,7 @@
-import { useMemo } from "react";
-import { ChartLine, ChevronRight, Flame, Lock, Settings as SettingsIcon, Trophy } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ChartLine, ChevronRight, Flame, Lock, Moon as MoonIcon, ScrollText, Settings as SettingsIcon, Trophy } from "lucide-react";
 import { useApp } from "../context.js";
-import { todayIso } from "../lib/dates.js";
+import { formatFull, todayIso } from "../lib/dates.js";
 import { progressOf } from "../lib/domain.js";
 import { formatDuration } from "../lib/ritual.js";
 import { xpRules } from "../lib/progress.js";
@@ -19,11 +19,16 @@ const relicSymbols = {
   cartas: "M8 8h11v16H8zM12 6l11 2-2 16",
   noturno: "M21 6a10 10 0 1 0 5 13A8 8 0 0 1 21 6z",
   "dez-horas": "M16 6a10 10 0 1 0 .01 0zM16 10v6l4 3",
+  "primeira-estrela": "M16 5l3 7 7 .6-5.4 4.6 1.7 7-6.3-3.8-6.3 3.8 1.7-7L6 12.6l7-.6z",
+  "diario-aberto": "M6 8c4-1.5 7-1.5 10 1v15c-3-2.5-6-2.5-10-1zM16 9c3-2.5 6-2.5 10-1v15c-4-1-7-1-10 1M9 13h4M9 17h4",
+  "comeco-magico": "M16 26V14M16 14c0-4 3-7 7-7 0 4-3 7-7 7zM16 18c0-3-2.5-5.5-6-5.5 0 3 2.5 5.5 6 5.5z",
+  lunar: "M20 6a10 10 0 1 0 6 13 8 8 0 0 1-6-13zM8 8l1 2M6 14h2",
+  musical: "M12 23V9l12-3v14M12 23a3 3 0 1 1-3-3 3 3 0 0 1 3 3zM24 20a3 3 0 1 1-3-3 3 3 0 0 1 3 3z",
 };
 
 function Relic({ relic }) {
   return (
-    <li className={`relic ${relic.unlocked ? "is-unlocked" : ""}`}>
+    <li className={`relic ${relic.unlocked ? "is-unlocked" : ""}`} title={relic.description}>
       <span className="relic-medal" aria-hidden="true">
         <svg viewBox="0 0 32 32" width="30" height="30">
           <path d={relicSymbols[relic.id]} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -32,15 +37,30 @@ function Relic({ relic }) {
         {!relic.unlocked && <Lock size={11} className="relic-lock" />}
       </span>
       <strong>{relic.title}</strong>
-      <small>{relic.unlocked ? "Conquistada" : relic.goal > 1 ? `${relic.value} de ${relic.goal}` : relic.description}</small>
+      <small>
+        {relic.unlocked ? (relic.unlockedOn ? `Conquistada em ${formatFull(relic.unlockedOn)}` : "Conquistada") : relic.goal > 1 ? `${relic.value} de ${relic.goal}` : relic.description}
+      </small>
     </li>
   );
 }
 
 export default function Profile() {
-  const { data, user, go } = useApp();
+  const { data, user, go, call, params } = useApp();
   const today = todayIso();
   const progress = useMemo(() => progressOf(data, today), [data, today]);
+  // Datas guardadas no servidor quando a relíquia foi percebida (para as que os registros não datam).
+  // Relíquia já conquistada continua conquistada, mesmo que um registro tenha sido apagado depois.
+  const [saved, setSaved] = useState({});
+  useEffect(() => {
+    call("/progress").then((result) => setSaved(result.relics || {})).catch(() => {});
+  }, [call, data]);
+  const relics = progress.achievements.map((relic) =>
+    relic.unlocked || relic.id in saved ? { ...relic, unlocked: true, unlockedOn: relic.unlockedOn || saved[relic.id] || "" } : relic,
+  );
+  const relicsRef = useRef(null);
+  useEffect(() => {
+    if (params.secao === "reliquias") relicsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [params.secao]);
   const span = progress.levelTo - progress.levelFrom;
   const inLevel = progress.xp - progress.levelFrom;
   const totalSeconds = data["study-sessions"].reduce((sum, session) => sum + session.durationSeconds, 0);
@@ -77,7 +97,7 @@ export default function Profile() {
           <div>
             <dt>Relíquias</dt>
             <dd>
-              {progress.unlocked} de {progress.achievements.length}
+              {relics.filter((relic) => relic.unlocked).length} de {relics.length}
             </dd>
           </div>
           <div>
@@ -90,16 +110,19 @@ export default function Profile() {
           </div>
         </dl>
         <MoonWeek days={progress.week} />
+        <button type="button" className="link-btn level-history" onClick={() => go("historico-xp")}>
+          <ScrollText size={14} /> Ver de onde veio cada XP
+        </button>
       </section>
 
-      <section aria-labelledby="reliquias-title">
+      <section aria-labelledby="reliquias-title" ref={relicsRef}>
         <div className="section-head">
           <h2 className="section-title" id="reliquias-title">
             Relíquias
           </h2>
         </div>
         <ul className="relics">
-          {progress.achievements.map((relic) => (
+          {relics.map((relic) => (
             <Relic key={relic.id} relic={relic} />
           ))}
         </ul>
@@ -112,6 +135,26 @@ export default function Profile() {
             <span className="row-main">
               <strong>Ranking dos Bruxinhos</strong>
               <small>Só aparece quem escolhe participar.</small>
+            </span>
+            <ChevronRight size={16} className="chevron" aria-hidden="true" />
+          </button>
+        </li>
+        <li>
+          <button type="button" className="row" onClick={() => go("historico-xp")}>
+            <ScrollText size={18} className="row-icon" aria-hidden="true" />
+            <span className="row-main">
+              <strong>Histórico de XP</strong>
+              <small>Quanto ganhou, quando e por quê.</small>
+            </span>
+            <ChevronRight size={16} className="chevron" aria-hidden="true" />
+          </button>
+        </li>
+        <li>
+          <button type="button" className="row" onClick={() => go("lua")}>
+            <MoonIcon size={18} className="row-icon" aria-hidden="true" />
+            <span className="row-main">
+              <strong>Fases da Lua</strong>
+              <small>Seu mood de estudante, a Constelação e a Rádio.</small>
             </span>
             <ChevronRight size={16} className="chevron" aria-hidden="true" />
           </button>
