@@ -423,3 +423,17 @@
   .kantinho-speech .btn { justify-self: stretch; }
   .feed-grid { grid-template-columns: 1fr; }
 }
+
+/* Toque no celular: links de texto e o selo de nível ganham área de toque de 36px sem mudar o desenho
+   (o preenchimento extra é compensado pela margem negativa). */
+@media (pointer: coarse) {
+  .link-btn,
+  .focus-level {
+    padding-block: 8px;
+    margin-block: -8px;
+  }
+}
+
+/* Estado vazio: o texto e o botão quebram linha em vez de passar da largura da tela. */
+.empty > :last-child { min-width: 0; }
+.empty .btn { max-width: 100%; white-space: normal; text-align: center; }

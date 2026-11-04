@@ -287,7 +287,7 @@ export default function Ritual() {
   };
 
   const mood = celebrate ? "happy" : state.status === "paused" ? "sleepy" : state.status === "running" ? "focused" : state.status === "finished" ? "happy" : "calm";
-  const statusText = { idle: "Silencie o mundo. Concentre-se no que importa.", running: goalMs && remaining < 0 ? "Meta cumprida. O tempo extra também conta." : "Concentração em andamento", paused: "Pausado: o tempo parado não conta", finished: "Sessão finalizada" }[state.status];
+  const statusText = { idle: "Silencie o mundo. Concentre-se no que importa.", running: goalMs && remaining < 0 ? "Meta cumprida. O tempo extra também conta." : "Concentração em andamento", paused: state.autoPaused ? "Pausado porque você saiu do Grimiau: o tempo fora não conta" : "Pausado: o tempo parado não conta", finished: "Sessão finalizada" }[state.status];
   const subject = data.subjects.find((item) => item.id === state.subjectId);
 
   return (

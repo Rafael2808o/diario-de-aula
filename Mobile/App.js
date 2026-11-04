@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   BackHandler,
   Image,
   Linking,
@@ -23,6 +24,14 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [canGoBack, setCanGoBack] = useState(false);
+
+  // Ao ir para segundo plano, avisa o site na hora para o Ritual pausar e guardar o tempo válido.
+  React.useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => {
+      if (state !== 'active') webView.current?.injectJavaScript("window.dispatchEvent(new Event('grimiau:background')); true;");
+    });
+    return () => subscription.remove();
+  }, []);
 
   React.useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
