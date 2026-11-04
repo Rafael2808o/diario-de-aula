@@ -117,10 +117,20 @@ Formato JSON: {"explanation":"...","examples":["..."],"check":[{"question":"..."
   },
 
   async transcribe(input) {
-    const prompt = `Transcreva fielmente este áudio de uma aula${input.subject ? ` de ${input.subject}` : ''}, em português. Não invente nem complete frases: quando um trecho estiver incompreensível, escreva [trecho incerto]. Depois, a partir SOMENTE do que foi falado, organize um resumo.
+    const terms = list(input.terms, 40).map(term => text(term, 80)).filter(Boolean);
+    const prompt = `Transcreva fielmente este áudio de uma aula${input.subject ? ` de ${input.subject}` : ''}, em português do Brasil.
+Regras da transcrição:
+- Escreva tudo o que foi falado, do começo ao fim, sem resumir, sem pular trechos e sem acrescentar nada que não foi dito.
+- Pontue como texto escrito (vírgulas, pontos, interrogações) e use letra maiúscula no começo das frases, sem mudar o sentido nem trocar palavras.
+- Junte as falas em frases completas; pausas e hesitações ("é...", "né", "tipo") podem ser omitidas quando não mudam o sentido.
+- Separe em parágrafos a cada mudança de assunto ou explicação longa, com uma linha em branco entre eles.
+- Escreva termos técnicos, científicos e nomes próprios na grafia correta da área${terms.length ? `. Termos que podem aparecer nesta disciplina (use só se forem de fato falados): ${terms.join('; ')}` : ''}.
+- Quando um trecho estiver inaudível ou incompreensível, escreva [trecho incerto]. Quando entender o trecho mas não tiver certeza de uma palavra, escreva a palavra mais provável seguida de [?]. Nunca invente palavras para preencher.
+Depois, a partir SOMENTE do que foi falado, organize um resumo.
 Formato JSON: {"transcript":"...","summary":{"subject":"assunto principal","concepts":["..."],"examples":["..."],"guidance":["atividades e orientações"],"exam":["informações sobre provas"],"doubts":["dúvidas e pontos a revisar"]}}
 Listas vazias quando o áudio não tratar do item.`;
-    const { data, model } = await callGemini([{ text: prompt }, { inline_data: { mime_type: input.mime, data: input.data } }], { maxOutputTokens: 8000, timeout: 150_000, temperature: 0.1 });
+    // A transcrição completa de uma parte de 3 MB passa fácil de 8 mil tokens; o limite antigo cortava o fim de aulas longas.
+    const { data, model } = await callGemini([{ text: prompt }, { inline_data: { mime_type: input.mime, data: input.data } }], { maxOutputTokens: 24_000, timeout: 180_000, temperature: 0.1 });
     const summary = data?.summary || {};
     const clean = items => list(items, 15).map(item => text(item, 600)).filter(Boolean);
     const transcript = text(data?.transcript, 60_000);
@@ -140,8 +150,8 @@ const failureMessage = {
 
 // ---------- Fila de trabalhos ----------
 
-// Pior caso: quatro modelos tentados em sequência na transcrição (150 s cada).
-const jobLifetime = 11 * 60 * 1000;
+// Pior caso: quatro modelos tentados em sequência na transcrição (180 s cada).
+const jobLifetime = 13 * 60 * 1000;
 let ready;
 function initJobs() {
   ready ||= (async () => {
@@ -281,7 +291,7 @@ export function registerAiRoutes(app, requireAuth, aiRateLimit) {
     if (!req.body.consent) return res.status(400).json({ error: 'Confirme que a gravação foi autorizada.' });
     if (!audioTypes.has(mime)) return res.status(400).json({ error: 'Formato de áudio não suportado. Use MP3, M4A, WAV, OGG, AAC, FLAC ou WEBM.' });
     if (!data || data.length > 4_200_000) return res.status(413).json({ error: 'O áudio precisa ter até 3 MB.' });
-    return enqueue(req, res, 'transcribe', { mime: geminiMime(mime), data, subject: text(req.body.subject, 100) });
+    return enqueue(req, res, 'transcribe', { mime: geminiMime(mime), data, subject: text(req.body.subject, 100), terms: list(req.body.terms, 40).map(term => text(term, 80)).filter(Boolean) });
   });
 
   app.get('/api/v1/ai/jobs/:id', requireAuth, async (req, res, next) => {

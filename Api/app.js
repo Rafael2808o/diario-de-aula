@@ -35,13 +35,15 @@ import { registerRankingRoutes } from './ranking.js';
 import { registerLunarRoutes } from './lunar.js';
 import { registerNotificationRoutes } from './notifications.js';
 import { registerSharedRoutes } from './shared.js';
+import { registerPresenceRoutes } from './presence.js';
+import { registerFeedRoutes } from './feed.js';
 
 const app = express();
 const corsOrigins = (process.env.CORS_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean);
 app.use(cors({ origin: corsOrigins.length ? corsOrigins : true }));
 // Arquivos e áudio usam um limite maior, aplicado na própria rota.
 const smallJson = express.json({ limit: '120kb' });
-const largeBodyRoutes = new Set(['POST /api/v1/files', 'POST /api/v1/ai/transcribe', 'PUT /api/v1/me/avatar']);
+const largeBodyRoutes = new Set(['POST /api/v1/files', 'POST /api/v1/ai/transcribe', 'PUT /api/v1/me/avatar', 'POST /api/v1/feed']);
 // Registros de aula levam transcrição e caderno: aceitam até 600 kb.
 const lessonJson = express.json({ limit: '600kb' });
 const isLessonWrite = req => ['POST', 'PATCH'].includes(req.method) && /^\/api\/v1\/lessons(\/[\w-]+)?$/.test(req.path);
@@ -101,7 +103,9 @@ function cleanPreferences(value, current = {}) {
     // Fases da Lua: aparecer na Constelação também é opcional; apelido e foto valem só lá e na Rádio.
     lunarPublic: input.lunarPublic !== undefined ? input.lunarPublic === true : current.lunarPublic === true,
     lunarShowPhoto: input.lunarShowPhoto !== undefined ? input.lunarShowPhoto !== false : current.lunarShowPhoto !== false,
-    nickname: input.nickname !== undefined ? cleanText(input.nickname, 30) : current.nickname || ''
+    nickname: input.nickname !== undefined ? cleanText(input.nickname, 30) : current.nickname || '',
+    // Presença na Comunidade: aparece por padrão; a pessoa pode esconder quando está online.
+    presenceHidden: input.presenceHidden !== undefined ? input.presenceHidden === true : current.presenceHidden === true
   };
 }
 
@@ -635,6 +639,8 @@ app.put('/api/v1/diaries', requireAuth, async (req, res, next) => {
 
 registerAiRoutes(app, requireAuth, aiRateLimit);
 registerSocialRoutes(app, requireAuth);
+registerPresenceRoutes(app, requireAuth);
+registerFeedRoutes(app, requireAuth);
 registerHoroscopeRoutes(app, requireAuth);
 registerRankingRoutes(app, requireAuth);
 registerLunarRoutes(app, requireAuth);
