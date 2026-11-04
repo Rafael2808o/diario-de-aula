@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, MessageCircle, PenLine, Plus, Search, Trash2 } from "lucide-react";
 import { useApp } from "../context.js";
 import { Avatar, Confirm, Empty, FormError, Modal, useSubmit } from "../ui.jsx";
+import Members from "../components/Members.jsx";
 
 // Conselho dos Bruxinhos (antigo Quadro de Dúvidas): um único mural para todas as contas. Cada publicação mostra só o nome público do autor.
 // A ordem acompanha a API: categorias novas entram no fim.
@@ -313,6 +314,7 @@ export default function Community() {
         </>
       ) : (
         <>
+          <Members />
           <div className="toolbar community-tools">
             <label className="search-field">
               <Search size={15} aria-hidden="true" />

@@ -7,7 +7,10 @@
 
 /* ---------- Céu de fundo ---------- */
 .sky { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
-.sidebar, .main-column { position: relative; z-index: 1; }
+/* Sem z-index aqui: criar um contexto de empilhamento prendia as janelas (modal, z-index 100) abaixo da barra
+   de navegação do celular (z-index 50), que cobria o fim do registro de aula. Por virem depois do céu no HTML,
+   as colunas posicionadas continuam pintadas por cima dele. */
+.sidebar, .main-column { position: relative; }
 .sidebar { position: sticky; }
 .sky-star { position: absolute; border-radius: 50%; background: var(--text-2); opacity: 0.35; }
 .sky-star.is-gold { background: var(--gold); }
@@ -348,4 +351,75 @@
 @media (max-width: 760px) {
   .topbar:has(.recording-bar:not(.is-done)) .searchbox { display: none; }
   .topbar:has(.recording-bar) .recording-bar { margin-left: auto; }
+}
+
+/* Membros online no início do Conselho: faixa horizontal com rolagem própria, sem empurrar a página para os lados. */
+.members { display: grid; gap: 10px; min-width: 0; }
+.members-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.members-head small { color: var(--text-3); font-size: 13px; }
+.members-list { list-style: none; margin: 0; padding: 2px 2px 6px; display: flex; gap: 14px; overflow-x: auto; scrollbar-width: thin; overscroll-behavior-x: contain; }
+.members-list li { flex: none; width: 92px; display: grid; justify-items: center; gap: 3px; text-align: center; }
+.members-list strong { font-size: 13px; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.members-list small { font-size: 11.5px; line-height: 1.3; color: var(--text-3); }
+.members-list li.is-online small { color: var(--success); font-weight: 600; }
+.members-avatar { position: relative; display: inline-grid; }
+.presence-dot { position: absolute; right: 1px; bottom: 1px; width: 12px; height: 12px; border-radius: 50%; background: var(--text-3); box-shadow: 0 0 0 2px var(--bg); opacity: 0.55; }
+.is-online .presence-dot { background: var(--success); opacity: 1; }
+
+/* Janelas no celular: altura pela área visível de verdade (dvh desconta a barra do navegador),
+   rolagem só dentro da janela e campo focado longe da borda. */
+.modal { max-height: calc(100dvh - 32px); overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scroll-padding-block: 24px 96px; }
+@media (max-width: 620px) {
+  .modal, .modal.wide { max-height: 92dvh; }
+}
+
+/* ---------- Feed dos Migles e Kantinho ---------- */
+/* O Kantinho é sempre a imagem oficial; humor = só movimento e brilho ao redor, nunca outro desenho. */
+.kantinho { position: relative; display: inline-block; flex: none; width: var(--kantinho-size); line-height: 0; }
+/* Sem filter: drop-shadow com a animação desenhava um retângulo escuro em volta da imagem no Chrome. */
+.kantinho img { width: 100%; height: auto; transform-origin: 50% 90%; }
+.kantinho-spark { position: absolute; width: 7px; height: 7px; border-radius: 50%; background: var(--gold); opacity: 0; pointer-events: none; }
+.kantinho-spark.s1 { top: 12%; left: 4%; }
+.kantinho-spark.s2 { top: 34%; right: 0; width: 5px; height: 5px; }
+.kantinho-spark.s3 { bottom: 22%; left: 10%; width: 4px; height: 4px; }
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-motion="reduzido"]) .kantinho-calm img { animation: kantinho-float 4.2s ease-in-out infinite; }
+  :root:not([data-motion="reduzido"]) .kantinho-party img { animation: kantinho-hop 0.9s cubic-bezier(0.3, 0.7, 0.4, 1) 3; }
+  :root:not([data-motion="reduzido"]) .kantinho-calm .kantinho-spark,
+  :root:not([data-motion="reduzido"]) .kantinho-party .kantinho-spark { animation: kantinho-twinkle 2.6s ease-in-out infinite; }
+  :root:not([data-motion="reduzido"]) .kantinho-spark.s2 { animation-delay: 0.8s; }
+  :root:not([data-motion="reduzido"]) .kantinho-spark.s3 { animation-delay: 1.6s; }
+}
+@keyframes kantinho-float { 0%, 100% { transform: translateY(0) rotate(-1.5deg); } 50% { transform: translateY(-6px) rotate(1.5deg); } }
+@keyframes kantinho-hop { 0%, 100% { transform: translateY(0) scale(1); } 35% { transform: translateY(-14px) scale(1.03) rotate(-3deg); } 60% { transform: translateY(0) scale(0.98, 1.02); } }
+@keyframes kantinho-twinkle { 0%, 100% { opacity: 0; transform: scale(0.4); } 50% { opacity: 0.95; transform: scale(1); } }
+
+.kantinho-card { display: flex; gap: 20px; align-items: center; padding: 20px; border-radius: 18px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--card-line); }
+.kantinho-speech { display: grid; gap: 8px; min-width: 0; font-size: 14.5px; color: var(--text-2); }
+.kantinho-speech strong { color: var(--text); }
+.kantinho-speech .btn { justify-self: start; margin-top: 4px; }
+.kantinho-today { display: grid; gap: 4px; padding: 10px 12px; border-radius: 12px; background: var(--accent-soft); }
+.kantinho-today strong { font-size: 16px; }
+
+.feed-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; align-items: start; }
+.feed-item { overflow: hidden; border-radius: 16px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--card-line); }
+.feed-item header { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+.feed-item header span { display: grid; flex: 1; min-width: 0; }
+.feed-item header strong { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feed-item header small { font-size: 12px; color: var(--text-3); }
+.feed-item > img { display: block; width: 100%; height: auto; max-height: 520px; object-fit: cover; background: var(--fill); }
+.feed-caption { display: grid; gap: 6px; padding: 10px 12px 12px; font-size: 14px; overflow-wrap: anywhere; white-space: pre-line; }
+.feed-inspired { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-2); }
+.feed-picker { display: grid; place-items: center; min-height: 180px; border-radius: 14px; border: 1.5px dashed var(--card-line); background: var(--fill); cursor: pointer; overflow: hidden; color: var(--text-2); text-align: center; }
+.feed-picker span { display: grid; justify-items: center; gap: 8px; padding: 20px; }
+.feed-picker.has-photo { border-style: solid; }
+.feed-picker img { width: 100%; max-height: 50dvh; object-fit: contain; }
+.feed-posted { display: grid; justify-items: center; gap: 14px; text-align: center; padding: 6px 0 4px; }
+.feed-posted p { font-size: 16px; font-weight: 500; }
+
+@media (max-width: 620px) {
+  .kantinho-card { flex-direction: column; align-items: center; padding: 16px; text-align: left; }
+  .kantinho-card > .kantinho { --kantinho-size: 120px !important; }
+  .kantinho-speech .btn { justify-self: stretch; }
+  .feed-grid { grid-template-columns: 1fr; }
 }

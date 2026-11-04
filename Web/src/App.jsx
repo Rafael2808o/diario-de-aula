@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BookOpen, CalendarDays, GraduationCap, Home as HomeIcon, Layers, MessagesSquare, Moon as MoonIcon, NotebookPen, NotebookText, ScrollText, Settings as SettingsIcon, Sparkles, Trophy, UserRound, Users, X } from "lucide-react";
+import { BookOpen, Camera, CalendarDays, GraduationCap, Home as HomeIcon, Layers, MessagesSquare, Moon as MoonIcon, NotebookPen, NotebookText, ScrollText, Settings as SettingsIcon, Sparkles, Trophy, UserRound, Users, X } from "lucide-react";
 import { AppContext, useApp } from "./context.js";
 import { readSession, request, storeSession, useAcademicData } from "./lib/api.js";
 import { useLocalNotifications } from "./lib/notify.js";
 import { useRitual } from "./lib/ritual.js";
 import { activeStatuses, useTranscription } from "./lib/transcription.js";
 import { useRecorder } from "./lib/recorder.js";
+import { leavePresence, usePresence } from "./lib/presence.js";
 import { progressOf } from "./lib/domain.js";
 import { todayIso } from "./lib/dates.js";
 import { Avatar, Logo, Nox, ToastProvider, useToast } from "./ui.jsx";
@@ -20,6 +21,7 @@ import Auth from "./pages/Auth.jsx";
 import Calendar from "./pages/Calendar.jsx";
 import Cards from "./pages/Cards.jsx";
 import Community from "./pages/Community.jsx";
+import Feed from "./pages/Feed.jsx";
 import Download from "./pages/Download.jsx";
 import Exams from "./pages/Exams.jsx";
 import History from "./pages/History.jsx";
@@ -40,7 +42,7 @@ import Subjects from "./pages/Subjects.jsx";
 const nav = [
   { id: "inicio", label: "Início", title: "Início", icon: HomeIcon, page: Home, group: ["inicio"] },
   { id: "conteudos", label: "Grimório", title: "Meu Grimório", icon: BookOpen, page: Subjects, group: ["conteudos", "aulas", "provas", "caderno"] },
-  { id: "ia", label: "Estudar", title: "Estudar", icon: Sparkles, page: StudyAI, group: ["ia", "cartoes", "comunidade", "ranking", "lua", "compartilhadas"] },
+  { id: "ia", label: "Estudar", title: "Estudar", icon: Sparkles, page: StudyAI, group: ["ia", "cartoes", "comunidade", "migles", "ranking", "lua", "compartilhadas"] },
   { id: "calendario", label: "Agenda", title: "Agenda", icon: CalendarDays, page: Calendar, group: ["calendario"] },
   { id: "perfil", label: "Perfil", title: "Perfil", icon: UserRound, page: Profile, group: ["perfil", "configuracoes", "historico", "historico-xp"] },
 ];
@@ -50,6 +52,7 @@ const extraPages = [
   { id: "provas", label: "Provas", title: "Provas", icon: GraduationCap, page: Exams },
   { id: "cartoes", label: "Cartas do Saber", title: "Cartas do Saber", icon: Layers, page: Cards },
   { id: "comunidade", label: "Conselho dos Bruxinhos", title: "Conselho dos Bruxinhos", icon: MessagesSquare, page: Community },
+  { id: "migles", label: "Feed dos Migles", title: "Feed dos Migles", icon: Camera, page: Feed },
   { id: "ranking", label: "Ranking", title: "Ranking dos Bruxinhos", icon: Trophy, page: Ranking },
   { id: "configuracoes", label: "Configurações", title: "Configurações", icon: SettingsIcon, page: Settings },
   { id: "historico", label: "Histórico de estudos", title: "Histórico de estudos", page: History },
@@ -59,7 +62,7 @@ const extraPages = [
   { id: "caderno", label: "Caderno da aula", title: "Caderno da aula", icon: NotebookText, page: Notebook },
 ];
 const allPages = [...nav, ...extraPages];
-const shortcuts = ["aulas", "provas", "cartoes", "lua", "compartilhadas", "comunidade", "ranking", "configuracoes"];
+const shortcuts = ["aulas", "provas", "cartoes", "lua", "compartilhadas", "comunidade", "migles", "ranking", "configuracoes"];
 const sectionOf = (page) => nav.find((item) => item.group.includes(page))?.id;
 // Endereços das versões anteriores continuam funcionando.
 const legacyPages = { central: "inicio", diario: "aulas", prova: "ia", estudos: "calendario", biblioteca: "conteudos", desempenho: "perfil" };
@@ -162,6 +165,7 @@ function Shell({ session, setSession }) {
   const ritual = useRitual();
   const transcription = useTranscription(session);
   const recorder = useRecorder();
+  usePresence(session.token);
   const celebrations = useCelebrations();
   const notifications = useNotifications(academic.call, academic.data, celebrations.celebrateRelic);
 
@@ -209,6 +213,7 @@ function Shell({ session, setSession }) {
     if (recorder.active && !window.confirm("Há uma gravação em andamento. Sair agora para a gravação (o que já foi gravado fica salvo neste aparelho). Sair mesmo assim?")) return;
     if (recorder.active) await recorder.stop();
     // Invalida o token no servidor; a saída local acontece mesmo sem conexão.
+    if (!skipServer) await leavePresence(session.token);
     if (!skipServer) await request("/auth/logout", { method: "POST", token: session.token }).catch(() => {});
     history.replaceState({}, "", "/");
     storeSession(null);

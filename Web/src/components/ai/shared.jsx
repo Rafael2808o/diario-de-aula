@@ -119,7 +119,7 @@ export async function postAi(session, path, body, onStage = () => {}) {
   if (!payload.jobId) return payload;
   onStage("pendente");
   // Prazos acima do pior caso do servidor, que encerra trabalhos presos em 11 minutos.
-  const deadline = Date.now() + (path.includes("transcribe") ? 11.5 * 60_000 : 4 * 60_000);
+  const deadline = Date.now() + (path.includes("transcribe") ? 13.5 * 60_000 : 4 * 60_000);
   let delay = 1200;
   let failures = 0;
   while (Date.now() < deadline) {

@@ -8,6 +8,21 @@ import { Modal } from "../ui.jsx";
 // em outro aparelho nem a cada login. Só o comunicado mais recente vira aviso; os anteriores ficam no histórico.
 export const announcements = [
   {
+    version: "3.0.0",
+    date: "2026-11-04",
+    title: "Chegou a versão 3.0 do Grimiau! 📸",
+    summary: "Novidades na comunidade, na transcrição e no celular. Sua conta, suas aulas, seu XP e seu histórico continuam exatamente onde estavam.",
+    items: [
+      "Feed dos Migles: compartilhe fotos dos seus momentos de estudo. O Kantinho, nosso duende fotógrafo, traz uma inspiração nova todos os dias.",
+      "Bruxinhos por aqui: no início do Conselho você vê quem está online agora e quando cada pessoa foi vista por último.",
+      "Quer ficar invisível? Em Configurações › Privacidade, desligue “Mostrar quando estou online”.",
+      "Transcrição melhor: pontuação, parágrafos, termos da disciplina escritos certo e trechos duvidosos marcados para você revisar.",
+      "Se a aula já tem transcrição, você escolhe entre adicionar a nova ou substituir a anterior.",
+      "Registro de aula no celular corrigido: o formulário rola até o fim e o botão “Concluir registro” fica sempre ao alcance.",
+    ],
+    action: "Que tal começar pela inspiração de hoje do Kantinho, no Feed dos Migles?",
+  },
+  {
     version: "2.0.0",
     date: "2026-10-28",
     title: "Nosso site divo está atualizado! ✨",

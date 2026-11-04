@@ -63,15 +63,15 @@ export function useTranscription(session) {
   }, []);
 
   const submit = useCallback(
-    async ({ blob, name, subjectId, date, subjectName }) => {
+    async ({ blob, name, subjectId, date, subjectName, terms = [] }) => {
       if (activeStatuses.includes(readState()?.status)) throw new Error("Já existe uma transcrição em andamento. Aguarde ela terminar.");
       await keepAudio({ blob, name, type: blob.type });
-      commit({ status: "enviando", fileName: name, size: blob.size, subjectId, date, subjectName: subjectName || "", startedAt: Date.now() });
+      commit({ status: "enviando", fileName: name, size: blob.size, subjectId, date, subjectName: subjectName || "", terms, startedAt: Date.now() });
       try {
         const response = await fetch(`${apiBase}/ai/transcribe`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ consent: true, mime: blob.type, data: await fileToBase64(blob), subject: subjectName || "" }),
+          body: JSON.stringify({ consent: true, mime: blob.type, data: await fileToBase64(blob), subject: subjectName || "", terms }),
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || !payload.jobId) throw new Error(payload.error || "Não foi possível enviar o áudio.");
@@ -118,7 +118,7 @@ export function useTranscription(session) {
     const current = readState();
     if (!audio?.blob) throw new Error("O áudio original não está mais neste aparelho. Importe o arquivo de novo.");
     commit(null);
-    await submit({ blob: audio.blob, name: audio.name, subjectId: current?.subjectId, date: current?.date, subjectName: current?.subjectName });
+    await submit({ blob: audio.blob, name: audio.name, subjectId: current?.subjectId, date: current?.date, subjectName: current?.subjectName, terms: current?.terms || [] });
   }, [commit, submit]);
 
   const clear = useCallback(async () => {

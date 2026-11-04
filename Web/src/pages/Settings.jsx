@@ -105,11 +105,12 @@ function RankingPrivacy() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const on = user.preferences?.rankingPublic === true;
-  const toggle = async () => {
+  const presenceHidden = user.preferences?.presenceHidden === true;
+  const toggle = async (preferences) => {
     setBusy(true);
     setError("");
     try {
-      setUser(await call("/me", { method: "PATCH", body: { preferences: { rankingPublic: !on } } }));
+      setUser(await call("/me", { method: "PATCH", body: { preferences } }));
     } catch (failure) {
       setError(failure.message);
     } finally {
@@ -119,10 +120,17 @@ function RankingPrivacy() {
   return (
     <div className="panel-body settings-text">
       <label className="check switch-row">
-        <input type="checkbox" checked={on} disabled={busy} onChange={toggle} />
+        <input type="checkbox" checked={on} disabled={busy} onChange={() => toggle({ rankingPublic: !on })} />
         <span>
           Aparecer no Ranking dos Bruxinhos
           <small>Mostra só o primeiro nome com a inicial do sobrenome, a foto, o nível, o XP, a sequência e as relíquias. Desligado por padrão.</small>
+        </span>
+      </label>
+      <label className="check switch-row">
+        <input type="checkbox" checked={!presenceHidden} disabled={busy} onChange={() => toggle({ presenceHidden: !presenceHidden })} />
+        <span>
+          Mostrar quando estou online
+          <small>No início do Conselho, outros bruxinhos veem sua foto, seu nome público e se você está online ou quando foi visto por último. Desligado, você não aparece na lista.</small>
         </span>
       </label>
       <FormError>{error}</FormError>
@@ -150,7 +158,7 @@ export default function Settings() {
   const { submit, busy, error, setError } = useSubmit(
     async () => {
       // Signo, playlist e comunicados são salvos em outros pontos; o formulário só envia o que ele edita.
-      const { sign: _sign, spotifyUrl: _spotify, announcementSeen: _seen, rankingPublic: _ranking, ...preferences } = draft.preferences;
+      const { sign: _sign, spotifyUrl: _spotify, announcementSeen: _seen, rankingPublic: _ranking, presenceHidden: _presence, ...preferences } = draft.preferences;
       const saved = await call("/me", { method: "PATCH", body: { ...draft, preferences } });
       setUser(saved);
       return saved;

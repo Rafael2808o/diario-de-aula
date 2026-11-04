@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Download, Layers, Mic, NotebookPen, Pause, Play, RotateCcw, Square, Trash2, Upload } from "lucide-react";
 import { useApp } from "../../context.js";
 import { todayIso, weekdayOf } from "../../lib/dates.js";
@@ -130,6 +130,8 @@ export default function Transcribe() {
   const [saved, setSaved] = useState("");
   const [error, setError] = useState("");
   const [sent, setSent] = useState([]);
+  const [replaceOld, setReplaceOld] = useState(false);
+  const transcriptBox = useRef(null);
   const result = job?.status === "pronto" ? job.result : null;
   // Disciplina e data vêm do que a pessoa escolheu (ou do link da aula); nunca da primeira disciplina da lista.
   const knownSubject = (id) => (data.subjects.some((item) => item.id === id) ? id : "");
@@ -151,6 +153,20 @@ export default function Transcribe() {
   }, [job?.status, job?.jobId]);
 
   const subjectOf = (id) => data.subjects.find((item) => item.id === id);
+  // Vocabulário da disciplina para a IA acertar a grafia de termos e nomes: professor, temas de aulas, conteúdos de provas e títulos de materiais.
+  const vocabulary = (subject) =>
+    [
+      ...new Set(
+        [
+          subject.professor,
+          ...data.lessons.filter((lesson) => lesson.subjectId === subject.id).map((lesson) => lesson.theme),
+          ...data.exams.filter((exam) => exam.subjectId === subject.id).flatMap((exam) => exam.topics.map((topic) => topic.title)),
+          ...data.materials.filter((material) => material.subjectId === subject.id).map((material) => material.title),
+        ]
+          .map((term) => String(term || "").trim().slice(0, 80))
+          .filter(Boolean),
+      ),
+    ].slice(0, 40);
   const context = { subjectId, date, subjectName: subjectOf(subjectId)?.name || "" };
   const changeContext = (next) => {
     if (next.subjectId !== undefined) setSubjectId(next.subjectId);
@@ -175,7 +191,7 @@ export default function Transcribe() {
     try {
       const subject = subjectOf(subjectId);
       // Sem disciplina escolhida, a IA não recebe nome de matéria nenhum: o assunto sai só do áudio.
-      await transcription.submit({ blob: part.blob, name: part.name, subjectId: subject ? subjectId : "", date, subjectName: subject?.name || "" });
+      await transcription.submit({ blob: part.blob, name: part.name, subjectId: subject ? subjectId : "", date, subjectName: subject?.name || "", terms: subject ? vocabulary(subject) : [] });
       setSent((list) => [...new Set([...list, key])]);
       if (key === "importado") setImported(null);
     } catch (failure) {
@@ -205,11 +221,13 @@ export default function Transcribe() {
         examInfo: [lesson?.examInfo, summary.exam.join("\n")].filter(Boolean).join("\n"),
         notes: [lesson?.notes, summary.doubts.length && `Dúvidas e pontos a revisar: ${summary.doubts.join("; ")}`].filter(Boolean).join("\n"),
         // Uma aula pode ter várias partes: a transcrição nova entra depois da que já existia.
-        transcript: [lesson?.transcript, result.transcript].filter(Boolean).join("\n\n"),
+        // Substituir só quando a pessoa escolhe isso explicitamente.
+        transcript: replaceOld ? result.transcript : [lesson?.transcript, result.transcript].filter(Boolean).join("\n\n"),
         draft: true,
       });
       toast(`Aula salva em ${subject.name}, como rascunho para você revisar.`);
       setSaved(resultSubjectId);
+      setReplaceOld(false);
       await transcription.clear();
     } catch (failure) {
       setError(failure.message);
@@ -219,6 +237,27 @@ export default function Transcribe() {
   };
 
   const running = job && activeStatuses.includes(job.status);
+  // Trechos que a IA marcou para revisão: [trecho incerto] (não entendeu) e [?] (palavra duvidosa).
+  const markers = /\[(trecho incerto|\?)\]/gi;
+  const doubtful = result ? (result.transcript.match(markers) || []).length : 0;
+  const nextDoubt = () => {
+    const box = transcriptBox.current;
+    if (!box) return;
+    const pattern = new RegExp(markers.source, "gi");
+    pattern.lastIndex = box.selectionEnd;
+    let found = pattern.exec(box.value);
+    if (!found) {
+      pattern.lastIndex = 0;
+      found = pattern.exec(box.value);
+    }
+    if (!found) return;
+    box.focus();
+    box.setSelectionRange(found.index, found.index + found[0].length);
+    // Leva o trecho para a área visível da caixa.
+    const lineHeight = parseFloat(getComputedStyle(box).lineHeight) || 20;
+    box.scrollTop = Math.max(0, (box.value.slice(0, found.index).split("\n").length - 3) * lineHeight);
+  };
+  const existingTranscript = result ? data.lessons.find((item) => item.subjectId === resultSubjectId && item.date === resultDate)?.transcript : "";
   const savedSubject = subjectOf(saved);
   const recordingSubject = subjectOf(recorder.context?.subjectId);
 
@@ -363,7 +402,8 @@ export default function Transcribe() {
         <section className="ai-result">
           <TranscriptionStatus job={job} compact />
           <p className="source-note">
-            <strong>Transcrição automática. Confira antes de usar.</strong> Trechos marcados como [trecho incerto] não foram entendidos.
+            <strong>Transcrição automática. Confira antes de usar.</strong> [trecho incerto] marca o que não foi entendido; [?] marca uma palavra duvidosa.
+            {doubtful > 0 ? ` Há ${doubtful} ${doubtful === 1 ? "ponto" : "pontos"} para revisar.` : " Nenhum trecho foi marcado como incerto."}
           </p>
           <Segmented
             label="Resultado da aula"
@@ -377,7 +417,12 @@ export default function Transcribe() {
           {view === "transcricao" && (
             <label className="form">
               Transcrição (editável)
-              <textarea rows={12} value={result.transcript} onChange={(event) => transcription.updateResult({ ...result, transcript: event.target.value })} />
+              <textarea ref={transcriptBox} rows={12} value={result.transcript} onChange={(event) => transcription.updateResult({ ...result, transcript: event.target.value })} />
+              {doubtful > 0 && (
+                <button type="button" className="btn ghost small" onClick={nextDoubt}>
+                  Ir para o próximo trecho marcado
+                </button>
+              )}
             </label>
           )}
           {view === "resumo" && (
@@ -415,6 +460,17 @@ export default function Transcribe() {
               <input type="date" value={resultDate} onChange={(event) => setResultDate(event.target.value)} />
             </label>
           </div>
+          {existingTranscript && (
+            <fieldset className="record-context">
+              <legend>Esta aula já tem uma transcrição</legend>
+              <label className="check">
+                <input type="radio" name="transcript-mode" checked={!replaceOld} onChange={() => setReplaceOld(false)} /> Adicionar a nova depois da que já existe
+              </label>
+              <label className="check">
+                <input type="radio" name="transcript-mode" checked={replaceOld} onChange={() => setReplaceOld(true)} /> Substituir a transcrição anterior
+              </label>
+            </fieldset>
+          )}
           <div className="form-actions">
             <button className="btn" onClick={() => transcription.clear()}>
               Descartar
