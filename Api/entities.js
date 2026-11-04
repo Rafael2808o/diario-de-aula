@@ -166,7 +166,11 @@ export const entities = {
       date: date('session_date', { required: 'Informe a data da sessão.' }),
       startTime: time('start_time'),
       durationSeconds: int('duration_seconds', 1, 86400),
-      notes: multiline('notes', 1000)
+      notes: multiline('notes', 1000),
+      // Conteúdo estudado na sessão (ex.: assunto da prova ou tema da aula) e a referência dele,
+      // para a próxima recomendação do Ritual não repetir o que acabou de ser estudado.
+      topic: text('topic', 200),
+      topicRef: text('topic_ref', 120)
     }
   },
   materials: {

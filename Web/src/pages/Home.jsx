@@ -187,22 +187,42 @@ function MaterialPending({ data, onOpen, onNoMaterial }) {
 }
 
 // O que estudar agora: a prova mais próxima com assunto ainda não revisado; sem prova à vista,
-// a disciplina da próxima aula, revisando o tema da última aula registrada dela.
+// a disciplina da próxima aula, revisando o tema de uma aula registrada dela.
+// Cada sessão do Ritual guarda o conteúdo estudado (topicRef): o que já foi estudado em uma sessão
+// só volta a ser sugerido quando não sobra outro item pendente (e aí vem o estudado há mais tempo).
+function pickFresh(candidates, studied) {
+  const fresh = candidates.find((item) => !studied.has(item.ref));
+  if (fresh) return fresh;
+  return [...candidates].sort((a, b) => (studied.get(a.ref) || "").localeCompare(studied.get(b.ref) || ""))[0];
+}
+
 function nextRitual(data, user, today) {
+  const studied = new Map();
+  for (const session of data["study-sessions"] || []) {
+    if (!session.topicRef) continue;
+    const stamp = `${session.date}T${session.startTime || "00:00"}`;
+    if ((studied.get(session.topicRef) || "") < stamp) studied.set(session.topicRef, stamp);
+  }
   const exam = data.exams.find((item) => item.date >= today && item.date <= addDays(today, 21) && item.topics.some((topic) => topic.status !== "Dominado"));
   if (exam) {
     const subject = subjectById(data.subjects, exam.subjectId);
-    const topic = exam.topics.find((item) => item.status === "Não iniciado" || item.status === "Em estudo") || exam.topics.find((item) => item.status !== "Dominado");
-    return { subject, title: subject?.name || exam.title, detail: `Revisar ${topic.title}`, when: `${exam.title} ${countdown(exam.date, today)}` };
+    const open = exam.topics.filter((item) => item.status === "Não iniciado" || item.status === "Em estudo");
+    const rest = exam.topics.filter((item) => item.status !== "Dominado" && !open.includes(item));
+    const toItem = (topic) => ({ ref: `exam:${exam.id}:${topic.id}`, topic });
+    const choice = pickFresh(open.map(toItem), studied) || pickFresh(rest.map(toItem), studied);
+    return { subject, title: subject?.name || exam.title, detail: `Revisar ${choice.topic.title}`, topic: choice.topic.title, topicRef: choice.ref, when: `${exam.title} ${countdown(exam.date, today)}` };
   }
-  const upcoming = agendaItems(data, user, today, addDays(today, 7)).find((item) => item.kind === "aula" && (item.date > today || !item.start || item.start >= nowTime()));
+  const upcoming = agendaItems(data, user, today, addDays(today, 7)).find((item) => item.kind === "aula" && item.status !== "feriado" && (item.date > today || !item.start || item.start >= nowTime()));
   const subject = upcoming?.subject || data.subjects[0];
   if (!subject) return null;
-  const last = data.lessons.filter((lesson) => lesson.subjectId === subject.id && lesson.theme).sort((x, y) => y.date.localeCompare(x.date))[0];
+  const lessons = data.lessons.filter((lesson) => lesson.subjectId === subject.id && lesson.theme && lesson.status !== "cancelada").sort((x, y) => y.date.localeCompare(x.date));
+  const choice = lessons.length ? pickFresh(lessons.map((lesson) => ({ ref: `lesson:${lesson.id}`, lesson })), studied) : null;
   return {
     subject,
     title: subject.name,
-    detail: last ? `Revisar ${last.theme}` : "Revisar a última aula",
+    detail: choice ? `Revisar ${choice.lesson.theme}` : "Revisar a última aula",
+    topic: choice?.lesson.theme || "",
+    topicRef: choice?.ref || "",
     when: upcoming ? `Próxima aula ${upcoming.date === today ? "hoje" : formatShort(upcoming.date)}${upcoming.start ? `, ${upcoming.start}` : ""}` : "",
   };
 }
@@ -246,7 +266,7 @@ export default function Home() {
   };
 
   const startRitual = () => {
-    if (!ritualActive && ritual.state.status !== "finished") ritual.start(next?.subject?.id || "");
+    if (!ritualActive && ritual.state.status !== "finished") ritual.start(next?.subject?.id || "", undefined, next ? { topic: next.topic, topicRef: next.topicRef } : {});
     ritual.setView("open");
   };
 

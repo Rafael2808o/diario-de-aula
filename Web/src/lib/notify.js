@@ -52,7 +52,7 @@ export function dueNotifications(data, user, now = new Date()) {
     for (const item of classOccurrences(data.subjects, data.lessons, user, today, today)) {
       const end = item.end ? minutesOf(item.end) : null;
       // Lembra de registrar logo depois que a aula termina, se ainda não houver registro.
-      if (end !== null && !item.lesson && current >= end && current <= end + 90) list.push({ tag: `aula-${item.key}`, title: "Você teve aula hoje?", body: `Registre o que aconteceu em ${item.subject.name}.` });
+      if (end !== null && !item.lesson && !item.holiday && current >= end && current <= end + 90) list.push({ tag: `aula-${item.key}`, title: "Você teve aula hoje?", body: `Registre o que aconteceu em ${item.subject.name}.` });
     }
   }
   for (const event of data.events) {

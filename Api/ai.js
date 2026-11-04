@@ -50,6 +50,16 @@ const depthText = {
   essencial: 'apenas os conceitos e definições essenciais para memorizar, no máximo 8 itens curtos'
 };
 
+// Questões e cartas avaliam conhecimento real da matéria, nunca a organização da turma.
+const knowledgeFocus = `Foco das perguntas:
+- Pergunte sobre o conteúdo da disciplina: conceitos, definições, teorias, relações entre ideias, exemplos e aplicações práticas que aparecem nas aulas, resumos e materiais.
+- Nunca pergunte sobre datas de entrega, prazos, instruções administrativas, avisos, tarefas passadas, organização de atividades, nomes ou características de professores e colegas. Ignore esses trechos do material.
+- Prefira perguntas que exijam interpretar, comparar, aplicar a um caso, associar conceitos ou identificar causa e consequência, em vez de só repetir uma definição.`;
+const hardOptions = `Alternativas:
+- As quatro precisam ser plausíveis para quem estudou pouco: use erros comuns, conceitos vizinhos e confusões típicas da matéria.
+- Nada de alternativas absurdas, piadas, "todas as anteriores", "nenhuma das anteriores" ou opções muito mais longas que as outras.
+- A posição da correta deve variar entre as questões.`;
+
 const withMaterial = (prompt, input) => `${prompt}\n\n${rules}\n\nMATERIAL DO ESTUDANTE:\n${input.context || '(nenhum registro enviado)'}`;
 const cleanGaps = data => list(data?.gaps, 6).map(gap => text(gap, 300)).filter(Boolean);
 
@@ -66,7 +76,9 @@ function validQuestions(value, quantity) {
 const tools = {
   async questions(input) {
     const level = ['Fácil', 'Média', 'Avançada'].includes(input.difficulty) ? `Todas com dificuldade ${input.difficulty}.` : 'Misture dificuldades Fácil, Média e Avançada.';
-    const prompt = `Você é um educador brasileiro. Crie ${input.quantity} questões originais de múltipla escolha, em português, para revisar ${input.topic} na disciplina ${input.subject}. Use quatro alternativas plausíveis por questão, apenas uma correta, uma explicação didática e dificuldade Fácil, Média ou Avançada. ${level} Baseie as explicações no material do estudante quando ele trouxer a informação e não invente fatos fora dele.
+    const prompt = `Você é um educador brasileiro. Crie ${input.quantity} questões originais de múltipla escolha, em português, para revisar ${input.topic} na disciplina ${input.subject}. Use quatro alternativas por questão, apenas uma correta, uma explicação didática (por que a correta está certa e por que as outras estão erradas) e dificuldade Fácil, Média ou Avançada. ${level} Mesmo as fáceis devem exigir entender o conteúdo, não decorar uma palavra. Baseie as explicações no material do estudante quando ele trouxer a informação e não invente fatos fora dele.
+${knowledgeFocus}
+${hardOptions}
 Responda só com JSON neste formato: {"title":"Título da revisão","questions":[{"question":"Enunciado","options":["A","B","C","D"],"correctIndex":0,"explanation":"Explicação","difficulty":"Fácil"}]}. Use exatamente quatro opções e correctIndex entre 0 e 3.
 
 MATERIAL DO ESTUDANTE:
@@ -92,6 +104,7 @@ Formato JSON: {"title":"...","points":[{"heading":"...","text":"...","source":".
   async flashcards(input) {
     const quantity = Math.max(3, Math.min(20, Number.parseInt(input.quantity, 10) || 8));
     const { data, model } = await callGemini([{ text: withMaterial(`Crie ${quantity} flashcards de pergunta e resposta para revisar "${input.topic || 'as aulas registradas'}" na disciplina ${input.subject}. Perguntas objetivas; respostas com até 3 frases.
+${knowledgeFocus}
 Formato JSON: {"cards":[{"front":"pergunta","back":"resposta","source":"..."}],"gaps":["..."]}`, input) }]);
     const result = {
       cards: list(data?.cards, 20).map(card => ({ front: text(card?.front, 300), back: text(card?.back, 1200), source: text(card?.source, 160) })).filter(card => card.front && card.back),

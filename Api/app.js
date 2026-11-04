@@ -105,8 +105,36 @@ function cleanPreferences(value, current = {}) {
     lunarShowPhoto: input.lunarShowPhoto !== undefined ? input.lunarShowPhoto !== false : current.lunarShowPhoto !== false,
     nickname: input.nickname !== undefined ? cleanText(input.nickname, 30) : current.nickname || '',
     // Presença na Comunidade: aparece por padrão; a pessoa pode esconder quando está online.
-    presenceHidden: input.presenceHidden !== undefined ? input.presenceHidden === true : current.presenceHidden === true
+    presenceHidden: input.presenceHidden !== undefined ? input.presenceHidden === true : current.presenceHidden === true,
+    // Versão 3.0: apresentação animada (versão vista e tela em que parou) e passeio guiado.
+    presentationSeen: input.presentationSeen !== undefined ? cleanText(input.presentationSeen, 20) : current.presentationSeen || '',
+    presentationStep: input.presentationStep !== undefined ? Math.max(0, Math.min(40, Number.parseInt(input.presentationStep, 10) || 0)) : current.presentationStep || 0,
+    tutorialDone: input.tutorialDone !== undefined ? input.tutorialDone === true : current.tutorialDone === true,
+    tutorialDismissed: input.tutorialDismissed !== undefined ? input.tutorialDismissed === true : current.tutorialDismissed === true,
+    // Feriados: dias sem aula a mais (locais, recesso) e feriados em que houve aula normal.
+    extraHolidays: input.extraHolidays !== undefined ? cleanHolidays(input.extraHolidays) : current.extraHolidays || [],
+    holidaysOff: input.holidaysOff !== undefined ? [...new Set((Array.isArray(input.holidaysOff) ? input.holidaysOff : []).filter(isDate))].slice(0, 80) : current.holidaysOff || [],
+    // Última visita a cada área da Comunidade, para o indicador de novidades.
+    communitySeen: input.communitySeen !== undefined ? cleanSeen(input.communitySeen, current.communitySeen) : current.communitySeen || {}
   };
+}
+
+function cleanHolidays(value) {
+  const seen = new Set();
+  return (Array.isArray(value) ? value : [])
+    .map(item => ({ date: cleanText(item?.date, 10), name: cleanText(item?.name, 60) || 'Sem aula' }))
+    .filter(item => isDate(item.date) && !seen.has(item.date) && seen.add(item.date))
+    .slice(0, 80);
+}
+
+const communityAreas = ['conselho', 'batepapo', 'comunicados', 'resumos', 'feed'];
+function cleanSeen(value, current = {}) {
+  const out = { ...current };
+  for (const area of communityAreas) {
+    const stamp = cleanText(value?.[area], 40);
+    if (stamp && !Number.isNaN(Date.parse(stamp))) out[area] = new Date(stamp).toISOString();
+  }
+  return out;
 }
 
 const zodiacSigns = new Set(['aries', 'touro', 'gemeos', 'cancer', 'leao', 'virgem', 'libra', 'escorpiao', 'sagitario', 'capricornio', 'aquario', 'peixes']);

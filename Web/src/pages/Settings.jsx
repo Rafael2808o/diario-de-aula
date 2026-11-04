@@ -9,6 +9,7 @@ import { canonicalSpotify } from "../components/Ritual.jsx";
 import { AnnouncementHistory } from "../components/Announcements.jsx";
 import { disableNotifications, enableNotifications, notificationsEnabled, notificationsSupported } from "../lib/notify.js";
 import { lessonStatus, subjectById } from "../lib/domain.js";
+import { formatFull, formatShort, nationalHolidays, todayIso } from "../lib/dates.js";
 import { Empty, FormError, Modal, Segmented, useSubmit } from "../ui.jsx";
 import { AcademicFields, RoutineFields, profileDraft, validProfile } from "../components/ProfileFields.jsx";
 import { SubjectList, useSubjectEditing } from "./Subjects.jsx";
@@ -97,6 +98,77 @@ function PermissionList() {
         <dd>{label[states.notifications] || "Verificando..."}</dd>
       </div>
     </dl>
+  );
+}
+
+// Feriados: os nacionais entram sozinhos; aqui a pessoa soma feriados da cidade, recessos e dias sem aula da faculdade.
+function HolidaySettings() {
+  const { user, setUser, call } = useApp();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [date, setDate] = useState("");
+  const [name, setName] = useState("");
+  const extra = user.preferences?.extraHolidays || [];
+  const year = Number(todayIso().slice(0, 4));
+  const upcoming = [...nationalHolidays(year), ...nationalHolidays(year + 1)].sort(([a], [b]) => a.localeCompare(b)).filter(([day]) => day >= todayIso()).slice(0, 4);
+  const save = async (list) => {
+    setBusy(true);
+    setError("");
+    try {
+      setUser(await call("/me", { method: "PATCH", body: { preferences: { extraHolidays: list } } }));
+      return true;
+    } catch (failure) {
+      setError(failure.message);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="group form-group form">
+      <p className="hint">
+        Os feriados nacionais já entram sozinhos: nesses dias as aulas aparecem como feriado e não viram pendência. Se a faculdade teve aula mesmo assim, é só registrar a aula
+        normalmente. Próximos: {upcoming.map(([day, label]) => `${label} (${formatShort(day)})`).join(", ")}.
+      </p>
+      {extra.length > 0 && (
+        <ul className="holiday-list">
+          {[...extra].sort((a, b) => a.date.localeCompare(b.date)).map((item) => (
+            <li key={item.date}>
+              <span>
+                <strong>{formatFull(item.date)}</strong> {item.name}
+              </span>
+              <button type="button" className="btn small ghost" disabled={busy} onClick={() => save(extra.filter((other) => other.date !== item.date))}>
+                Tirar
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form
+        className="form-row holiday-form"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          if (!date) return setError("Escolha a data.");
+          if (await save([...extra.filter((item) => item.date !== date), { date, name: name.trim() || "Sem aula" }])) {
+            setDate("");
+            setName("");
+          }
+        }}
+      >
+        <label>
+          Data
+          <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+        </label>
+        <label>
+          Motivo
+          <input value={name} maxLength={60} placeholder="Ex.: feriado municipal, recesso" onChange={(event) => setName(event.target.value)} />
+        </label>
+        <button type="submit" className="btn" disabled={busy}>
+          <Plus size={14} /> Adicionar dia sem aula
+        </button>
+      </form>
+      <FormError>{error}</FormError>
+    </div>
   );
 }
 
@@ -277,6 +349,11 @@ export default function Settings() {
           </button>
         </div>
         {data.subjects.length ? <SubjectList onEdit={editing.open} /> : <Empty compact title="Nenhuma disciplina cadastrada." />}
+      </section>
+
+      <section id="feriados">
+        <h2 className="section-title">Feriados e dias sem aula</h2>
+        <HolidaySettings />
       </section>
 
       <div className="settings-columns">

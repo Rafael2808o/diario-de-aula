@@ -156,10 +156,10 @@ export function useRitual() {
   }, []);
 
   const start = useCallback(
-    (subjectId = "", goalMinutes = readGoal()) => {
+    (subjectId = "", goalMinutes = readGoal(), { topic = "", topicRef = "" } = {}) => {
       const now = Date.now();
       // goalMs é a meta do pomodoro (0 = tempo livre). Só muda o que o relógio mostra; o tempo salvo é sempre o real.
-      commit({ status: "running", id: newId(), startedAt: now, date: todayIso(), startTime: nowTime(), segmentStart: now, checkpointAt: now, accumulatedMs: 0, subjectId, goalMs: goalMinutes * 60_000 });
+      commit({ status: "running", id: newId(), startedAt: now, date: todayIso(), startTime: nowTime(), segmentStart: now, checkpointAt: now, accumulatedMs: 0, subjectId, goalMs: goalMinutes * 60_000, topic, topicRef });
     },
     [commit],
   );
@@ -182,7 +182,8 @@ export function useRitual() {
   const setSubject = useCallback(
     (subjectId) => {
       const current = read(sessionKey, idle);
-      if (current.status !== "idle") commit({ ...current, subjectId });
+      // Trocar a disciplina desfaz o conteúdo sugerido, que era de outra matéria.
+      if (current.status !== "idle") commit({ ...current, subjectId, ...(subjectId !== current.subjectId ? { topic: "", topicRef: "" } : {}) });
     },
     [commit],
   );

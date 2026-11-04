@@ -81,7 +81,7 @@ export default function History() {
     // Pendências olham as últimas três semanas, como em Dias de aula; aulas antigas sem registro não viram cobrança.
     const past = classOccurrences(data.subjects, data.lessons, user, addDays(today, -21), today);
     const registered = data.lessons.filter((lesson) => lesson.status === "presente" && !lesson.draft);
-    const unregistered = past.filter((item) => !item.lesson);
+    const unregistered = past.filter((item) => !item.lesson && !item.holiday);
     const lowMastery = data.lessons.filter((lesson) => lesson.mastery && lesson.mastery <= 2);
     const missed = data.lessons.filter((lesson) => lesson.status === "falta" && !lesson.recovered);
     const pendingTopics = data.exams.filter((exam) => exam.date >= today).flatMap((exam) => exam.topics.filter((topic) => topic.status === "Não iniciado" || topic.status === "Em estudo").map((topic) => ({ ...topic, exam })));
@@ -124,6 +124,9 @@ export default function History() {
         <div>
           <h1>Histórico de estudos</h1>
           <p>Sua evolução no semestre, calculada só com o que você registrou. Toque em um indicador para ver os registros.</p>
+          <button type="button" className="btn small" onClick={() => go("relatorio")}>
+            Ver relatório mensal
+          </button>
         </div>
       </header>
 

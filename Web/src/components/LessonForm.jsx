@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { ArrowRightLeft, Link2, NotebookText, Pencil, Plus, Vault } from "lucide-react";
+import { ArrowRightLeft, FileImage, Link2, NotebookText, Pencil, Plus, Vault } from "lucide-react";
 import { useApp } from "../context.js";
 import { formatLong, formatShort } from "../lib/dates.js";
 import { lessonStatus } from "../lib/domain.js";
 import { htmlToText } from "../lib/richtext.js";
 import { Confirm, FormError, Modal, Segmented, SubjectTag, useSubmit } from "../ui.jsx";
 import { MaterialForm, MaterialLinks, NoteForm } from "./forms.jsx";
+import { SlidesPdf } from "./SlidesPdf.jsx";
 
 // Cria o registro da ocorrência na primeira gravação e atualiza nas seguintes.
 export function saveLesson({ create, update }, occurrence, changes) {
@@ -53,6 +54,7 @@ export function LessonForm({ occurrence, onClose }) {
         </span>
         {current.lesson?.draft && <span className="badge">Rascunho</span>}
       </div>
+      {occurrence.holiday && !current.lesson && <p className="notice">{occurrence.holiday}: não precisa registrar esta aula. Se a faculdade teve aula mesmo assim, registre normalmente.</p>}
       <form
         className="form"
         onSubmit={(event) => {
@@ -209,6 +211,17 @@ export function LessonForm({ occurrence, onClose }) {
             >
               <Plus size={14} /> Adicionar material
             </button>
+            <button
+              type="button"
+              className="btn ghost small"
+              disabled={busy}
+              onClick={async (event) => {
+                const saved = await ensureSaved(event.currentTarget.form);
+                if (saved) setExtra("slides");
+              }}
+            >
+              <FileImage size={14} /> Adicionar fotos dos slides
+            </button>
           </div>
           <div>
             <strong>Cofre do professor</strong>
@@ -259,6 +272,7 @@ export function LessonForm({ occurrence, onClose }) {
           </button>
         </div>
       </form>
+      {extra === "slides" && current.lesson && <SlidesPdf lesson={current.lesson} subject={occurrence.subject} onClose={() => setExtra(null)} />}
       {extra === "material" && current.lesson && (
         <MaterialForm defaults={{ subjectId: occurrence.subject.id, lessonId: current.lesson.id }} onClose={() => setExtra(null)} />
       )}

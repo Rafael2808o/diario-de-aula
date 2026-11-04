@@ -8,7 +8,7 @@ import { SubjectSelect } from "../components/forms.jsx";
 import { LessonForm } from "../components/LessonForm.jsx";
 
 function OccurrenceRow({ occurrence, onOpen }) {
-  const status = occurrence.lesson?.status || "pendente";
+  const status = occurrence.lesson?.status || (occurrence.holiday ? "feriado" : "pendente");
   return (
     <button type="button" className="occurrence" style={{ "--subject": occurrence.subject.color }} onClick={() => onOpen(occurrence)}>
       <span className="subject-dot" aria-hidden="true" />
@@ -20,6 +20,7 @@ function OccurrenceRow({ occurrence, onOpen }) {
           {occurrence.lesson?.theme ? `, ${occurrence.lesson.theme}` : ""}
           {occurrence.lesson?.draft ? ", rascunho" : ""}
           {occurrence.extra ? ", fora da grade" : ""}
+          {occurrence.holiday ? `, ${occurrence.holiday}` : ""}
         </small>
       </span>
       <span className={`status status-${status}`}>{lessonStatus[status].short}</span>
@@ -38,7 +39,7 @@ export default function Lessons() {
   const monthEnd = addDays(startOfWeek(endOfMonth(cursor)), 6);
   const occurrences = useMemo(() => classOccurrences(data.subjects, data.lessons, user, monthStart, monthEnd), [data.subjects, data.lessons, user, monthStart, monthEnd]);
   const recent = useMemo(
-    () => classOccurrences(data.subjects, data.lessons, user, addDays(today, -21), today).filter((item) => !item.lesson || item.lesson.draft).reverse(),
+    () => classOccurrences(data.subjects, data.lessons, user, addDays(today, -21), today).filter((item) => (!item.lesson && !item.holiday) || item.lesson?.draft).reverse(),
     [data.subjects, data.lessons, user, today],
   );
 
@@ -109,7 +110,7 @@ export default function Lessons() {
                     {Number(day.slice(8))}
                     <span className="dots" aria-hidden="true">
                       {items.slice(0, 3).map((item) => (
-                        <i key={item.key} className={`dot status-dot-${item.lesson?.status || "pendente"}`} style={{ "--subject": item.subject.color }} />
+                        <i key={item.key} className={`dot status-dot-${item.lesson?.status || (item.holiday ? "feriado" : "pendente")}`} style={{ "--subject": item.subject.color }} />
                       ))}
                     </span>
                   </button>
@@ -117,7 +118,7 @@ export default function Lessons() {
               })}
             </div>
             <p className="hint legend">
-              <i className="dot status-dot-pendente" /> pendente <i className="dot status-dot-presente" /> registrada <i className="dot status-dot-falta" /> falta <i className="dot status-dot-cancelada" /> cancelada
+              <i className="dot status-dot-pendente" /> pendente <i className="dot status-dot-presente" /> registrada <i className="dot status-dot-falta" /> falta <i className="dot status-dot-cancelada" /> cancelada <i className="dot status-dot-feriado" /> feriado
             </p>
           </Card>
 

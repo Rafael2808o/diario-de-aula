@@ -96,6 +96,47 @@ export function subjectPeriod(subject, user) {
 export const occurrenceKey = (subjectId, date, start) => `${subjectId}|${date}|${start || ""}`;
 
 // Gera as ocorrências de aula entre from e to e junta o registro salvo de cada uma, quando existe.
+// Feriados nacionais do Brasil (fixos e móveis, a partir da Páscoa) + ajustes da pessoa:
+// preferences.extraHolidays = [{ date, name }] (feriado local, recesso, calendário da faculdade)
+// preferences.holidaysOff = [date] (feriado em que a faculdade teve aula normal).
+function easter(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+const holidayCache = new Map();
+export function nationalHolidays(year) {
+  if (holidayCache.has(year)) return holidayCache.get(year);
+  const fixed = [["01-01", "Confraternização Universal"], ["04-21", "Tiradentes"], ["05-01", "Dia do Trabalhador"], ["09-07", "Independência do Brasil"], ["10-12", "Nossa Senhora Aparecida"], ["11-02", "Finados"], ["11-15", "Proclamação da República"], ["11-20", "Dia da Consciência Negra"], ["12-25", "Natal"]];
+  const map = new Map(fixed.map(([day, name]) => [`${year}-${day}`, name]));
+  const e = easter(year);
+  map.set(addDays(e, -48), "Carnaval");
+  map.set(addDays(e, -47), "Carnaval");
+  map.set(addDays(e, -2), "Sexta-feira Santa");
+  map.set(addDays(e, 60), "Corpus Christi");
+  holidayCache.set(year, map);
+  return map;
+}
+export function holidayOn(date, user) {
+  const prefs = user?.preferences || {};
+  if ((prefs.holidaysOff || []).includes(date)) return "";
+  const extra = (prefs.extraHolidays || []).find((item) => item.date === date);
+  if (extra) return extra.name || "Sem aula";
+  return nationalHolidays(Number(date.slice(0, 4))).get(date) || "";
+}
+
 export function classOccurrences(subjects, lessons, user, from, to) {
   const saved = new Map(lessons.map((lesson) => [occurrenceKey(lesson.subjectId, lesson.date, lesson.startTime), lesson]));
   const result = [];
@@ -109,7 +150,10 @@ export function classOccurrences(subjects, lessons, user, from, to) {
       for (const slot of subject.schedule) {
         if (slot.day !== weekday) continue;
         const key = occurrenceKey(subject.id, day, slot.start);
-        result.push({ key, subject, date: day, start: slot.start, end: slot.end, room: slot.room, lesson: saved.get(key) || null });
+        const lesson = saved.get(key) || null;
+        // Feriado sem registro: a aula aparece marcada e não vira pendência. Se a pessoa registrar, vale o registro.
+        const holiday = lesson ? "" : holidayOn(day, user);
+        result.push({ key, subject, date: day, start: slot.start, end: slot.end, room: slot.room, lesson, ...(holiday ? { holiday } : {}) });
         saved.delete(key);
       }
     }

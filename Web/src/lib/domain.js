@@ -10,6 +10,7 @@ export const lessonStatus = {
   presente: { label: "Presente", short: "Presente" },
   falta: { label: "Faltei", short: "Falta" },
   cancelada: { label: "Aula cancelada", short: "Cancelada" },
+  feriado: { label: "Feriado, sem aula", short: "Feriado" },
 };
 
 // Cada tipo tem ícone e rótulo próprios, para que a cor da disciplina nunca seja a única pista.
@@ -46,9 +47,9 @@ export function agendaItems(data, user, from, to) {
     start: occurrence.start,
     end: occurrence.end,
     title: occurrence.subject.name,
-    detail: occurrence.lesson?.theme || occurrence.room || "",
+    detail: occurrence.holiday ? `Feriado: ${occurrence.holiday}` : occurrence.lesson?.theme || occurrence.room || "",
     subject: occurrence.subject,
-    status: occurrence.lesson?.status || "pendente",
+    status: occurrence.lesson?.status || (occurrence.holiday ? "feriado" : "pendente"),
     occurrence,
   }));
   for (const exam of exams) {
@@ -190,7 +191,7 @@ export function pendingLessons(data, user, today, now, days = 45) {
     .filter((occurrence) => occurrence.date < today || !occurrence.start || occurrence.start <= now)
     .flatMap((occurrence) => {
       const lesson = occurrence.lesson;
-      if (lesson?.status === "cancelada") return [];
+      if (lesson?.status === "cancelada" || occurrence.holiday) return [];
       let kind = "";
       if (!lesson || lesson.status === "pendente") kind = "vazia";
       else if (lesson.draft) kind = "revisar";
@@ -237,7 +238,7 @@ export const progressOf = (data, today) => computeProgress({ ...data, studySessi
 // Progresso de uma disciplina: aulas que já aconteceram com conteúdo registrado e assuntos de prova revisados.
 // Aulas canceladas não contam. Sem grade nem assuntos, o progresso fica indefinido (null).
 export function subjectProgress(data, user, subject, today) {
-  const occurrences = classOccurrences([subject], data.lessons, user, "0000-01-01", today).filter((occurrence) => occurrence.lesson?.status !== "cancelada" && (occurrence.date < today || occurrence.lesson));
+  const occurrences = classOccurrences([subject], data.lessons, user, "0000-01-01", today).filter((occurrence) => occurrence.lesson?.status !== "cancelada" && !occurrence.holiday && (occurrence.date < today || occurrence.lesson));
   // Mesmo critério das aulas pendentes do Início: presente com conteúdo, ou falta com o conteúdo perdido anotado.
   const filled = (text) => Boolean(String(text || "").trim());
   const registered = occurrences.filter(({ lesson }) => lesson && !lesson.draft && ((lesson.status === "presente" && (filled(lesson.taught) || filled(lesson.transcript) || filled(htmlToText(lesson.annotations)))) || (lesson.status === "falta" && (lesson.recovered || filled(lesson.missedContent))))).length;

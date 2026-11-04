@@ -437,3 +437,47 @@
 /* Estado vazio: o texto e o botão quebram linha em vez de passar da largura da tela. */
 .empty > :last-child { min-width: 0; }
 .empty .btn { max-width: 100%; white-space: normal; text-align: center; }
+
+/* Fotos dos slides em PDF */
+.slides-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; }
+.slides-grid li { display: grid; gap: 4px; }
+.slides-thumb { position: relative; display: block; width: 100%; aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--card-line); }
+.slides-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.slides-thumb span { position: absolute; left: 6px; top: 6px; min-width: 22px; padding: 1px 6px; border-radius: 99px; background: rgb(20 14 40 / 0.78); color: #fff; font-size: 12px; font-weight: 600; text-align: center; }
+.slides-actions { display: flex; justify-content: center; gap: 2px; }
+.slides-preview { margin: 0; display: grid; gap: 8px; justify-items: center; }
+.slides-preview img { max-width: 100%; max-height: 50dvh; border-radius: 10px; object-fit: contain; }
+
+.status-feriado { background: var(--fill); color: var(--text-2); }
+.holiday-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.holiday-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.holiday-form { align-items: end; }
+
+/* Relatório mensal */
+.report-month { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 8px 0 16px; }
+.report-month h2 { font-size: 18px; text-transform: capitalize; min-width: 10ch; text-align: center; }
+.report-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.report-tile { display: grid; gap: 4px; padding: 16px; border-radius: var(--radius); background: var(--surface); box-shadow: inset 0 0 0 1px var(--card-line); min-width: 0; }
+.report-tile small { color: var(--text-2); font-size: 13px; }
+.report-tile strong { font-size: 24px; line-height: 1.15; overflow-wrap: anywhere; }
+.report-section { margin-bottom: 18px; }
+.report-bars { list-style: none; margin: 0; padding: 14px 16px; display: grid; gap: 12px; border-radius: var(--radius); background: var(--surface); box-shadow: inset 0 0 0 1px var(--card-line); }
+.report-bars li { display: grid; grid-template-columns: minmax(0, 12rem) 1fr auto; align-items: center; gap: 10px; }
+.report-bar-label { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.report-rank { color: var(--text-3); font-variant-numeric: tabular-nums; }
+.report-bar-track { height: 10px; border-radius: 99px; background: var(--fill); overflow: hidden; }
+.report-bar { display: block; height: 100%; border-radius: 99px; background: var(--bar); }
+.report-bar-value { font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.report-bar-value small { color: var(--text-3); }
+.report-days { display: grid; grid-template-columns: repeat(31, minmax(0, 1fr)); align-items: end; gap: 2px; height: 140px; padding: 14px 12px 22px; border-radius: var(--radius); background: var(--surface); box-shadow: inset 0 0 0 1px var(--card-line); }
+.report-day { position: relative; height: 100%; display: flex; align-items: flex-end; }
+.report-day-bar { width: 100%; border-radius: 4px 4px 0 0; background: var(--accent); }
+.report-day:hover .report-day-bar { filter: brightness(1.15); }
+.report-day small { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--text-3); }
+.report-table table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; }
+.report-table th, .report-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--card-line); }
+@media (max-width: 560px) {
+  .report-bars li { grid-template-columns: 1fr auto; }
+  .report-bar-track { grid-column: 1 / -1; grid-row: 2; }
+}
+.dot.status-dot-feriado { background: transparent; box-shadow: inset 0 0 0 1.5px var(--text-3); }

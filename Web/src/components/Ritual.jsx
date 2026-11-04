@@ -270,7 +270,7 @@ export default function Ritual() {
     setError("");
     const seconds = Math.max(1, Math.round(state.accumulatedMs / 1000));
     try {
-      await create("study-sessions", { clientId: state.id, date: state.date, startTime: state.startTime, durationSeconds: seconds, subjectId: state.subjectId || null });
+      await create("study-sessions", { clientId: state.id, date: state.date, startTime: state.startTime, durationSeconds: seconds, subjectId: state.subjectId || null, topic: state.topic || "", topicRef: state.topicRef || "" });
       toast("Feitiço lançado com sucesso. Sessão guardada no histórico!");
       ritual.reset();
       setCelebrate(true);
@@ -391,7 +391,8 @@ export default function Ritual() {
             <div className="ritual-summary">
               <p>
                 Você estudou <strong>{formatDuration(state.accumulatedMs / 1000)}</strong>
-                {subject ? ` de ${subject.name}` : ""}. Quer guardar no histórico?
+                {subject ? ` de ${subject.name}` : ""}
+                {state.topic ? ` (${state.topic})` : ""}. Quer guardar no histórico?
               </p>
               {data.subjects.length > 0 && (
                 <label className="ritual-subject">

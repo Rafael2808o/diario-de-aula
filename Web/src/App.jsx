@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BookOpen, Camera, CalendarDays, GraduationCap, Home as HomeIcon, Layers, MessagesSquare, Moon as MoonIcon, NotebookPen, NotebookText, ScrollText, Settings as SettingsIcon, Sparkles, Trophy, UserRound, Users, X } from "lucide-react";
+import { BookOpen, Camera, CalendarDays, ChartColumn, GraduationCap, Home as HomeIcon, Layers, MessagesSquare, Moon as MoonIcon, NotebookPen, NotebookText, ScrollText, Settings as SettingsIcon, Sparkles, Trophy, UserRound, Users, X } from "lucide-react";
 import { AppContext, useApp } from "./context.js";
 import { readSession, request, storeSession, useAcademicData } from "./lib/api.js";
 import { useLocalNotifications } from "./lib/notify.js";
@@ -30,6 +30,7 @@ import Lessons from "./pages/Lessons.jsx";
 import Moon from "./pages/Moon.jsx";
 import Notebook from "./pages/Notebook.jsx";
 import Shared from "./pages/Shared.jsx";
+import Report from "./pages/Report.jsx";
 import XpHistory from "./pages/XpHistory.jsx";
 import Onboarding from "./pages/Onboarding.jsx";
 import Profile from "./pages/Profile.jsx";
@@ -44,7 +45,7 @@ const nav = [
   { id: "conteudos", label: "Grimório", title: "Meu Grimório", icon: BookOpen, page: Subjects, group: ["conteudos", "aulas", "provas", "caderno"] },
   { id: "ia", label: "Estudar", title: "Estudar", icon: Sparkles, page: StudyAI, group: ["ia", "cartoes", "comunidade", "migles", "ranking", "lua", "compartilhadas"] },
   { id: "calendario", label: "Agenda", title: "Agenda", icon: CalendarDays, page: Calendar, group: ["calendario"] },
-  { id: "perfil", label: "Perfil", title: "Perfil", icon: UserRound, page: Profile, group: ["perfil", "configuracoes", "historico", "historico-xp"] },
+  { id: "perfil", label: "Perfil", title: "Perfil", icon: UserRound, page: Profile, group: ["perfil", "configuracoes", "historico", "historico-xp", "relatorio"] },
 ];
 // Páginas abertas a partir das seções. Os endereços antigos (?abrir=aulas, provas, cartoes...) continuam valendo.
 const extraPages = [
@@ -59,6 +60,7 @@ const extraPages = [
   { id: "lua", label: "Fases da Lua", title: "Fases da Lua — seu mood de estudante", icon: MoonIcon, page: Moon },
   { id: "compartilhadas", label: "Atividades compartilhadas", title: "Atividades compartilhadas", icon: Users, page: Shared },
   { id: "historico-xp", label: "Histórico de XP", title: "Histórico de XP", icon: ScrollText, page: XpHistory },
+  { id: "relatorio", label: "Relatório mensal", title: "Relatório mensal de estudos", icon: ChartColumn, page: Report },
   { id: "caderno", label: "Caderno da aula", title: "Caderno da aula", icon: NotebookText, page: Notebook },
 ];
 const allPages = [...nav, ...extraPages];
