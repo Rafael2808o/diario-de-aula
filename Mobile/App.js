@@ -78,7 +78,7 @@ export default function App() {
       {loading && (
         <View style={styles.loading}>
           <ActivityIndicator color="#4f5bd5" size="large" />
-          <Text style={styles.loadingText}>Abrindo o Lúmina…</Text>
+          <Text style={styles.loadingText}>Abrindo o Grimiau…</Text>
         </View>
       )}
     </SafeAreaView>
