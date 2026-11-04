@@ -54,3 +54,25 @@ Especificação: prompt mestre "Grimiau" enviado pelo Rafael em 28/10/2026. Evol
 - SPOTIFY_CLIENT_ID e SPOTIFY_CLIENT_SECRET vazios no Render e no `.env`: a Rádio salva título e capa, mas sem nome do artista.
 - Aula 169bb9f7 (Design e Produção Gráfica, 28/10) tem tema "Fundamentos de Marketing…" vindo do bug antigo; corrigir pelo botão "Corrigir disciplina ou data" ou editar o tema.
 - Render não fez deploy automático no push: usar `render deploys create srv-dafnrgf40ujc73c3urd0 --wait`.
+
+# Versão 3.0 — 04/11/2026
+
+Especificação: complemento oficial da V3.0 (seções 13 a 19) enviado pelo Rafael em 03/11/2026, mais a imagem de referência do Kantinho (`docs/referencias/kantinho-original.png`). O documento principal da V3.0 não foi enviado; o Feed dos Migles foi feito a partir do que o complemento descreve.
+
+## Proteção de dados
+- [x] Branch de backup no Neon: `backup-pre-v3-20261104` (br-wispy-bread-aramyqi7).
+- [x] Backup JSON: `D:\Codes\_backups_grimiau\neon-pre-v3-20261104.json` (users 14, subjects 47, lessons 89, study_materials 40, study_files 38, flashcards 48, community_posts 16, notifications 68).
+- [x] Migrações só aditivas (`user_presence`, `feed_photos`), testadas no branch descartável `qa-v3-20261104`, já apagado: conta antiga entra, dados intactos, nenhuma tabela com menos linhas.
+
+## Entregue
+- Bruxinhos por aqui (início do Conselho): online agora e visto por último, sinal a cada 60 s só com atividade real, tolerância de 2,5 min, saída ao fechar a aba ou sair da conta. "Mostrar quando estou online" em Configurações › Privacidade (ligado por padrão). Só nome público e foto.
+- Transcrição: pontuação, parágrafos, vocabulário da disciplina enviado à IA, marcas [trecho incerto] e [?], botão para ir ao próximo trecho marcado, escolha entre adicionar ou substituir a transcrição anterior, limite de saída de 8 mil para 24 mil tokens.
+- Registro de aula no celular: o `z-index` da coluna principal prendia as janelas abaixo da barra de navegação; removido. Janelas usam `dvh`.
+- Feed dos Migles: fotos (reduzidas no aparelho, até 650 KB), legenda, inspiração diária do Kantinho, mensagem oficial após publicar com a inspiração, apagar a própria foto.
+- Kantinho: sempre a imagem oficial recortada (`Web/public/kantinho/`), com movimento e brilho ao redor; nenhum redesenho.
+- Comunicado da versão 3.0.
+
+## Pendências
+- Teste em celular real (teclado virtual incluso) do registro de aula.
+- Fotos do Feed ficam no Postgres do Neon (plano gratuito de 0,5 GB): acompanhar o tamanho se o Feed crescer.
+- `gemini-flash-latest` respondeu 503 (alta demanda) nos testes; o reserva `flash-lite` transcreveu certo.
