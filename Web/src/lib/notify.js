@@ -25,7 +25,7 @@ export const notificationsSupported = () => typeof window !== "undefined" && "No
 export const notificationsEnabled = () => notificationsSupported() && Notification.permission === "granted" && read(enabledKey, "0") === "1";
 
 export async function enableNotifications() {
-  if (window.LUMINA_APP) throw new Error("No app Android, as notificações ainda não funcionam. Use o Lúmina pelo navegador ou instalado na tela inicial para recebê-las.");
+  if (window.LUMINA_APP) throw new Error("No app Android, as notificações ainda não funcionam. Use o Grimiau pelo navegador ou instalado na tela inicial para recebê-las.");
   if (!notificationsSupported()) throw new Error("Este navegador não mostra notificações. No iPhone, instale a Grimiau na Tela de Início primeiro.");
   const permission = await Notification.requestPermission();
   if (permission !== "granted") throw new Error("A permissão foi negada. Libere as notificações do site nas configurações do navegador.");

@@ -106,7 +106,7 @@ export function registerFileRoutes(app, requireAuth) {
     try {
       await initFiles();
       const ticket = /^[0-9a-f]{48}$/.test(req.params.ticket) ? await useTicket(req.params.ticket) : null;
-      if (!ticket) return res.status(410).type('text/plain; charset=utf-8').send('Este link expirou. Volte ao Lúmina e abra o arquivo de novo.');
+      if (!ticket) return res.status(410).type('text/plain; charset=utf-8').send('Este link expirou. Volte ao Grimiau e abra o arquivo de novo.');
       const file = await readFile(ticket.userId, ticket.fileId);
       return file ? sendFile(res, file) : res.status(404).type('text/plain; charset=utf-8').send('Arquivo não encontrado.');
     } catch (error) {
