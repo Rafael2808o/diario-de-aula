@@ -76,3 +76,35 @@ Especificação: complemento oficial da V3.0 (seções 13 a 19) enviado pelo Raf
 - Teste em celular real (teclado virtual incluso) do registro de aula.
 - Fotos do Feed ficam no Postgres do Neon (plano gratuito de 0,5 GB): acompanhar o tamanho se o Feed crescer.
 - `gemini-flash-latest` respondeu 503 (alta demanda) nos testes; o reserva `flash-lite` transcreveu certo.
+
+# Versão 3.0 completa — documento principal (desde 04/11/2026)
+
+Especificação: "GRIMIAU V3.0 — PROMPT MASTER DE IMPLEMENTAÇÃO" (Partes 1 a 13 + adendo do Feed dos Divos), recebido em 04/11/2026.
+O complemento (seções 13 a 19) vale por cima do documento principal: personagem é o Kantinho (nunca Píxel),
+mensagem pós-publicação é a do complemento, Kantinho só com a imagem original (sem piscar/acenar redesenhados).
+"Feed dos Divos" do adendo = Feed dos Migles.
+
+Backup antes desta etapa: branch Neon `backup-pre-v3master-20261104` (br-late-mouse-arn67crw).
+
+## Decisões (sem perguntar, registradas no relatório)
+- XP: o cálculo atual (derivado dos registros) fica igual; recompensas novas vão para a tabela `xp_events`
+  (único por usuário + tipo + referência). Total = derivado + soma de `xp_events`.
+- Apresentação da 3.0: chave nova `preferences.presentationSeen` (o aviso `announcementSeen` continua);
+  fechar antes do fim guarda a tela em que parou e não marca como vista.
+- Tutorial: guia é o Nox; convite só para contas novas; reabrir só em Configurações.
+- Expiração (Bate-papo 48 h, Feed 24 h): filtro em toda consulta + limpeza a cada pedido + cron externo.
+  Nunca apaga `community_posts` (Conselho).
+- Papéis: tabela `user_roles`; admin inicial pelo `ADMIN_EMAILS` do Render.
+
+## Andamento
+- [x] Etapa 2a — Ritual: pausa ao sair de vista, pontos de controle a cada 5 s, recuperação pausada após
+  encerramento sem aviso. 10 cenários no Playwright (`scratchpad/pw/ritual.mjs`) passaram. App Android avisa
+  o site em segundo plano (vai no próximo APK).
+- [x] Etapa 2b — Auditoria de responsividade (`scratchpad/pw/audit.mjs`): 17 páginas × 8 tamanhos, centro de
+  cada botão clicável, sem rolagem lateral. Corrigidos: área de toque dos links de texto, botão do estado vazio.
+- [ ] Etapa 3 — apresentação animada 3.0 (21 telas) e tutorial interativo
+- [ ] Etapa 4 — IA/questões, PDF das fotos dos slides, feriados, progressão do Ritual, relatório mensal
+- [ ] Etapa 5 — Comunidade (página principal, Conselho com status, Bate-papo 48 h, Comunicados, Resumos)
+- [ ] Etapa 6 — Feed (24 h, +200 XP, curtidas/comentários/reações, redesign), Mural de XP
+- [ ] Etapa 7 — Sala de Estudos (grupos, perfil acadêmico, link do documento, Kanban, lembretes, −300 XP, chamadas)
+- [ ] Etapa 8 — testes finais, APK 1.6.0 (permissão de câmera para chamadas)
