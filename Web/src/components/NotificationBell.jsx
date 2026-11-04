@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Award, Bell, BellRing, CheckCheck, MessagesSquare, Sparkles, Users } from "lucide-react";
+import { Award, Bell, BellRing, CheckCheck, Megaphone, MessagesSquare, Sparkles, Users } from "lucide-react";
 import { useApp } from "../context.js";
 
-const icons = { reliquia: Award, nivel: Sparkles, comunidade: MessagesSquare, compartilhada: Users };
+const icons = { reliquia: Award, nivel: Sparkles, comunidade: MessagesSquare, comunicado: Megaphone, compartilhada: Users };
 const when = (iso) => {
   const date = new Date(iso);
   const minutes = Math.round((Date.now() - date.getTime()) / 60000);

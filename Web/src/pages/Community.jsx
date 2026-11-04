@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, MessageCircle, PenLine, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, ImagePlus, MessageCircle, PenLine, Plus, Search, Trash2 } from "lucide-react";
 import { useApp } from "../context.js";
 import { Avatar, Confirm, Empty, FormError, Modal, useSubmit } from "../ui.jsx";
-import Members from "../components/Members.jsx";
+import { photoToJpeg } from "../lib/pdf.js";
+import { apiFileUrl, useMarkSeen, useRole } from "../lib/social.js";
 
-// Conselho dos Bruxinhos (antigo Quadro de Dúvidas): um único mural para todas as contas. Cada publicação mostra só o nome público do autor.
+// Conselho dos Bruxinhos (V3.0): só sugestões, melhorias e erros, com acompanhamento de status pela administração.
+// Conversa geral fica no Bate-papo. Publicações antigas mantêm a categoria original.
 // A ordem acompanha a API: categorias novas entram no fim.
-export const categories = ["Dúvida", "Ideia ou sugestão", "Erro encontrado", "Atualização", "Comentário geral", "Material", "Dica de estudo"];
-const shortNames = { "Ideia ou sugestão": "Ideias", "Comentário geral": "Comentários", "Erro encontrado": "Erros", Atualização: "Atualizações", Dúvida: "Dúvidas", Material: "Materiais", "Dica de estudo": "Dicas" };
-const filterOrder = ["Dúvida", "Material", "Dica de estudo", "Ideia ou sugestão", "Erro encontrado", "Atualização", "Comentário geral"];
+export const categories = ["Dúvida", "Ideia ou sugestão", "Erro encontrado", "Atualização", "Comentário geral", "Material", "Dica de estudo", "Sugestão", "Melhoria", "Outro"];
+export const councilCategories = ["Sugestão", "Erro encontrado", "Melhoria", "Outro"];
+export const councilStatuses = ["Recebido", "Em análise", "Em desenvolvimento", "Resolvido"];
+const statusClass = (status) => `council-status status-${councilStatuses.indexOf(status || "Recebido")}`;
 
 const when = (iso) => {
   const date = new Date(iso);
@@ -39,9 +42,18 @@ export function usePosts(params = {}) {
   return { ...state, load };
 }
 
+async function imagePayload(file) {
+  const image = await photoToJpeg(file, 1600, 0.8);
+  let binary = "";
+  for (let i = 0; i < image.bytes.length; i += 0x8000) binary += String.fromCharCode(...image.bytes.subarray(i, i + 0x8000));
+  return { mime: "image/jpeg", data: btoa(binary) };
+}
+
 function PostForm({ post, onClose, onSaved }) {
   const { call } = useApp();
-  const { submit, busy, error } = useSubmit((body) => call(post ? `/community/posts/${post.id}` : "/community/posts", { method: post ? "PATCH" : "POST", body }), {
+  const [attachment, setAttachment] = useState(null);
+  const options = post && !councilCategories.includes(post.category) ? [post.category, ...councilCategories] : councilCategories;
+  const { submit, busy, error } = useSubmit(async (body) => call(post ? `/community/posts/${post.id}` : "/community/posts", { method: post ? "PATCH" : "POST", body: attachment && !post ? { ...body, attachment: await imagePayload(attachment) } : body }), {
     success: post ? "Publicação atualizada." : "Publicado no quadro.",
     onDone: onSaved,
   });
@@ -56,8 +68,8 @@ function PostForm({ post, onClose, onSaved }) {
       >
         <label>
           Categoria
-          <select name="category" defaultValue={post?.category || "Dúvida"}>
-            {categories.map((category) => (
+          <select name="category" defaultValue={post?.category || "Sugestão"}>
+            {options.map((category) => (
               <option key={category}>{category}</option>
             ))}
           </select>
@@ -70,7 +82,14 @@ function PostForm({ post, onClose, onSaved }) {
           Detalhes
           <textarea name="body" rows={6} maxLength={4000} defaultValue={post?.body} placeholder="Conte o contexto. Não compartilhe senhas, documentos ou dados pessoais." />
         </label>
-        <p className="hint">Todo mundo que usa a Grimiau vê o quadro. Aparece só o seu primeiro nome e a inicial do sobrenome.</p>
+        {!post && (
+          <label>
+            Anexo (opcional)
+            <input type="file" accept="image/*" onChange={(event) => setAttachment(event.target.files?.[0] || null)} />
+            <small className="hint">Um print do erro ajuda muito. A imagem é reduzida antes de enviar.</small>
+          </label>
+        )}
+        <p className="hint">O Conselho é para sugestões, melhorias e erros. Para conversar, use o Bate-papo. Todo mundo vê o Conselho; aparece só o seu primeiro nome e a inicial do sobrenome.</p>
         <FormError>{error}</FormError>
         <div className="form-actions">
           <span className="spacer" />
@@ -94,7 +113,7 @@ export function PostRow({ post, onOpen }) {
         <span className="row-main">
           <strong>{post.title}</strong>
           <small>
-            <span className={`post-category cat-${categories.indexOf(post.category)}`}>{post.category}</span> {post.author.name}, {when(post.createdAt)}
+            <span className={`post-category cat-${categories.indexOf(post.category)}`}>{post.category}</span> <span className={statusClass(post.status)}>{post.status}</span> {post.author.name}, {when(post.createdAt)}
             {post.edited ? ", editado" : ""}
           </small>
         </span>
@@ -173,8 +192,35 @@ function CommentItem({ comment, onChanged }) {
   );
 }
 
+function StatusControl({ post, onSaved }) {
+  const { call } = useApp();
+  const [status, setStatus] = useState(post.status);
+  const [reply, setReply] = useState(post.reply || "");
+  const { submit, busy, error } = useSubmit(() => call(`/community/posts/${post.id}/status`, { method: "PUT", body: { status, reply } }), { success: "Status atualizado. O autor recebeu um aviso.", onDone: onSaved });
+  return (
+    <form className="group form-group form council-admin" onSubmit={(event) => { event.preventDefault(); submit(); }}>
+      <strong>Acompanhamento (administração)</strong>
+      <label>
+        Status
+        <select value={status} onChange={(event) => setStatus(event.target.value)}>
+          {councilStatuses.map((item) => <option key={item}>{item}</option>)}
+        </select>
+      </label>
+      <label>
+        Resposta para quem publicou
+        <textarea rows={3} maxLength={2000} value={reply} onChange={(event) => setReply(event.target.value)} placeholder="Ex.: obrigado! Já estamos corrigindo." />
+      </label>
+      <FormError>{error}</FormError>
+      <div className="form-actions">
+        <button className="btn primary" disabled={busy}>{busy ? "Salvando..." : "Salvar status"}</button>
+      </div>
+    </form>
+  );
+}
+
 function PostDetail({ id }) {
   const { call, go, toast } = useApp();
+  const role = useRole();
   const [post, setPost] = useState(null);
   const [status, setStatus] = useState("loading");
   const [modal, setModal] = useState(null);
@@ -197,8 +243,8 @@ function PostDetail({ id }) {
   if (status === "missing" || !post)
     return (
       <Empty title="Esta publicação não está mais no quadro.">
-        <button className="btn small" onClick={() => go("comunidade")}>
-          Voltar ao quadro
+        <button className="btn small" onClick={() => go("conselho")}>
+          Voltar ao Conselho
         </button>
       </Empty>
     );
@@ -207,7 +253,7 @@ function PostDetail({ id }) {
       <header className="post-head">
         <Avatar user={authorUser(post.author)} size={42} />
         <div>
-          <span className={`post-category cat-${categories.indexOf(post.category)}`}>{post.category}</span>
+          <span className={`post-category cat-${categories.indexOf(post.category)}`}>{post.category}</span> <span className={statusClass(post.status)}>{post.status}</span>
           <h2>{post.title}</h2>
           <small>
             {post.author.name}, {when(post.createdAt)}
@@ -226,6 +272,18 @@ function PostDetail({ id }) {
         )}
       </header>
       {post.body && <p className="prewrap post-body">{post.body}</p>}
+      {post.hasAttachment && (
+        <a className="council-attachment" href={apiFileUrl(`/community/posts/${post.id}/anexo`)} target="_blank" rel="noopener noreferrer">
+          <img src={apiFileUrl(`/community/posts/${post.id}/anexo`)} alt="Anexo da publicação" loading="lazy" />
+        </a>
+      )}
+      {post.reply && (
+        <div className="council-reply">
+          <strong>Resposta da equipe Grimiau</strong>
+          <p className="prewrap">{post.reply}</p>
+        </div>
+      )}
+      {(role === "admin" || role === "moderador") && <StatusControl key={post.status + post.reply} post={post} onSaved={setPost} />}
       <section>
         <h3 className="section-title">
           {post.comments.length} {post.comments.length === 1 ? "resposta" : "respostas"}
@@ -269,7 +327,7 @@ function PostDetail({ id }) {
           onConfirm={async () => {
             await call(`/community/posts/${post.id}`, { method: "DELETE" });
             toast("Publicação excluída.");
-            go("comunidade");
+            go("conselho");
           }}
           onClose={() => setModal(null)}
         />
@@ -281,10 +339,12 @@ function PostDetail({ id }) {
 export default function Community() {
   const { params, go } = useApp();
   const [category, setCategory] = useState("");
+  const [mine, setMine] = useState(false);
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
-  const { status, posts, error, load } = usePosts({ category, q: search });
+  const { status, posts, error, load } = usePosts({ category, q: search, minhas: mine ? "1" : "" });
+  useMarkSeen("conselho");
 
   useEffect(() => {
     const timer = setTimeout(() => setSearch(query.trim()), 300);
@@ -293,45 +353,45 @@ export default function Community() {
 
   return (
     <div className="page community">
+      <button className="link-btn back" onClick={() => (params.id ? go("conselho") : go("comunidade"))}>
+        <ArrowLeft size={15} /> {params.id ? "Conselho" : "Comunidade"}
+      </button>
       <header className="page-head">
         <div>
           <h1>Conselho dos Bruxinhos</h1>
-          <p>Um mural para toda a comunidade: dúvidas, respostas, materiais, dicas de estudo e ideias.</p>
+          <p>Tem uma sugestão ou encontrou algum erro? Conte para nós e acompanhe o andamento por aqui.</p>
         </div>
         <div className="page-actions">
           <button className="btn primary" onClick={() => setCreating(true)}>
-            <Plus size={16} /> Nova publicação
+            <Plus size={16} /> Nova sugestão ou erro
           </button>
         </div>
       </header>
 
       {params.id ? (
-        <>
-          <button className="link-btn back" onClick={() => go("comunidade")}>
-            <ArrowLeft size={15} /> Conselho
-          </button>
-          <PostDetail key={params.id} id={params.id} />
-        </>
+        <PostDetail key={params.id} id={params.id} />
       ) : (
         <>
-          <Members />
           <div className="toolbar community-tools">
             <label className="search-field">
               <Search size={15} aria-hidden="true" />
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar dúvida..." aria-label="Buscar no Conselho" maxLength={80} />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar no Conselho..." aria-label="Buscar no Conselho" maxLength={80} />
             </label>
-            <div className="chip-row" role="group" aria-label="Categoria">
-              {[["", "Todas"], ...filterOrder.map((item) => [item, shortNames[item]])].map(([value, label]) => (
+            <div className="chip-row" role="group" aria-label="Filtro">
+              {[["", "Todas"], ...councilCategories.map((item) => [item, item])].map(([value, label]) => (
                 <button key={label} type="button" className={`chip ${category === value ? "active" : ""}`} aria-pressed={category === value} onClick={() => setCategory(value)}>
                   {label}
                 </button>
               ))}
+              <button type="button" className={`chip ${mine ? "active" : ""}`} aria-pressed={mine} onClick={() => setMine(!mine)}>
+                Minhas
+              </button>
             </div>
           </div>
           {status === "loading" ? (
-            <p className="quiet">Carregando o quadro...</p>
+            <p className="quiet">Carregando o Conselho...</p>
           ) : status === "error" ? (
-            <Empty title="Não foi possível abrir o quadro.">
+            <Empty title="Não foi possível abrir o Conselho.">
               {error}
               <button className="btn small" onClick={load}>
                 Tentar de novo
@@ -340,17 +400,17 @@ export default function Community() {
           ) : posts.length ? (
             <ul className="group">
               {posts.map((post) => (
-                <PostRow key={post.id} post={post} onOpen={(item) => go("comunidade", { id: item.id })} />
+                <PostRow key={post.id} post={post} onOpen={(item) => go("conselho", { id: item.id })} />
               ))}
             </ul>
           ) : (
-            <Empty title={search || category ? "Nada encontrado com esse filtro." : "Este capítulo do grimório ainda está vazio."}>
-              {search || category ? "Tente outra busca ou categoria." : "Seja a primeira pessoa a deixar uma dúvida ou ideia."}
+            <Empty title={search || category || mine ? "Nada encontrado com esse filtro." : "Nenhuma sugestão por aqui ainda."}>
+              {search || category || mine ? "Tente outra busca ou filtro." : "Conte uma ideia para o Grimiau ou avise sobre um erro."}
             </Empty>
           )}
         </>
       )}
-      {creating && <PostForm onClose={() => setCreating(false)} onSaved={(post) => { setCreating(false); go("comunidade", { id: post.id }); load(); }} />}
+      {creating && <PostForm onClose={() => setCreating(false)} onSaved={(post) => { setCreating(false); go("conselho", { id: post.id }); load(); }} />}
     </div>
   );
 }

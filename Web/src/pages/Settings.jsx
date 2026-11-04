@@ -9,6 +9,7 @@ import { canonicalSpotify } from "../components/Ritual.jsx";
 import { AnnouncementHistory } from "../components/Announcements.jsx";
 import { disableNotifications, enableNotifications, notificationsEnabled, notificationsSupported } from "../lib/notify.js";
 import { lessonStatus, subjectById } from "../lib/domain.js";
+import { useRole } from "../lib/social.js";
 import { formatFull, formatShort, nationalHolidays, todayIso } from "../lib/dates.js";
 import { Empty, FormError, Modal, Segmented, useSubmit } from "../ui.jsx";
 import { AcademicFields, RoutineFields, profileDraft, validProfile } from "../components/ProfileFields.jsx";
@@ -102,6 +103,63 @@ function PermissionList() {
 }
 
 // Feriados: os nacionais entram sozinhos; aqui a pessoa soma feriados da cidade, recessos e dias sem aula da faculdade.
+// Papéis da Comunidade: só a administração vê esta seção.
+const roleLabels = { admin: "Administração", moderador: "Moderação", publicador: "Publica comunicados" };
+function RolesSettings() {
+  const { call, user } = useApp();
+  const [query, setQuery] = useState("");
+  const [people, setPeople] = useState([]);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let alive = true;
+    const timer = setTimeout(() => {
+      call(`/roles?q=${encodeURIComponent(query.trim())}`)
+        .then((list) => alive && setPeople(list))
+        .catch((failure) => alive && setError(failure.message));
+    }, 300);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [call, query]);
+  const change = async (person, role) => {
+    setError("");
+    try {
+      await call(`/roles/${person.id}`, { method: "PUT", body: { role } });
+      setPeople((list) => list.map((item) => (item.id === person.id ? { ...item, role } : item)));
+    } catch (failure) {
+      setError(failure.message);
+    }
+  };
+  return (
+    <div className="group form-group form">
+      <p className="hint">Moderação muda o status do Conselho e cuida dos comunicados. Quem publica comunicados só edita os próprios. Busque pelo nome para dar um papel.</p>
+      <label>
+        Buscar pessoa
+        <input value={query} maxLength={60} onChange={(event) => setQuery(event.target.value)} placeholder="Nome" />
+      </label>
+      {people.length > 0 && (
+        <ul className="holiday-list">
+          {people.map((person) => (
+            <li key={person.id}>
+              <span>{person.fullName}</span>
+              <select value={person.role} aria-label={`Papel de ${person.fullName}`} disabled={person.id === user.id} onChange={(event) => change(person, event.target.value)}>
+                <option value="">Sem papel</option>
+                {Object.entries(roleLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </li>
+          ))}
+        </ul>
+      )}
+      <FormError>{error}</FormError>
+    </div>
+  );
+}
+
 function HolidaySettings() {
   const { user, setUser, call } = useApp();
   const [busy, setBusy] = useState(false);
@@ -202,7 +260,7 @@ function RankingPrivacy() {
         <input type="checkbox" checked={!presenceHidden} disabled={busy} onChange={() => toggle({ presenceHidden: !presenceHidden })} />
         <span>
           Mostrar quando estou online
-          <small>No início do Conselho, outros bruxinhos veem sua foto, seu nome público e se você está online ou quando foi visto por último. Desligado, você não aparece na lista.</small>
+          <small>Na página da Comunidade, outros bruxinhos veem sua foto, seu nome público e se você está online ou quando foi visto por último. Desligado, você não aparece na lista.</small>
         </span>
       </label>
       <FormError>{error}</FormError>
@@ -218,6 +276,7 @@ function RankingPrivacy() {
 
 export default function Settings() {
   const { user, data, setUser, call, signOut, toast, go } = useApp();
+  const role = useRole();
   const [draft, setDraft] = useState(() => profileDraft(user));
   const [theme, setTheme] = useState(currentTheme);
   const [motion, setMotion] = useState(currentMotion);
@@ -350,6 +409,13 @@ export default function Settings() {
         </div>
         {data.subjects.length ? <SubjectList onEdit={editing.open} /> : <Empty compact title="Nenhuma disciplina cadastrada." />}
       </section>
+
+      {role === "admin" && (
+        <section id="papeis">
+          <h2 className="section-title">Papéis da Comunidade</h2>
+          <RolesSettings />
+        </section>
+      )}
 
       <section id="feriados">
         <h2 className="section-title">Feriados e dias sem aula</h2>

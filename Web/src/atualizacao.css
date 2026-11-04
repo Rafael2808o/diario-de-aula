@@ -482,3 +482,120 @@
 }
 .dot.status-dot-feriado { background: transparent; box-shadow: inset 0 0 0 1.5px var(--text-3); }
 .xp-amount.is-negative { color: var(--danger, #d0567a); }
+
+/* ---------- Comunidade (V3.0) ---------- */
+.community-areas { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 10px; }
+.community-area { width: 100%; display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; text-align: left; padding: 14px 16px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--card-line); color: var(--text); --tone: var(--gold); }
+.community-area:hover { border-color: color-mix(in srgb, var(--tone) 55%, var(--card-line)); }
+.community-area:focus-visible { outline: 2px solid var(--tone); outline-offset: 2px; }
+.community-area-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; color: var(--tone); border: 1px solid color-mix(in srgb, var(--tone) 40%, transparent); }
+.community-area-text { display: grid; gap: 3px; min-width: 0; }
+.community-area-text strong { font-family: var(--font-title); font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.community-area-text small { color: var(--text-2); font-size: 13px; line-height: 1.4; }
+.community-area-go { color: var(--text-3); }
+.tone-gold { --tone: var(--gold); }
+.tone-rose { --tone: #e79bb8; }
+.tone-lilac { --tone: #b49ae0; }
+.tone-sage { --tone: #9cc6a4; }
+.tone-sky { --tone: #8ec3e6; }
+:root[data-theme="light"] .tone-rose { --tone: #a8466c; }
+:root[data-theme="light"] .tone-lilac { --tone: #6f52a0; }
+:root[data-theme="light"] .tone-sage { --tone: #3f7a4b; }
+:root[data-theme="light"] .tone-sky { --tone: #2f6e96; }
+.news-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); flex: none; }
+
+/* Conselho */
+.council-status { display: inline-block; padding: 1px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; background: var(--fill); color: var(--text-2); }
+.council-status.status-1 { background: var(--warning-soft); color: var(--warning); }
+.council-status.status-2 { background: var(--accent-soft); color: var(--accent-text); }
+.council-status.status-3 { background: var(--success-soft); color: var(--success); }
+.council-reply { margin: 14px 0; padding: 12px 14px; border-left: 2px solid var(--gold); background: var(--surface-2); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.council-attachment { display: block; margin: 12px 0; max-width: 100%; }
+.council-attachment img { max-width: 100%; max-height: 420px; border-radius: var(--radius-sm); border: 1px solid var(--card-line); }
+.council-admin { margin-top: 14px; }
+
+/* Reações (Bate-papo e Resumos) */
+.reaction-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.reaction { display: inline-flex; align-items: center; gap: 4px; min-height: 34px; padding: 4px 10px; border-radius: 18px; border: 1px solid var(--card-line); background: transparent; color: var(--text-2); font-size: 14px; }
+.reaction small { font-size: 12px; color: var(--text-3); }
+.reaction.active { border-color: var(--gold); color: var(--text); background: var(--gold-soft); }
+.reaction.active small { color: var(--text); }
+
+/* Bate-papo: cartinhas de tarô */
+.tarot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 14px; align-items: start; }
+.tarot-letter { position: relative; display: grid; gap: 10px; padding: 18px 16px 14px; border-radius: 14px; background: var(--tarot); color: var(--text); border: 1px solid color-mix(in srgb, var(--gold) 38%, transparent); outline: 1px solid color-mix(in srgb, var(--gold) 14%, transparent); outline-offset: -6px; }
+.tarot-letter-head { display: flex; align-items: center; gap: 10px; padding-right: 36px; }
+.tarot-numeral { position: absolute; top: 10px; right: 14px; font-family: var(--font-display); font-size: 12px; letter-spacing: 0.12em; color: var(--gold); opacity: 0.8; }
+.tarot-author { display: grid; min-width: 0; }
+.tarot-author strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tarot-author small { color: var(--text-3); font-size: 12px; }
+.tarot-title { margin: 0; font-family: var(--font-title); font-size: 19px; font-weight: 600; color: var(--gold); overflow-wrap: anywhere; }
+.tarot-body { margin: 0; line-height: 1.55; overflow-wrap: anywhere; }
+.tarot-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid color-mix(in srgb, var(--gold) 18%, transparent); }
+.tarot-expires { display: inline-flex; align-items: center; gap: 4px; color: var(--text-3); font-size: 12px; margin-left: auto; }
+.tarot-replies { display: grid; gap: 10px; }
+.tarot-reply { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: start; list-style: none; }
+.tarot-reply p { margin: 0; font-size: 14px; overflow-wrap: anywhere; }
+.tarot-reply small { color: var(--text-3); }
+.form.tarot-reply-form { display: flex; gap: 8px; align-items: center; }
+.form.tarot-reply-form input { flex: 1; min-width: 0; }
+.reaction, .summary-row-meta { font-family: var(--font), "Noto Color Emoji"; }
+.letter-editor { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.letter-editor .form-error, .letter-editor .form-actions { grid-column: 1 / -1; }
+.letter-editor-fields { display: grid; gap: 12px; align-content: start; }
+.letter-editor-preview { display: grid; gap: 6px; align-content: start; }
+@media (max-width: 640px) { .letter-editor { grid-template-columns: 1fr; } }
+
+/* Comunicados */
+.notice-list { display: grid; gap: 12px; margin-top: 14px; }
+.notice-card { display: grid; gap: 8px; padding: 16px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--card-line); }
+.notice-card.is-important { border-color: color-mix(in srgb, var(--gold) 60%, var(--card-line)); }
+.notice-card.is-read { opacity: 0.86; }
+.notice-card h3 { margin: 0; font-family: var(--font-title); font-size: 19px; font-weight: 600; overflow-wrap: anywhere; }
+.notice-card p { margin: 0; overflow-wrap: anywhere; }
+.notice-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.notice-category { font-size: 12px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.06em; }
+.notice-flag { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--gold); }
+.notice-event, .notice-file { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--text-2); }
+.notice-file { color: var(--link); width: fit-content; max-width: 100%; overflow-wrap: anywhere; }
+.notice-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid var(--separator); }
+.notice-author { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-3); min-width: 0; }
+.notice-actions { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.notices-page .chip-row, .summaries-page .toolbar { margin-top: 4px; }
+
+/* Resumos */
+.summary-list { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
+.summary-row { width: 100%; display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; text-align: left; padding: 12px 14px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--card-line); color: var(--text); }
+.summary-row:hover { border-color: color-mix(in srgb, var(--gold) 45%, var(--card-line)); }
+.summary-row-icon { color: #9cc6a4; }
+:root[data-theme="light"] .summary-row-icon { color: #3f7a4b; }
+.summary-row-text { display: grid; gap: 2px; min-width: 0; }
+.summary-row-text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.summary-row-text small { color: var(--text-3); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.summary-row-meta { display: inline-flex; align-items: center; gap: 8px; color: var(--text-3); }
+.summary-row-meta small { display: inline-flex; align-items: center; gap: 3px; }
+.summary-form { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.summary-form .form-error, .summary-form .form-actions { grid-column: 1 / -1; }
+.summary-form-fields { display: grid; gap: 12px; align-content: start; }
+.summary-preview { display: grid; place-items: center; min-height: 220px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); overflow: hidden; }
+.summary-preview img { max-width: 100%; max-height: 360px; object-fit: contain; }
+.summary-preview object { width: 100%; height: 360px; }
+@media (max-width: 640px) { .summary-form { grid-template-columns: 1fr; } .summary-preview { min-height: 140px; } }
+.summary-subject { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-2); }
+.summary-author { display: flex; align-items: center; gap: 6px; color: var(--text-3); font-size: 14px; }
+.summary-description { margin: 0 0 14px; }
+.summary-file { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
+.summary-file img { display: block; max-width: 100%; max-height: 520px; border-radius: var(--radius-sm); border: 1px solid var(--card-line); }
+.summary-file a:has(img) { flex-basis: 100%; }
+.summary-saved { display: inline-flex; align-items: center; gap: 4px; color: var(--success); font-size: 14px; font-weight: 600; }
+.summary-comments { margin-top: 20px; display: grid; gap: 10px; }
+.summary-comments h2 { margin: 0; font-family: var(--font-title); font-size: 19px; font-weight: 600; }
+.summary-comments ul { margin: 0; padding: 0; display: grid; gap: 10px; }
+
+/* Seis seções na barra inferior */
+@media (max-width: 900px) {
+  .bottom-nav { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; }
+  .bottom-nav button { font-size: 10.5px; letter-spacing: -0.01em; min-width: 0; }
+  .bottom-nav button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+@media (max-width: 359px) { .bottom-nav { padding-inline: 0; } .bottom-nav button { font-size: 10px; padding-inline: 0; } }

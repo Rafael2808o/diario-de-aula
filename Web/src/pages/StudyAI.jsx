@@ -53,7 +53,7 @@ function StudyHub() {
     { icon: Route, title: "Plano de estudos", action: () => go("ia", { tool: "plano" }) },
     { icon: Hourglass, title: "Ritual de Foco", action: () => ritual.setView("open") },
     { icon: Layers, title: "Cartas do Saber", action: () => go("cartoes") },
-    { icon: MessagesSquare, title: "Conselho dos Bruxinhos", action: () => go("comunidade") },
+    { icon: MessagesSquare, title: "Comunidade", action: () => go("comunidade") },
     { icon: Camera, title: "Feed dos Migles", action: () => go("migles") },
     { icon: Trophy, title: "Ranking dos Bruxinhos", action: () => go("ranking") },
     { icon: ChartLine, title: "Histórico de aprendizagem", action: () => go("historico") },

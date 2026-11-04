@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BookOpen, Camera, CalendarDays, ChartColumn, GraduationCap, Home as HomeIcon, Layers, MessagesSquare, Moon as MoonIcon, NotebookPen, NotebookText, ScrollText, Settings as SettingsIcon, Sparkles, Trophy, UserRound, Users, X } from "lucide-react";
+import { BookOpen, Camera, CalendarDays, ChartColumn, GraduationCap, Heart, Home as HomeIcon, Layers, LibraryBig, Megaphone, MessagesSquare, Moon as MoonIcon, NotebookPen, NotebookText, ScrollText, Settings as SettingsIcon, Sparkles, Trophy, UserRound, Users, X } from "lucide-react";
 import { AppContext, useApp } from "./context.js";
 import { readSession, request, storeSession, useAcademicData } from "./lib/api.js";
 import { useLocalNotifications } from "./lib/notify.js";
@@ -21,6 +21,10 @@ import Auth from "./pages/Auth.jsx";
 import Calendar from "./pages/Calendar.jsx";
 import Cards from "./pages/Cards.jsx";
 import Community from "./pages/Community.jsx";
+import CommunityHub from "./pages/CommunityHub.jsx";
+import Chat from "./pages/Chat.jsx";
+import Notices from "./pages/Notices.jsx";
+import Summaries from "./pages/Summaries.jsx";
 import Feed from "./pages/Feed.jsx";
 import Download from "./pages/Download.jsx";
 import Exams from "./pages/Exams.jsx";
@@ -39,11 +43,12 @@ import Settings from "./pages/Settings.jsx";
 import StudyAI from "./pages/StudyAI.jsx";
 import Subjects from "./pages/Subjects.jsx";
 
-// Cinco seções fixas em todas as telas. Cada seção reúne as páginas que abre (group), para o menu marcar a certa.
+// Seis seções fixas em todas as telas. Cada seção reúne as páginas que abre (group), para o menu marcar a certa.
 const nav = [
   { id: "inicio", label: "Início", title: "Início", icon: HomeIcon, page: Home, group: ["inicio"] },
   { id: "conteudos", label: "Grimório", title: "Meu Grimório", icon: BookOpen, page: Subjects, group: ["conteudos", "aulas", "provas", "caderno"] },
-  { id: "ia", label: "Estudar", title: "Estudar", icon: Sparkles, page: StudyAI, group: ["ia", "cartoes", "comunidade", "migles", "ranking", "lua", "compartilhadas"] },
+  { id: "ia", label: "Estudar", title: "Estudar", icon: Sparkles, page: StudyAI, group: ["ia", "cartoes", "ranking", "lua", "compartilhadas"] },
+  { id: "comunidade", label: "Comunidade", short: "Social", title: "Comunidade", icon: Heart, page: CommunityHub, group: ["comunidade", "conselho", "batepapo", "comunicados", "resumos", "migles"] },
   { id: "calendario", label: "Agenda", title: "Agenda", icon: CalendarDays, page: Calendar, group: ["calendario"] },
   { id: "perfil", label: "Perfil", title: "Perfil", icon: UserRound, page: Profile, group: ["perfil", "configuracoes", "historico", "historico-xp", "relatorio"] },
 ];
@@ -52,7 +57,10 @@ const extraPages = [
   { id: "aulas", label: "Registro de aulas", title: "Registro de aulas", icon: NotebookPen, page: Lessons },
   { id: "provas", label: "Provas", title: "Provas", icon: GraduationCap, page: Exams },
   { id: "cartoes", label: "Cartas do Saber", title: "Cartas do Saber", icon: Layers, page: Cards },
-  { id: "comunidade", label: "Conselho dos Bruxinhos", title: "Conselho dos Bruxinhos", icon: MessagesSquare, page: Community },
+  { id: "conselho", label: "Conselho dos Bruxinhos", title: "Conselho dos Bruxinhos", icon: ScrollText, page: Community },
+  { id: "batepapo", label: "Bate-papo", title: "Bate-papo", icon: MessagesSquare, page: Chat },
+  { id: "comunicados", label: "Comunicados Gerais", title: "Comunicados Gerais", icon: Megaphone, page: Notices },
+  { id: "resumos", label: "Resumos Compartilhados", title: "Resumos Compartilhados", icon: LibraryBig, page: Summaries },
   { id: "migles", label: "Feed dos Migles", title: "Feed dos Migles", icon: Camera, page: Feed },
   { id: "ranking", label: "Ranking", title: "Ranking dos Bruxinhos", icon: Trophy, page: Ranking },
   { id: "configuracoes", label: "Configurações", title: "Configurações", icon: SettingsIcon, page: Settings },
@@ -64,7 +72,7 @@ const extraPages = [
   { id: "caderno", label: "Caderno da aula", title: "Caderno da aula", icon: NotebookText, page: Notebook },
 ];
 const allPages = [...nav, ...extraPages];
-const shortcuts = ["aulas", "provas", "cartoes", "lua", "compartilhadas", "comunidade", "migles", "ranking", "configuracoes"];
+const shortcuts = ["aulas", "provas", "cartoes", "lua", "compartilhadas", "migles", "ranking", "configuracoes"];
 const sectionOf = (page) => nav.find((item) => item.group.includes(page))?.id;
 // Endereços das versões anteriores continuam funcionando.
 const legacyPages = { central: "inicio", diario: "aulas", prova: "ia", estudos: "calendario", biblioteca: "conteudos", desempenho: "perfil" };
@@ -298,10 +306,10 @@ function Shell({ session, setSession }) {
           )}
         </div>
         <nav className="bottom-nav" aria-label="Navegação principal">
-          {nav.map(({ id, label, icon: Icon }) => (
+          {nav.map(({ id, label, short, icon: Icon }) => (
             <button key={id} className={section === id ? "active" : ""} aria-current={location.page === id ? "page" : undefined} onClick={() => go(id)}>
               <Icon size={21} aria-hidden="true" />
-              <span>{label}</span>
+              <span>{short || label}</span>
             </button>
           ))}
         </nav>
