@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { BookOpen, CheckSquare, Clock, HelpCircle, Layers, NotebookPen, Target } from "lucide-react";
+import { BookOpen, CheckSquare, Clock, HelpCircle, Layers, NotebookPen, Sparkles, Target, TriangleAlert } from "lucide-react";
 import { useApp } from "../context.js";
 import { addDays, formatFull, formatMonth, todayIso } from "../lib/dates.js";
 import { progressOf, subjectById } from "../lib/domain.js";
@@ -13,8 +13,10 @@ const kinds = {
   carta: { label: "Cartas do Saber", icon: Layers },
   assunto: { label: "Assuntos de prova", icon: Target },
   atividade: { label: "Atividades", icon: CheckSquare },
+  comunidade: { label: "Comunidade", icon: Sparkles },
+  penalidade: { label: "Penalidades", icon: TriangleAlert },
 };
-const dateLabels = { aula: "dia da aula", sessao: "dia da sessão", simulado: "dia do simulado", "ultima-revisao": "última revisão" };
+const dateLabels = { comunidade: "dia da ação", aula: "dia da aula", sessao: "dia da sessão", simulado: "dia do simulado", "ultima-revisao": "última revisão" };
 
 // Cada linha é um registro que existe hoje, com o XP que ele vale pelas regras do perfil.
 // A soma das linhas é o XP total. Quando o registro não guarda o dia do ganho, a linha aparece em "Sem data".
@@ -97,7 +99,7 @@ export default function XpHistory() {
                         {subject && <SubjectTag subject={subject} small />}
                       </small>
                     </span>
-                    <strong className="xp-amount">+{entry.xp}</strong>
+                    <strong className={`xp-amount ${entry.xp < 0 ? "is-negative" : ""}`}>{entry.xp > 0 ? "+" : "−"}{Math.abs(entry.xp)}</strong>
                   </li>
                 );
               })}

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { entities, listEntity } from './entities.js';
 import { listMoods, listOwnSongs, todayInBrazil } from './lunar.js';
 import { computeProgress } from './progress.js';
+import { listXpEvents, recordActivity } from './xp.js';
 import { initStore, memory, pool } from './store.js';
 
 // Avisos do sino no cabeçalho. Cada aviso nasce de um acontecimento real e tem uma chave única por conta
@@ -57,12 +58,13 @@ export async function notify(userId, { kind, key, title, body = '', link = {} })
 
 // Mesmos registros usados no perfil, para o XP e as relíquias baterem em todo lugar (ranking, avisos, perfil).
 export async function progressFor(userId, today = todayInBrazil()) {
-  const [lessons, studySessions, flashcards, quizResults, exams, tasks, moods, songs] = await Promise.all([
+  const [lessons, studySessions, flashcards, quizResults, exams, tasks, moods, songs, xpEvents] = await Promise.all([
     ...['lessons', 'study-sessions', 'flashcards', 'quiz-results', 'exams', 'tasks'].map(key => listEntity(entities[key], userId)),
     listMoods(userId),
-    listOwnSongs(userId)
+    listOwnSongs(userId),
+    listXpEvents(userId)
   ]);
-  return computeProgress({ lessons, studySessions, flashcards, quizResults, exams, tasks, moods, songs }, today);
+  return computeProgress({ lessons, studySessions, flashcards, quizResults, exams, tasks, moods, songs, xpEvents }, today);
 }
 
 async function readState(userId) {
@@ -105,8 +107,10 @@ export async function syncProgress(userId) {
   for (const item of fresh) {
     next.relics[item.id] = today;
     await notify(userId, { kind: 'reliquia', key: `reliquia:${item.id}`, title: `Nova relíquia: ${item.title}`, body: item.description, link: { page: 'perfil', params: { secao: 'reliquias' } } });
+    await recordActivity(userId, { kind: 'reliquia', text: `conquistou a relíquia ${item.title}!`, dedupe: `reliquia:${item.id}` });
   }
   if (progress.level > state.level) {
+    await recordActivity(userId, { kind: 'nivel', text: `passou para o nível ${progress.level}!`, dedupe: `nivel:${progress.level}` });
     await notify(userId, { kind: 'nivel', key: `nivel:${progress.level}`, title: `Você chegou ao nível ${progress.level}`, body: `${progress.title}. Total de ${progress.xp} XP.`, link: { page: 'historico-xp' } });
   }
   if (fresh.length || progress.level > state.level) await writeState(userId, next);

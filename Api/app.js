@@ -37,13 +37,16 @@ import { registerNotificationRoutes } from './notifications.js';
 import { registerSharedRoutes } from './shared.js';
 import { registerPresenceRoutes } from './presence.js';
 import { registerFeedRoutes } from './feed.js';
+import { registerXpRoutes } from './xp.js';
+import { registerRoleRoutes } from './roles.js';
+import { registerCommunityRoutes } from './community.js';
 
 const app = express();
 const corsOrigins = (process.env.CORS_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean);
 app.use(cors({ origin: corsOrigins.length ? corsOrigins : true }));
 // Arquivos e áudio usam um limite maior, aplicado na própria rota.
 const smallJson = express.json({ limit: '120kb' });
-const largeBodyRoutes = new Set(['POST /api/v1/files', 'POST /api/v1/ai/transcribe', 'PUT /api/v1/me/avatar', 'POST /api/v1/feed']);
+const largeBodyRoutes = new Set(['POST /api/v1/files', 'POST /api/v1/ai/transcribe', 'PUT /api/v1/me/avatar', 'POST /api/v1/feed', 'POST /api/v1/community/posts', 'POST /api/v1/resumos', 'POST /api/v1/comunicados', 'POST /api/v1/batepapo']);
 // Registros de aula levam transcrição e caderno: aceitam até 600 kb.
 const lessonJson = express.json({ limit: '600kb' });
 const isLessonWrite = req => ['POST', 'PATCH'].includes(req.method) && /^\/api\/v1\/lessons(\/[\w-]+)?$/.test(req.path);
@@ -669,6 +672,9 @@ registerAiRoutes(app, requireAuth, aiRateLimit);
 registerSocialRoutes(app, requireAuth);
 registerPresenceRoutes(app, requireAuth);
 registerFeedRoutes(app, requireAuth);
+registerXpRoutes(app, requireAuth);
+registerRoleRoutes(app, requireAuth);
+registerCommunityRoutes(app, requireAuth);
 registerHoroscopeRoutes(app, requireAuth);
 registerRankingRoutes(app, requireAuth);
 registerLunarRoutes(app, requireAuth);

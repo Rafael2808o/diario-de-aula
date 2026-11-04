@@ -1,6 +1,7 @@
 import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { notify } from './notifications.js';
+import { can, roleOf } from './roles.js';
 import { initStore, memory, pool } from './store.js';
 
 // Foto de perfil e quadro global de dúvidas.
@@ -11,7 +12,12 @@ import { initStore, memory, pool } from './store.js';
 export const avatarMaxBytes = 400 * 1024;
 const avatarTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 // Novas categorias entram sempre no fim, para não mudar as publicações que já existem.
-export const postCategories = ['Dúvida', 'Ideia ou sugestão', 'Erro encontrado', 'Atualização', 'Comentário geral', 'Material', 'Dica de estudo'];
+export const postCategories = ['Dúvida', 'Ideia ou sugestão', 'Erro encontrado', 'Atualização', 'Comentário geral', 'Material', 'Dica de estudo', 'Sugestão', 'Melhoria', 'Outro'];
+// V3.0: o Conselho fica só para sugestões, melhorias e erros (conversa geral foi para o Bate-papo).
+// Publicações antigas mantêm a categoria original; novas só usam estas.
+export const councilCategories = ['Sugestão', 'Erro encontrado', 'Melhoria', 'Outro'];
+export const councilStatuses = ['Recebido', 'Em análise', 'Em desenvolvimento', 'Resolvido'];
+const attachmentMaxBytes = 700 * 1024;
 
 let ready;
 function initSocial() {
@@ -31,7 +37,13 @@ function initSocial() {
         id TEXT PRIMARY KEY, post_id TEXT NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
         user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, body TEXT NOT NULL,
         created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW(), edited BOOLEAN DEFAULT FALSE);
-      CREATE INDEX IF NOT EXISTS community_comments_post_idx ON community_comments(post_id)`);
+      CREATE INDEX IF NOT EXISTS community_comments_post_idx ON community_comments(post_id);
+      ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Recebido';
+      ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS reply TEXT DEFAULT '';
+      ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS reply_at TIMESTAMPTZ;
+      CREATE TABLE IF NOT EXISTS community_post_files (
+        post_id TEXT PRIMARY KEY REFERENCES community_posts(id) ON DELETE CASCADE,
+        mime TEXT NOT NULL, data BYTEA NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())`);
   })().catch(error => {
     ready = null;
     throw error;
@@ -110,7 +122,9 @@ const author = row => ({ id: row.userId, name: publicName(row.authorName), avata
 const publicPost = (row, viewerId) => ({
   id: row.id, category: row.category, title: row.title, body: row.body, edited: Boolean(row.edited),
   createdAt: new Date(row.createdAt).toISOString(), commentCount: Number(row.commentCount || 0),
-  author: author(row), mine: row.userId === viewerId
+  author: author(row), mine: row.userId === viewerId,
+  status: row.status || 'Recebido', reply: row.reply || '', replyAt: row.replyAt ? new Date(row.replyAt).toISOString() : null,
+  hasAttachment: Boolean(row.hasAttachment)
 });
 const publicComment = (row, viewerId) => ({
   id: row.id, postId: row.postId, body: row.body, edited: Boolean(row.edited),
@@ -118,15 +132,20 @@ const publicComment = (row, viewerId) => ({
 });
 
 const postSelect = `SELECT p.id, p.user_id AS "userId", p.category, p.title, p.body, p.edited, p.created_at AS "createdAt",
+  p.status, p.reply, p.reply_at AS "replyAt", EXISTS (SELECT 1 FROM community_post_files f WHERE f.post_id=p.id) AS "hasAttachment",
   u.name AS "authorName", u.avatar_version AS "avatarVersion",
   (SELECT COUNT(*) FROM community_comments c WHERE c.post_id=p.id) AS "commentCount"
   FROM community_posts p JOIN users u ON u.id=p.user_id`;
 
-async function listPosts(viewerId, { category, q }) {
+async function listPosts(viewerId, { category, q, mine }) {
   await initSocial();
   if (pool) {
     const where = [];
     const values = [];
+    if (mine) {
+      values.push(viewerId);
+      where.push(`p.user_id=${values.length}`);
+    }
     if (category) {
       values.push(category);
       where.push(`p.category=$${values.length}`);
@@ -140,10 +159,10 @@ async function listPosts(viewerId, { category, q }) {
   }
   const term = (q || '').toLowerCase();
   return memoryPosts()
-    .filter(post => (!category || post.category === category) && (!term || `${post.title} ${post.body}`.toLowerCase().includes(term)))
+    .filter(post => (!mine || post.userId === viewerId) && (!category || post.category === category) && (!term || `${post.title} ${post.body}`.toLowerCase().includes(term)))
     .sort((a, b) => b.createdAt - a.createdAt)
     .slice(0, 100)
-    .map(post => publicPost({ ...post, authorName: memoryAuthor(post.userId).name, avatarVersion: memoryAuthor(post.userId).avatar_version, commentCount: memoryComments().filter(c => c.postId === post.id).length }, viewerId));
+    .map(post => publicPost({ ...post, authorName: memoryAuthor(post.userId).name, avatarVersion: memoryAuthor(post.userId).avatar_version, commentCount: memoryComments().filter(c => c.postId === post.id).length, hasAttachment: memory.postFiles?.has(post.id) }, viewerId));
 }
 
 async function getPost(viewerId, id) {
@@ -160,14 +179,14 @@ async function getPost(viewerId, id) {
   if (!post) return null;
   const decorate = row => ({ ...row, authorName: memoryAuthor(row.userId).name, avatarVersion: memoryAuthor(row.userId).avatar_version });
   const comments = memoryComments().filter(comment => comment.postId === id).sort((a, b) => a.createdAt - b.createdAt);
-  return { ...publicPost({ ...decorate(post), commentCount: comments.length }, viewerId), comments: comments.map(comment => publicComment(decorate(comment), viewerId)) };
+  return { ...publicPost({ ...decorate(post), commentCount: comments.length, hasAttachment: memory.postFiles?.has(post.id) }, viewerId), comments: comments.map(comment => publicComment(decorate(comment), viewerId)) };
 }
 
-function postInput(body) {
+function postInput(body, allowed = postCategories) {
   const category = oneLine(body?.category, 40);
   const title = oneLine(body?.title, 140);
   const text = clean(body?.body, 4000);
-  if (!postCategories.includes(category)) return { error: 'Escolha uma categoria.' };
+  if (!allowed.includes(category)) return { error: 'Escolha uma categoria.' };
   if (title.length < 3) return { error: 'Escreva um título com pelo menos 3 letras.' };
   return { post: { category, title, body: text } };
 }
@@ -212,7 +231,7 @@ export function registerSocialRoutes(app, requireAuth) {
   app.get('/api/v1/community/posts', requireAuth, async (req, res, next) => {
     try {
       const category = postCategories.includes(req.query.category) ? req.query.category : '';
-      return res.json(await listPosts(req.user.id, { category, q: oneLine(req.query.q, 80) }));
+      return res.json(await listPosts(req.user.id, { category, q: oneLine(req.query.q, 80), mine: req.query.minhas === '1' }));
     } catch (error) {
       return next(error);
     }
@@ -227,15 +246,66 @@ export function registerSocialRoutes(app, requireAuth) {
     }
   });
 
-  app.post('/api/v1/community/posts', requireAuth, socialRateLimit, async (req, res, next) => {
+  app.post('/api/v1/community/posts', express.json({ limit: '1mb' }), requireAuth, socialRateLimit, async (req, res, next) => {
     try {
-      const { post, error } = postInput(req.body);
+      const { post, error } = postInput(req.body, councilCategories);
       if (error) return res.status(400).json({ error });
+      // Anexo opcional: uma imagem (print do erro, por exemplo), conferida pela assinatura do arquivo.
+      let file = null;
+      if (req.body?.attachment) {
+        const mime = String(req.body.attachment.mime || '');
+        const data = Buffer.from(String(req.body.attachment.data || ''), 'base64');
+        if (!avatarTypes.has(mime) || !imageMatches(mime, data)) return res.status(400).json({ error: 'O anexo precisa ser uma imagem JPG, PNG ou WebP.' });
+        if (data.length > attachmentMaxBytes) return res.status(413).json({ error: 'O anexo precisa ter até 700 KB.' });
+        file = { mime, data };
+      }
       await initSocial();
       const id = randomUUID();
-      if (pool) await pool.query('INSERT INTO community_posts (id,user_id,category,title,body) VALUES ($1,$2,$3,$4,$5)', [id, req.user.id, post.category, post.title, post.body]);
-      else memoryPosts().push({ id, userId: req.user.id, ...post, edited: false, createdAt: Date.now() });
+      if (pool) {
+        await pool.query("INSERT INTO community_posts (id,user_id,category,title,body,status) VALUES ($1,$2,$3,$4,$5,'Recebido')", [id, req.user.id, post.category, post.title, post.body]);
+        if (file) await pool.query('INSERT INTO community_post_files (post_id,mime,data) VALUES ($1,$2,$3)', [id, file.mime, file.data]);
+      } else {
+        memoryPosts().push({ id, userId: req.user.id, ...post, status: 'Recebido', reply: '', edited: false, createdAt: Date.now() });
+        if (file) (memory.postFiles ||= new Map()).set(id, file);
+      }
       return res.status(201).json(await getPost(req.user.id, id));
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  // Anexo do Conselho: endereço com o id aleatório da publicação, como as fotos do Feed.
+  app.get('/api/v1/community/posts/:id/anexo', async (req, res, next) => {
+    try {
+      await initSocial();
+      const file = pool ? (await pool.query('SELECT mime, data FROM community_post_files WHERE post_id=$1', [req.params.id])).rows[0] : memory.postFiles?.get(req.params.id);
+      if (!file) return res.status(404).json({ error: 'Anexo não encontrado.' });
+      res.set('Cache-Control', 'private, max-age=86400').type(file.mime);
+      return res.send(Buffer.from(file.data));
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  // Acompanhamento: administração e moderação mudam o status e respondem; o autor recebe um aviso.
+  app.put('/api/v1/community/posts/:id/status', requireAuth, async (req, res, next) => {
+    try {
+      if (!can.moderate(await roleOf(req.user))) return res.status(403).json({ error: 'Só a administração ou a moderação atualiza o status.' });
+      const status = oneLine(req.body?.status, 40);
+      const reply = clean(req.body?.reply, 2000);
+      if (!councilStatuses.includes(status)) return res.status(400).json({ error: 'Status inválido.' });
+      await initSocial();
+      let post;
+      if (pool) post = (await pool.query(`UPDATE community_posts SET status=$2, reply=$3, reply_at=CASE WHEN $3 <> '' THEN NOW() ELSE reply_at END WHERE id=$1 RETURNING user_id AS "userId", title`, [req.params.id, status, reply])).rows[0];
+      else {
+        post = memoryPosts().find(item => item.id === req.params.id);
+        if (post) Object.assign(post, { status, reply, replyAt: reply ? Date.now() : post.replyAt });
+      }
+      if (!post) return res.status(404).json({ error: 'Publicação não encontrada.' });
+      if (post.userId !== req.user.id) {
+        await notify(post.userId, { kind: 'comunidade', key: `status:${req.params.id}:${status}:${reply.length}`, title: `Sua publicação no Conselho: ${status}`, body: reply || post.title, link: { page: 'conselho', params: { id: req.params.id } } }).catch(error => console.error('aviso de status', error));
+      }
+      return res.json(await getPost(req.user.id, req.params.id));
     } catch (error) {
       return next(error);
     }
@@ -295,7 +365,7 @@ export function registerSocialRoutes(app, requireAuth) {
       if (post.userId !== req.user.id) {
         await notify(post.userId, {
           kind: 'comunidade', key: `comentario:${id}`, title: `${publicName(req.user.name)} comentou na sua publicação`,
-          body: post.title, link: { page: 'comunidade', params: { id: req.params.id } }
+          body: post.title, link: { page: 'conselho', params: { id: req.params.id } }
         }).catch(error => console.error('aviso de comentário', error));
       }
       return res.status(201).json(await getPost(req.user.id, req.params.id));

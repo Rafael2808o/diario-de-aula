@@ -82,6 +82,8 @@ export function computeProgress(data, today) {
   const quizzes = data.quizResults || [];
   const exams = data.exams || [];
   const tasks = data.tasks || [];
+  // XP da comunidade (V3.0): recompensas e penalidades já gravadas pelo servidor, uma por ação.
+  const xpEvents = data.xpEvents || [];
   const topics = exams.flatMap((exam) => exam.topics || []);
 
   const counts = {
@@ -109,7 +111,8 @@ export function computeProgress(data, today) {
     counts.correct * xpRules.correct +
     counts.reviewed * xpRules.reviewed +
     counts.mastered * xpRules.mastered +
-    counts.tasks * xpRules.task;
+    counts.tasks * xpRules.task +
+    xpEvents.reduce((sum, event) => sum + (event.xp || 0), 0);
   const level = levelFor(xp);
   const days = studyDays(data);
   const { current, best } = streaks(days, today);
@@ -157,14 +160,14 @@ export function computeProgress(data, today) {
     achievements,
     unlocked: achievements.filter((item) => item.unlocked).length,
     week,
-    history: xpHistory({ lessons, sessions, cards, quizzes, exams, tasks }),
+    history: xpHistory({ lessons, sessions, cards, quizzes, exams, tasks, xpEvents }),
   };
 }
 
 // Histórico de XP: cada ganho vem de um registro que existe hoje, pelas mesmas regras do total.
 // A soma das linhas é sempre igual ao XP total (o teste confere). "date" é o dia do registro quando ele tem data;
 // "dateKind" diz que data é essa. Revisões de cartas, assuntos e atividades não guardam o dia do ganho.
-export function xpHistory({ lessons = [], sessions = [], cards = [], quizzes = [], exams = [], tasks = [] }) {
+export function xpHistory({ lessons = [], sessions = [], cards = [], quizzes = [], exams = [], tasks = [], xpEvents = [] }) {
   const entries = [];
   const add = (entry) => entry.xp > 0 && entries.push({ date: "", dateKind: "", subjectId: "", ...entry });
   for (const lesson of lessons) {
@@ -189,6 +192,8 @@ export function xpHistory({ lessons = [], sessions = [], cards = [], quizzes = [
       if (topic.status === "Dominado") add({ id: `assunto-${exam.id}-${topic.id}`, kind: "assunto", xp: xpRules.mastered, subjectId: exam.subjectId, text: `Assunto dominado: ${topic.title} (${exam.title})` });
     }
   }
+  // Comunidade: entra também o que tira XP (tarefa atrasada), para a soma bater com o total.
+  for (const event of xpEvents) if (event.xp) entries.push({ id: `comunidade-${event.id}`, kind: event.xp < 0 ? "penalidade" : "comunidade", xp: event.xp, date: event.date || "", dateKind: event.date ? "comunidade" : "", subjectId: "", text: event.text });
   for (const task of tasks) if (task.done) add({ id: `atividade-${task.id}`, kind: "atividade", xp: xpRules.task, subjectId: task.subjectId || "", text: `Atividade concluída: ${task.title}` });
   return entries.sort((a, b) => (b.date || "").localeCompare(a.date || "") || a.id.localeCompare(b.id));
 }

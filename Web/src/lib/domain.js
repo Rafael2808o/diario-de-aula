@@ -233,7 +233,7 @@ export function examLessons(data, exam) {
 }
 
 // XP, nível e relíquias do perfil, a partir das coleções carregadas no app.
-export const progressOf = (data, today) => computeProgress({ ...data, studySessions: data["study-sessions"], quizResults: data["quiz-results"] }, today);
+export const progressOf = (data, today) => computeProgress({ ...data, studySessions: data["study-sessions"], quizResults: data["quiz-results"], xpEvents: data["xp-events"] }, today);
 
 // Progresso de uma disciplina: aulas que já aconteceram com conteúdo registrado e assuntos de prova revisados.
 // Aulas canceladas não contam. Sem grade nem assuntos, o progresso fica indefinido (null).

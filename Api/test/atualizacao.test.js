@@ -155,14 +155,14 @@ test('avisos: ponto de partida sem enxurrada, relíquia nova avisa uma vez, come
 
   const poster = await account('Autor Post');
   const reader = await account('Leitor Post');
-  const post = await request(app).post('/api/v1/community/posts').set(poster.auth).send({ category: 'Dúvida', title: 'Como estudar?', body: '' });
+  const post = await request(app).post('/api/v1/community/posts').set(poster.auth).send({ category: 'Sugestão', title: 'Como estudar?', body: '' });
   await request(app).get('/api/v1/notifications').set(poster.auth);
   await request(app).post(`/api/v1/community/posts/${post.body.id}/comments`).set(poster.auth).send({ body: 'Eu mesmo' });
   await request(app).post(`/api/v1/community/posts/${post.body.id}/comments`).set(reader.auth).send({ body: 'Com calma' });
   const inbox = await request(app).get('/api/v1/notifications').set(poster.auth);
   const comments = inbox.body.items.filter(item => item.kind === 'comunidade');
   assert.equal(comments.length, 1);
-  assert.deepEqual(comments[0].link, { page: 'comunidade', params: { id: post.body.id } });
+  assert.deepEqual(comments[0].link, { page: 'conselho', params: { id: post.body.id } });
 });
 
 test('atividade compartilhada: código de convite, status individual e acesso só de participantes', async () => {

@@ -79,7 +79,7 @@ test('foto de perfil: valida o arquivo e expõe só a versão no usuário', asyn
 test('quadro global: todos veem, só o autor altera e nada privado vaza', async () => {
   const ana = await account('Ana Beatriz Souza');
   const bia = await account('Bia Lima');
-  const created = await request(app).post('/api/v1/community/posts').set(ana.auth).send({ category: 'Dúvida', title: 'Como funciona o simulado?', body: 'Alguém já usou?' });
+  const created = await request(app).post('/api/v1/community/posts').set(ana.auth).send({ category: 'Sugestão', title: 'Como funciona o simulado?', body: 'Alguém já usou?' });
   assert.equal(created.status, 201);
   assert.equal(created.body.author.name, 'Ana S.');
   const seen = await request(app).get('/api/v1/community/posts').set(bia.auth);
@@ -87,7 +87,7 @@ test('quadro global: todos veem, só o autor altera e nada privado vaza', async 
   assert.ok(post);
   assert.equal(post.mine, false);
   assert.ok(!JSON.stringify(seen.body).includes('@grimiau.local'));
-  const hijack = await request(app).patch(`/api/v1/community/posts/${post.id}`).set(bia.auth).send({ category: 'Dúvida', title: 'Editado por outra', body: '' });
+  const hijack = await request(app).patch(`/api/v1/community/posts/${post.id}`).set(bia.auth).send({ category: 'Sugestão', title: 'Editado por outra', body: '' });
   assert.equal(hijack.status, 404);
   assert.equal((await request(app).delete(`/api/v1/community/posts/${post.id}`).set(bia.auth)).status, 404);
   const commented = await request(app).post(`/api/v1/community/posts/${post.id}/comments`).set(bia.auth).send({ body: 'Usei, é ótimo.' });
