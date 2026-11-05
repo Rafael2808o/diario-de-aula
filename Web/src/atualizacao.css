@@ -599,3 +599,100 @@
   .bottom-nav button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 @media (max-width: 359px) { .bottom-nav { padding-inline: 0; } .bottom-nav button { font-size: 10px; padding-inline: 0; } }
+
+/* ---------- Feed dos Migles (V3.0): diário visual noturno ----------
+   Única área com luz difusa e profundidade (pedido do redesign do Feed). O resto do app segue o padrão de bordas finas. */
+.page.feed { position: relative; isolation: isolate; --feed-lilac: #c9b6f2; --feed-rose: #e8b4cc; --feed-pearl: #f4eff9; --feed-night: #120d1f; --feed-card: #1a1329; --feed-line: rgba(201, 182, 242, 0.18); }
+:root[data-theme="light"] .page.feed { --feed-lilac: #6f52a0; --feed-rose: #a8466c; --feed-pearl: #2a1f3d; --feed-night: #f5f0fb; --feed-card: #ffffff; --feed-line: rgba(111, 82, 160, 0.2); }
+.feed-aura { position: absolute; inset: -40px -24px auto; height: 420px; z-index: -1; pointer-events: none; overflow: hidden;
+  background: radial-gradient(60% 70% at 18% 20%, rgba(141, 112, 184, 0.22), transparent 70%), radial-gradient(45% 60% at 85% 10%, rgba(232, 180, 204, 0.12), transparent 70%);
+  -webkit-mask-image: linear-gradient(#000 55%, transparent); mask-image: linear-gradient(#000 55%, transparent); }
+:root[data-theme="light"] .feed-aura { background: radial-gradient(60% 70% at 18% 20%, rgba(111, 82, 160, 0.12), transparent 70%), radial-gradient(45% 60% at 85% 10%, rgba(168, 70, 108, 0.07), transparent 70%); }
+.feed-aura i { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: var(--feed-pearl); opacity: 0.5;
+  left: calc(6% + var(--i) * 7.6%); top: calc(10% + var(--i) * 5%); }
+.feed-aura i:nth-child(odd) { top: calc(62% - var(--i) * 4%); }
+.feed-aura i:nth-child(3n) { background: var(--gold); width: 2px; height: 2px; }
+.feed-head h1 { font-family: var(--font-title); }
+.feed-head p { max-width: 46ch; }
+
+.feed-layout { display: grid; gap: 18px; align-items: start; }
+.feed-main { min-width: 0; }
+@media (min-width: 1100px) {
+  .feed-layout { grid-template-columns: minmax(0, 600px) 300px; justify-content: center; gap: 28px; }
+  .feed-side { order: 2; position: sticky; top: 84px; }
+}
+@media (min-width: 700px) and (max-width: 1099px) { .feed-layout { max-width: 620px; margin-inline: auto; } }
+
+/* Convite do Kantinho */
+.feed-invite { display: flex; gap: 14px; align-items: flex-start; padding: 16px; border-radius: 20px; background: linear-gradient(160deg, color-mix(in srgb, var(--feed-card) 92%, var(--feed-lilac)), var(--feed-card)); border: 1px solid var(--feed-line); box-shadow: 0 10px 30px -18px rgba(0, 0, 0, 0.6); }
+.feed-invite-text { display: grid; gap: 8px; min-width: 0; }
+.feed-invite h2 { margin: 0; font-family: var(--font-title); font-size: 17px; font-weight: 600; color: var(--feed-pearl); }
+.feed-invite-quote { margin: 0; font-family: "Cormorant Garamond", var(--font-title); font-style: italic; font-size: 19px; line-height: 1.3; color: var(--feed-lilac); overflow-wrap: anywhere; }
+.feed-xp { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: 13px; color: var(--text-3); }
+.feed-xp.is-open { color: var(--gold); font-weight: 600; }
+.feed-invite-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+@media (min-width: 1100px) { .feed-invite { flex-direction: column; align-items: center; text-align: center; padding: 22px 18px; } .feed-invite-actions { justify-content: center; } .feed-invite .kantinho { --kantinho-size: 110px !important; } }
+@media (max-width: 420px) { .feed-invite { padding: 14px 12px; gap: 10px; } .feed-invite .kantinho { --kantinho-size: 58px !important; } .feed-invite-actions .btn { flex: 1 1 auto; justify-content: center; } }
+.kantinho-card.is-modal { flex-direction: column; align-items: center; padding: 0; background: none; box-shadow: none; }
+
+/* Publicações */
+.feed-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 22px; }
+.feed-post { border-radius: 22px; background: var(--feed-card); border: 1px solid var(--feed-line); box-shadow: 0 14px 36px -24px rgba(0, 0, 0, 0.7); overflow: hidden; }
+.feed-post-head { display: flex; align-items: center; gap: 10px; padding: 12px 12px 10px 14px; }
+.feed-post-who { display: grid; flex: 1; min-width: 0; }
+.feed-post-who strong { font-size: 14.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feed-post-who small { font-size: 12px; color: var(--text-3); }
+.feed-post-expires { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 3px 8px; border-radius: 12px; font-size: 11.5px; color: var(--text-2); border: 1px solid var(--feed-line); }
+.feed-photo { position: relative; margin: 0 8px; border-radius: 14px; overflow: hidden; background: color-mix(in srgb, var(--feed-night) 80%, #000); max-height: 78vh; }
+.feed-photo img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.feed-photo-missing { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 8px; color: var(--text-3); font-size: 14px; text-align: center; padding: 16px; }
+.feed-heart-burst { position: absolute; left: 50%; top: 50%; font-size: 64px; transform: translate(-50%, -50%) scale(0); pointer-events: none; font-family: "Noto Color Emoji", sans-serif; }
+.feed-post-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 10px 12px 4px; }
+.feed-like, .feed-comment-toggle { display: inline-flex; align-items: center; gap: 5px; min-height: 40px; min-width: 44px; padding: 6px 10px; border-radius: 20px; background: transparent; border: 1px solid transparent; color: var(--text-2); font-size: 14px; }
+.feed-like span { font-size: 21px; line-height: 1; filter: grayscale(1) opacity(0.55); transition: filter 0.2s; font-family: "Noto Color Emoji", sans-serif; }
+.feed-like.active span { filter: none; }
+.feed-like:hover, .feed-comment-toggle:hover { background: var(--fill); }
+.feed-reactions { margin-left: auto; }
+.feed-reactions .reaction { min-height: 36px; padding: 4px 9px; }
+.feed-caption { display: grid; gap: 6px; padding: 4px 16px 6px; font-size: 14.5px; overflow-wrap: anywhere; white-space: pre-line; }
+.feed-caption p { margin: 0; }
+.feed-see-comments { margin: 0 16px 14px; font-size: 13.5px; color: var(--text-3); }
+.feed-comments { display: grid; gap: 10px; padding: 6px 14px 14px; }
+.feed-post > :last-child:not(.feed-comments):not(.feed-see-comments) { margin-bottom: 10px; }
+.feed-more { justify-self: center; display: block; margin: 18px auto 0; }
+@media (max-width: 420px) {
+  .feed-photo { margin: 0; border-radius: 0; }
+  .feed-post { border-radius: 18px; }
+  .feed-reactions { margin-left: 0; width: 100%; }
+}
+
+/* Estados */
+.feed-state { display: grid; justify-items: center; gap: 10px; padding: 36px 20px; text-align: center; border-radius: 22px; border: 1px dashed var(--feed-line); color: var(--text-2); }
+.feed-state strong { font-family: var(--font-title); font-size: 19px; color: var(--text); }
+.feed-state p { margin: 0; max-width: 36ch; }
+.feed-post.is-skeleton .feed-photo { background: var(--fill); }
+.skeleton-dot { width: 36px; height: 36px; border-radius: 50%; background: var(--fill); }
+.skeleton-line { width: 40%; height: 12px; border-radius: 6px; background: var(--fill); }
+
+/* Celebração ao publicar */
+.feed-celebrate { position: relative; display: grid; place-items: center; width: 180px; height: 180px; }
+.feed-celebrate i { position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); opacity: 0; }
+.feed-celebrate i:nth-child(even) { background: var(--feed-lilac); width: 6px; height: 6px; }
+.feed-posted-xp { margin: 0; font-weight: 700; color: var(--gold); }
+
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-motion="reduzido"]) .feed-aura i { animation: feed-glimmer 5s ease-in-out infinite; animation-delay: calc(var(--i) * -0.45s); }
+  :root:not([data-motion="reduzido"]) .feed-post:not(.is-skeleton) { animation: feed-rise 0.45s cubic-bezier(0.2, 0.7, 0.3, 1) both; animation-delay: var(--delay); }
+  :root:not([data-motion="reduzido"]) .feed-post.is-skeleton .feed-photo, :root:not([data-motion="reduzido"]) .skeleton-line, :root:not([data-motion="reduzido"]) .skeleton-dot { animation: feed-pulse 1.4s ease-in-out infinite; }
+  :root:not([data-motion="reduzido"]) .feed-heart-burst { animation: feed-heart 0.7s cubic-bezier(0.2, 0.8, 0.3, 1) forwards; }
+  :root:not([data-motion="reduzido"]) .reaction.is-popping span { display: inline-block; animation: feed-pop 0.4s cubic-bezier(0.3, 1.6, 0.5, 1); }
+  :root:not([data-motion="reduzido"]) .feed-like.active span { animation: feed-pop 0.4s cubic-bezier(0.3, 1.6, 0.5, 1); }
+  :root:not([data-motion="reduzido"]) .feed-celebrate i { animation: feed-spark 1.2s ease-out forwards; animation-delay: calc(var(--i) * 40ms); }
+  .feed-like:active, .feed-comment-toggle:active, .feed-post .reaction:active { transform: scale(0.94); }
+}
+@keyframes feed-glimmer { 0%, 100% { opacity: 0.15; transform: scale(0.6); } 50% { opacity: 0.8; transform: scale(1); } }
+@keyframes feed-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes feed-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+@keyframes feed-heart { 0% { transform: translate(-50%, -50%) scale(0); opacity: 0; } 30% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; } 70% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -60%) scale(0.9); opacity: 0; } }
+@keyframes feed-pop { 0% { transform: scale(1); } 45% { transform: scale(1.35); } 100% { transform: scale(1); } }
+@keyframes feed-spark { 0% { opacity: 1; transform: translate(-50%, -50%) rotate(calc(var(--i) * 36deg)) translateY(0); } 100% { opacity: 0; transform: translate(-50%, -50%) rotate(calc(var(--i) * 36deg)) translateY(-84px); } }
