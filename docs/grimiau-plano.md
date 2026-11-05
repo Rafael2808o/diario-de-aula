@@ -102,9 +102,14 @@ Backup antes desta etapa: branch Neon `backup-pre-v3master-20261104` (br-late-mo
   o site em segundo plano (vai no próximo APK).
 - [x] Etapa 2b — Auditoria de responsividade (`scratchpad/pw/audit.mjs`): 17 páginas × 8 tamanhos, centro de
   cada botão clicável, sem rolagem lateral. Corrigidos: área de toque dos links de texto, botão do estado vazio.
-- [ ] Etapa 3 — apresentação animada 3.0 (21 telas) e tutorial interativo
-- [ ] Etapa 4 — IA/questões, PDF das fotos dos slides, feriados, progressão do Ritual, relatório mensal
-- [ ] Etapa 5 — Comunidade (página principal, Conselho com status, Bate-papo 48 h, Comunicados, Resumos)
-- [ ] Etapa 6 — Feed (24 h, +200 XP, curtidas/comentários/reações, redesign), Mural de XP
-- [ ] Etapa 7 — Sala de Estudos (grupos, perfil acadêmico, link do documento, Kanban, lembretes, −300 XP, chamadas)
+- [x] Etapa 3 — apresentação animada 3.0 (21 telas, retoma de onde parou) e passeio guiado pelo Nox (8 etapas).
+  Textos das 21 telas escritos por mim (os da versão anterior não vieram no pedido). `stage3.mjs`: 44/44.
+- [x] Etapa 4 — IA/questões, PDF das fotos dos slides, feriados, progressão do Ritual, relatório mensal
+- [x] Etapa 5 — Comunidade (página principal, Conselho com status, Bate-papo 48 h, Comunicados, Resumos)
+- [x] Etapa 6 — Feed (24 h, +200 XP, curtidas/comentários/reações, redesign), Mural de XP
+- [x] Etapa 7 — Sala de Estudos (grupos, perfil acadêmico, link do documento, Kanban, lembretes, −300 XP, chamadas).
+  Chamada: WebRTC direto entre aparelhos, só STUN (sem TURN, algumas redes podem falhar); sinalização em memória
+  (supõe uma instância só no Render).
 - [ ] Etapa 8 — testes finais, APK 1.6.0 (permissão de câmera para chamadas)
+- Testes da API no Postgres (branch descartável do Neon, 05/11/2026): 42/42 depois de corrigir o filtro
+  "meus pedidos" do Conselho, que quebrava só no banco real.
