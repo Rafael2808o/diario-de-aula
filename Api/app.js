@@ -115,6 +115,8 @@ function cleanPreferences(value, current = {}) {
     presentationStep: input.presentationStep !== undefined ? Math.max(0, Math.min(40, Number.parseInt(input.presentationStep, 10) || 0)) : current.presentationStep || 0,
     tutorialDone: input.tutorialDone !== undefined ? input.tutorialDone === true : current.tutorialDone === true,
     tutorialDismissed: input.tutorialDismissed !== undefined ? input.tutorialDismissed === true : current.tutorialDismissed === true,
+    // Convite do passeio guiado: só contas criadas a partir da 3.0 (marcado ao terminar o cadastro).
+    tutorialInvite: input.tutorialInvite !== undefined ? input.tutorialInvite === true : current.tutorialInvite === true,
     // Feriados: dias sem aula a mais (locais, recesso) e feriados em que houve aula normal.
     extraHolidays: input.extraHolidays !== undefined ? cleanHolidays(input.extraHolidays) : current.extraHolidays || [],
     holidaysOff: input.holidaysOff !== undefined ? [...new Set((Array.isArray(input.holidaysOff) ? input.holidaysOff : []).filter(isDate))].slice(0, 80) : current.holidaysOff || [],

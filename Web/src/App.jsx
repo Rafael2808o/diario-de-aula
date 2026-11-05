@@ -17,6 +17,8 @@ import RecordingBar from "./components/RecordingBar.jsx";
 import NotificationBell, { useNotifications } from "./components/NotificationBell.jsx";
 import Sky from "./components/Sky.jsx";
 import Celebrations, { useCelebrations } from "./components/Celebrate.jsx";
+import Presentation, { presentationVersion } from "./components/Presentation.jsx";
+import Tour, { TourInvite } from "./components/Tour.jsx";
 import Auth from "./pages/Auth.jsx";
 import Calendar from "./pages/Calendar.jsx";
 import Cards from "./pages/Cards.jsx";
@@ -166,6 +168,15 @@ function TranscriptionChip() {
 function Shell({ session, setSession }) {
   const toast = useToast();
   const [location, setLocation] = useState(readLocation);
+  // Apresentação da 3.0, convite e passeio guiado (o passeio também abre por Configurações).
+  const [guide, setGuide] = useState("");
+  const [presentationClosed, setPresentationClosed] = useState(false);
+  const [inviteClosed, setInviteClosed] = useState(false);
+  useEffect(() => {
+    const start = () => setGuide("tour");
+    window.addEventListener("grimiau:tour", start);
+    return () => window.removeEventListener("grimiau:tour", start);
+  }, []);
   const expire = useCallback(() => {
     history.replaceState({}, "", "/");
     storeSession(null);
@@ -315,6 +326,20 @@ function Shell({ session, setSession }) {
         </nav>
         {ready && <Ritual />}
         <Celebrations state={celebrations} />
+        {ready && guide !== "tour" && !presentationClosed && session.user.preferences?.presentationSeen !== presentationVersion && <Presentation onDone={() => setPresentationClosed(true)} />}
+        {ready && guide === "tour" && <Tour onClose={() => setGuide("")} />}
+        {ready && guide !== "tour" && !inviteClosed && session.user.preferences?.presentationSeen === presentationVersion && session.user.preferences?.tutorialInvite && !session.user.preferences?.tutorialDone && !session.user.preferences?.tutorialDismissed && (
+          <TourInvite
+            onStart={() => {
+              setInviteClosed(true);
+              setGuide("tour");
+            }}
+            onDismiss={() => {
+              setInviteClosed(true);
+              academic.call("/me", { method: "PATCH", body: { preferences: { tutorialDismissed: true, tutorialInvite: false } } }).then(setUser).catch(() => {});
+            }}
+          />
+        )}
         <PwaPrompt />
       </div>
     </AppContext.Provider>

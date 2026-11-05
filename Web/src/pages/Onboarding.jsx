@@ -22,7 +22,8 @@ export default function Onboarding() {
   const advance = async (next, finished = false) => {
     const problem = validProfile(draft);
     if (problem) return setError(problem);
-    const saved = await submit({ ...draft, ...(finished ? { onboardingDone: true } : {}) });
+    // Conta nova já começa na 3.0: em vez da apresentação das novidades, recebe o convite do passeio guiado.
+    const saved = await submit({ ...draft, ...(finished ? { onboardingDone: true, preferences: { ...(draft.preferences || {}), presentationSeen: "3.0", announcementSeen: "3.0.0", tutorialInvite: true } } : {}) });
     if (!saved) return;
     setUser(saved);
     if (!finished) setStep(next);

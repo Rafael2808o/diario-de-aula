@@ -802,3 +802,79 @@
 .call-tile video.is-hidden { visibility: hidden; }
 .call-name { position: absolute; left: 6px; bottom: 6px; display: inline-flex; align-items: center; gap: 4px; max-width: calc(100% - 12px); padding: 2px 8px; border-radius: 8px; font-size: 12px; background: rgba(0, 0, 0, 0.55); color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .call-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ---------- Apresentação da V3.0 (tela cheia) ---------- */
+.presentation { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; overflow-y: auto; padding: 56px 20px calc(24px + env(safe-area-inset-bottom));
+  background: radial-gradient(80% 60% at 50% 0%, #3a2463 0%, transparent 70%), radial-gradient(60% 50% at 85% 100%, #2a1a4a 0%, transparent 70%), #120b1f; color: #f4eff9; outline: none; }
+.pres-stars { position: fixed; inset: 0; pointer-events: none; }
+.pres-stars i { position: absolute; width: 2px; height: 2px; border-radius: 50%; background: #fff; opacity: 0.5; }
+.pres-stars i:nth-child(4n) { width: 3px; height: 3px; background: #e5c77b; }
+.pres-close { position: fixed; top: calc(12px + env(safe-area-inset-top)); right: 12px; z-index: 2; color: #f4eff9; }
+.pres-screen { position: relative; width: min(560px, 100%); --tone: #c9b6f2; }
+.pres-screen.tone-rose { --tone: #e8b4cc; }
+.pres-screen.tone-gold { --tone: #e5c77b; }
+.pres-screen.tone-sage { --tone: #a9d4b2; }
+.pres-screen.tone-sky { --tone: #9ccbea; }
+.pres-content { display: grid; justify-items: center; gap: 14px; text-align: center; }
+.pres-art { position: relative; width: min(220px, 52vw); aspect-ratio: 1; color: var(--tone); }
+.pres-constellation { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.45; }
+.pres-portal { position: absolute; inset: 14%; display: grid; place-items: center; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--tone) 55%, transparent);
+  background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--tone) 22%, transparent), transparent 70%); box-shadow: 0 0 60px -10px color-mix(in srgb, var(--tone) 45%, transparent); }
+.pres-art.is-card .pres-portal { border-radius: 16px; inset: 10% 24%; }
+.pres-art.is-polaroid .pres-portal { border-radius: 6px; inset: 14% 20% 20%; background: #f4eff9; color: #2a1f3d; box-shadow: 0 16px 40px -18px #000; transform: rotate(-4deg); }
+.pres-portal svg.art { max-width: 92%; height: auto; }
+.pres-kantinho { width: 78%; height: auto; }
+.pres-orbit { position: absolute; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--tone) 40%, transparent); background: #1d1430; color: var(--tone); }
+.pres-orbit.o0 { top: 4%; right: 2%; }
+.pres-orbit.o1 { bottom: 6%; left: 0; }
+.pres-kicker { margin: 4px 0 0; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--tone); }
+.presentation h1 { margin: 0; font-family: var(--font-title); font-size: clamp(26px, 6vw, 36px); font-weight: 600; line-height: 1.15; color: #fff; }
+.presentation h1.pres-brand { font-family: var(--font-display); letter-spacing: 0.08em; color: #e5c77b; }
+.pres-lead { margin: 0; font-size: 19px; font-weight: 600; }
+.pres-text { margin: 0; max-width: 46ch; font-size: 16px; line-height: 1.6; color: #d9cfe8; }
+.pres-progress { width: min(320px, 80%); height: 4px; border-radius: 4px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+.pres-progress span { display: block; height: 100%; background: var(--tone); transition: width 0.4s ease; }
+.pres-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 6px; }
+.presentation .btn.ghost { color: #f4eff9; }
+.pres-next { min-width: 200px; justify-content: center; }
+@media (max-height: 640px) { .pres-art { width: min(150px, 40vw); } .pres-text { font-size: 15px; } }
+
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-motion="reduzido"]) .presentation { animation: pres-fade 0.5s ease both; }
+  :root:not([data-motion="reduzido"]) .pres-stars i { animation: pres-twinkle 4s ease-in-out infinite; animation-delay: calc(var(--i) * -0.37s); }
+  :root:not([data-motion="reduzido"]) .pres-screen .pres-art { animation: pres-pop 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) 0.1s both; }
+  :root:not([data-motion="reduzido"]) .pres-screen .pres-portal { animation: pres-float 5s ease-in-out 0.7s infinite; }
+  :root:not([data-motion="reduzido"]) .pres-screen h1 { animation: pres-reveal 0.6s ease 0.25s both; }
+  :root:not([data-motion="reduzido"]) .pres-screen .pres-kicker, :root:not([data-motion="reduzido"]) .pres-screen .pres-lead { animation: pres-rise 0.5s ease 0.2s both; }
+  :root:not([data-motion="reduzido"]) .pres-screen .pres-text { animation: pres-rise 0.5s ease 0.4s both; }
+  :root:not([data-motion="reduzido"]) .pres-screen .pres-actions, :root:not([data-motion="reduzido"]) .pres-screen .pres-progress { animation: pres-rise 0.4s ease 0.55s both; }
+  :root:not([data-motion="reduzido"]) .pres-orbit { animation: pres-float 4s ease-in-out infinite; }
+  :root:not([data-motion="reduzido"]) .pres-orbit.o1 { animation-delay: -2s; }
+}
+@keyframes pres-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pres-twinkle { 0%, 100% { opacity: 0.15; } 50% { opacity: 0.9; } }
+@keyframes pres-pop { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: none; } }
+@keyframes pres-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes pres-reveal { from { opacity: 0; letter-spacing: 0.2em; filter: blur(4px); } to { opacity: 1; filter: none; } }
+@keyframes pres-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* ---------- Passeio guiado ---------- */
+.tour { position: fixed; inset: 0; z-index: 190; }
+.tour-dim { position: fixed; inset: 0; background: rgba(8, 5, 14, 0.62); }
+.tour-spot { position: fixed; border-radius: 14px; box-shadow: 0 0 0 9999px rgba(8, 5, 14, 0.62); outline: 2px solid var(--gold); outline-offset: 0; pointer-events: none; transition: top 0.25s ease, left 0.25s ease, width 0.25s ease, height 0.25s ease; }
+.tour-bubble { position: fixed; z-index: 1; display: flex; gap: 10px; align-items: flex-start; width: min(380px, calc(100vw - 32px)); padding: 14px; border-radius: 16px; background: var(--surface); border: 1px solid color-mix(in srgb, var(--gold) 45%, var(--card-line)); color: var(--text); box-shadow: 0 18px 40px -16px rgba(0, 0, 0, 0.7); }
+.tour-nox { flex: none; }
+.tour-body { display: grid; gap: 8px; min-width: 0; }
+.tour-body p { margin: 0; font-size: 14.5px; line-height: 1.5; }
+.tour-stage { font-size: 12px !important; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); }
+.tour-points { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 4px; }
+.tour-points li { padding: 2px 8px; border-radius: 10px; font-size: 12px; background: var(--fill); color: var(--text-2); }
+.tour-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tour-invite { position: fixed; z-index: 150; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); display: flex; gap: 12px; align-items: flex-start; width: min(400px, calc(100vw - 32px)); padding: 16px; border-radius: 18px; background: var(--surface); border: 1px solid color-mix(in srgb, var(--gold) 45%, var(--card-line)); box-shadow: 0 18px 40px -16px rgba(0, 0, 0, 0.7); }
+.tour-invite p { margin: 0 0 6px; font-size: 14.5px; }
+.tour-invite-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+@media (max-width: 900px) { .tour-invite { bottom: calc(80px + env(safe-area-inset-bottom)); right: 16px; left: 16px; width: auto; } }
+@media (max-width: 420px) { .tour-nox { width: 48px; height: 48px; } .tour-invite svg.art { width: 60px; height: 60px; } }
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-motion="reduzido"]) .tour-bubble, :root:not([data-motion="reduzido"]) .tour-invite { animation: pres-rise 0.3s ease both; }
+}

@@ -558,6 +558,11 @@ export default function Settings() {
         <section id="sobre">
           <h2 className="section-title">Novidades da Grimiau</h2>
           <AnnouncementHistory />
+          <div className="group form-group">
+            <button type="button" className="btn soft" onClick={() => window.dispatchEvent(new Event("grimiau:tour"))}>
+              Tutorial do Grimiau
+            </button>
+          </div>
         </section>
 
         <section id="privacidade">

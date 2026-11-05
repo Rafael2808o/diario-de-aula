@@ -545,7 +545,7 @@ export default function Shared() {
         } catch {
           skipped = false;
         }
-        if (!result.done && !skipped && !params.codigo) setModal((current) => current || { type: "profile" });
+        if (!result.done && !skipped && !params.codigo && !window.__grimiauTour) setModal((current) => current || { type: "profile" });
       })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
