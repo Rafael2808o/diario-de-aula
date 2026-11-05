@@ -13,7 +13,7 @@ export const memberStatuses = ['Pendente', 'Em andamento', 'Concluída'];
 const codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 let ready;
-function initShared() {
+export function initShared() {
   ready ||= (async () => {
     await initStore();
     if (!pool) return;
@@ -30,7 +30,10 @@ function initShared() {
         status TEXT NOT NULL DEFAULT 'Pendente', removed BOOLEAN DEFAULT FALSE,
         joined_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW(),
         PRIMARY KEY (activity_id, user_id));
-      CREATE INDEX IF NOT EXISTS shared_members_user_idx ON shared_members(user_id)`);
+      CREATE INDEX IF NOT EXISTS shared_members_user_idx ON shared_members(user_id);
+      ALTER TABLE shared_activities ADD COLUMN IF NOT EXISTS doc_url TEXT NOT NULL DEFAULT '';
+      ALTER TABLE shared_activities ADD COLUMN IF NOT EXISTS team_size INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE shared_activities ADD COLUMN IF NOT EXISTS agency BOOLEAN NOT NULL DEFAULT FALSE`);
   })().catch(error => {
     ready = null;
     throw error;
@@ -52,18 +55,19 @@ function activityInput(body) {
   if (title.length < 2) return { error: 'Dê um nome para a atividade.' };
   if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return { error: 'Use uma data válida para o prazo.' };
   if (dueTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(dueTime)) return { error: 'Use um horário válido.' };
-  return { activity: { title, description: clean(body?.description, 4000), subjectName: oneLine(body?.subjectName, 100), dueDate, dueTime, materials: clean(body?.materials, 2000) } };
+  const teamSize = Math.max(0, Math.min(30, Number.parseInt(body?.teamSize, 10) || 0));
+  return { activity: { title, description: clean(body?.description, 4000), subjectName: oneLine(body?.subjectName, 100), dueDate, dueTime, materials: clean(body?.materials, 2000), teamSize, agency: body?.agency === true } };
 }
 
 async function activityRow(id) {
   if (pool) {
     return (await pool.query(`SELECT id, owner_id AS "ownerId", title, description, subject_name AS "subjectName", due_date AS "dueDate", due_time AS "dueTime",
-      materials, invite_code AS "inviteCode", closed, updated_at AS "updatedAt" FROM shared_activities WHERE id=$1`, [id])).rows[0];
+      materials, invite_code AS "inviteCode", closed, updated_at AS "updatedAt", doc_url AS "docUrl", team_size AS "teamSize", agency FROM shared_activities WHERE id=$1`, [id])).rows[0];
   }
   return memoryActivities().find(item => item.id === id);
 }
 
-async function membersOf(activityId) {
+export async function membersOf(activityId) {
   if (pool) {
     return (await pool.query(`SELECT m.user_id AS "userId", m.status, m.removed, m.updated_at AS "updatedAt", u.name, u.avatar_version AS "avatarVersion"
       FROM shared_members m JOIN users u ON u.id=m.user_id WHERE m.activity_id=$1 ORDER BY m.joined_at`, [activityId])).rows;
@@ -72,7 +76,7 @@ async function membersOf(activityId) {
 }
 
 // Devolve a atividade só para quem participa (ou é dono); senão, null.
-async function visibleActivity(activityId, userId) {
+export async function visibleActivity(activityId, userId) {
   const activity = await activityRow(activityId);
   if (!activity) return null;
   const members = await membersOf(activityId);
@@ -81,7 +85,7 @@ async function visibleActivity(activityId, userId) {
   return { activity, members, me };
 }
 
-const present = ({ activity, members }, userId) => ({
+export const present = ({ activity, members }, userId) => ({
   id: activity.id,
   title: activity.title,
   description: activity.description,
@@ -90,6 +94,9 @@ const present = ({ activity, members }, userId) => ({
   dueTime: activity.dueTime,
   materials: activity.materials,
   closed: Boolean(activity.closed),
+  docUrl: activity.docUrl || '',
+  teamSize: Number(activity.teamSize) || 0,
+  agency: Boolean(activity.agency),
   owner: activity.ownerId === userId,
   inviteCode: activity.ownerId === userId ? activity.inviteCode : undefined,
   members: members
@@ -97,7 +104,7 @@ const present = ({ activity, members }, userId) => ({
     .map(member => ({ id: member.userId, name: publicName(member.name), avatarVersion: member.avatarVersion || '', status: member.status, owner: member.userId === activity.ownerId, me: member.userId === userId }))
 });
 
-async function listForUser(userId) {
+export async function listForUser(userId) {
   const ids = pool
     ? (await pool.query('SELECT activity_id AS id FROM shared_members WHERE user_id=$1 AND NOT removed', [userId])).rows.map(row => row.id)
     : memoryMembers().filter(item => item.userId === userId && !item.removed).map(item => item.activityId);
@@ -120,7 +127,7 @@ async function setMember(activityId, userId, changes) {
 }
 
 // Avisa os outros participantes ativos.
-async function notifyOthers(found, exceptUserId, message) {
+export async function notifyOthers(found, exceptUserId, message) {
   for (const member of found.members) {
     if (member.removed || member.userId === exceptUserId) continue;
     await notify(member.userId, { ...message, link: { page: 'compartilhadas', params: { id: found.activity.id } } });
@@ -161,8 +168,8 @@ export function registerSharedRoutes(app, requireAuth) {
       const code = newCode();
       try {
         if (pool) {
-          await pool.query(`INSERT INTO shared_activities (id,owner_id,title,description,subject_name,due_date,due_time,materials,invite_code) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-            [id, req.user.id, activity.title, activity.description, activity.subjectName, activity.dueDate, activity.dueTime, activity.materials, code]);
+          await pool.query(`INSERT INTO shared_activities (id,owner_id,title,description,subject_name,due_date,due_time,materials,invite_code,team_size,agency) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+            [id, req.user.id, activity.title, activity.description, activity.subjectName, activity.dueDate, activity.dueTime, activity.materials, code, activity.teamSize, activity.agency]);
           await pool.query('INSERT INTO shared_members (activity_id,user_id) VALUES ($1,$2)', [id, req.user.id]);
         } else {
           if (memoryActivities().some(item => item.inviteCode === code)) throw Object.assign(new Error('conflict'), { code: '23505' });
@@ -185,8 +192,8 @@ export function registerSharedRoutes(app, requireAuth) {
     if (error) return res.status(400).json({ error });
     const changedDue = activity.dueDate !== found.activity.dueDate || activity.dueTime !== found.activity.dueTime;
     if (pool) {
-      await pool.query('UPDATE shared_activities SET title=$2, description=$3, subject_name=$4, due_date=$5, due_time=$6, materials=$7, updated_at=NOW() WHERE id=$1',
-        [found.activity.id, activity.title, activity.description, activity.subjectName, activity.dueDate, activity.dueTime, activity.materials]);
+      await pool.query('UPDATE shared_activities SET title=$2, description=$3, subject_name=$4, due_date=$5, due_time=$6, materials=$7, team_size=$8, agency=$9, updated_at=NOW() WHERE id=$1',
+        [found.activity.id, activity.title, activity.description, activity.subjectName, activity.dueDate, activity.dueTime, activity.materials, activity.teamSize, activity.agency]);
     } else Object.assign(found.activity, activity, { updatedAt: new Date() });
     const stamp = Date.now().toString(36);
     await notifyOthers(found, req.user.id, {

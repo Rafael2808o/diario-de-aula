@@ -66,7 +66,7 @@ const extraPages = [
   { id: "configuracoes", label: "Configurações", title: "Configurações", icon: SettingsIcon, page: Settings },
   { id: "historico", label: "Histórico de estudos", title: "Histórico de estudos", page: History },
   { id: "lua", label: "Fases da Lua", title: "Fases da Lua — seu mood de estudante", icon: MoonIcon, page: Moon },
-  { id: "compartilhadas", label: "Atividades compartilhadas", title: "Atividades compartilhadas", icon: Users, page: Shared },
+  { id: "compartilhadas", label: "Sala de Estudos", title: "Sala de Estudos", icon: Users, page: Shared },
   { id: "historico-xp", label: "Histórico de XP", title: "Histórico de XP", icon: ScrollText, page: XpHistory },
   { id: "relatorio", label: "Relatório mensal", title: "Relatório mensal de estudos", icon: ChartColumn, page: Report },
   { id: "caderno", label: "Caderno da aula", title: "Caderno da aula", icon: NotebookText, page: Notebook },

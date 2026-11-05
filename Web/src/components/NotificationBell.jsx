@@ -168,7 +168,7 @@ export default function NotificationBell() {
               })}
             </ul>
           ) : (
-            <p className="bell-empty">{notifications.ready ? "Nenhum aviso por aqui. Relíquias novas, comentários nas suas publicações e atividades compartilhadas aparecem neste sino." : "Carregando avisos…"}</p>
+            <p className="bell-empty">{notifications.ready ? "Nenhum aviso por aqui. Relíquias novas, comentários nas suas publicações e trabalhos da Sala de Estudos aparecem neste sino." : "Carregando avisos…"}</p>
           )}
           {notifications.items.some((item) => item.read) && (
             <footer>

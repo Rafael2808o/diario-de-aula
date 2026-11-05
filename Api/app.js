@@ -35,6 +35,7 @@ import { registerRankingRoutes } from './ranking.js';
 import { registerLunarRoutes } from './lunar.js';
 import { registerNotificationRoutes } from './notifications.js';
 import { registerSharedRoutes } from './shared.js';
+import { registerSalaRoutes } from './sala.js';
 import { registerPresenceRoutes } from './presence.js';
 import { registerFeedRoutes } from './feed.js';
 import { registerXpRoutes } from './xp.js';
@@ -680,6 +681,7 @@ registerRankingRoutes(app, requireAuth);
 registerLunarRoutes(app, requireAuth);
 registerNotificationRoutes(app, requireAuth);
 registerSharedRoutes(app, requireAuth);
+registerSalaRoutes(app, requireAuth);
 
 app.get('/api/v1/integrations/spotify/status', (_req, res) =>
   res.json({

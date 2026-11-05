@@ -716,3 +716,89 @@
 .xp-rules li { display: flex; justify-content: space-between; gap: 10px; }
 .xp-rules li strong { color: var(--gold); white-space: nowrap; }
 .xp-rules li strong.is-negative { color: var(--danger); }
+
+/* ---------- Sala de Estudos (V3.0) ---------- */
+.sala-profile-link { margin: -6px 0 14px; }
+.sala-list { list-style: none; margin: 0 0 18px; padding: 0; display: grid; gap: 8px; }
+.sala-row { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto 120px auto; gap: 14px; align-items: center; text-align: left; padding: 14px 16px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--card-line); color: var(--text); }
+.sala-row:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--card-line)); }
+.sala-row-main { display: grid; gap: 3px; min-width: 0; }
+.sala-row-main strong { font-size: 15.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sala-row-main small { color: var(--text-3); font-size: 13px; }
+.sala-row-people { display: inline-flex; align-items: center; }
+.sala-row-people .avatar-img { margin-left: -6px; box-shadow: 0 0 0 2px var(--surface); }
+.sala-row-people .avatar-img:first-child { margin-left: 0; }
+.sala-row-people small { margin-left: 6px; color: var(--text-3); font-size: 12px; }
+.sala-row-progress { display: flex; align-items: center; gap: 8px; }
+.sala-row-progress .xp-track { flex: 1; }
+.sala-row-progress small { font-size: 12px; color: var(--text-2); min-width: 32px; text-align: right; }
+.sala-status { padding: 2px 9px; border-radius: 6px; font-size: 12px; font-weight: 600; background: var(--accent-soft); color: var(--link); white-space: nowrap; }
+.sala-status.status-concluído { background: var(--success-soft); color: var(--success); }
+.sala-status.status-atrasado { background: var(--danger-soft); color: var(--danger); }
+.sala-status.status-encerrado { background: var(--fill); color: var(--text-3); }
+@media (max-width: 700px) {
+  .sala-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "main status" "people progress"; row-gap: 10px; }
+  .sala-row-main { grid-area: main; }
+  .sala-status { grid-area: status; justify-self: end; }
+  .sala-row-people { grid-area: people; }
+  .sala-row-progress { grid-area: progress; min-width: 120px; }
+}
+.sala-detail { display: grid; gap: 20px; }
+.sala-detail .page-head p { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sala-description { margin: -8px 0 0; }
+.sala-doc { display: grid; gap: 10px; padding: 16px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--card-line); }
+.sala-doc .section-title { display: flex; align-items: center; gap: 6px; margin: 0; }
+.sala-doc-link { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.sala-doc-host { font-size: 13px; color: var(--text-3); overflow-wrap: anywhere; }
+.sala-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 900px) { .sala-columns { grid-template-columns: minmax(0, 1fr); } }
+.sala-members, .sala-call { display: grid; gap: 12px; padding: 16px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--card-line); min-width: 0; }
+.sala-members .section-head, .sala-call .section-head, .sala-board .section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.sala-members .section-title, .sala-call .section-title, .sala-board .section-title { margin: 0; }
+.sala-add { display: grid; gap: 10px; }
+.sala-footer { padding-top: 8px; border-top: 1px solid var(--separator); }
+.sala-draw, .sala-agency { display: grid; gap: 10px; }
+
+/* Pessoas */
+.people-picker { display: grid; gap: 8px; }
+.people-results { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.person-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 4px 10px 4px 4px; border-radius: 20px; border: 1px solid var(--card-line); background: transparent; color: var(--text); font-size: 14px; }
+.person-chip.active { border-color: var(--accent); background: var(--accent-soft); }
+.people-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.people-list li { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.people-list li > span { flex: 1; min-width: 0; }
+.people-list .check { display: flex; align-items: center; gap: 10px; }
+
+/* Quadro de tarefas */
+.sala-board { display: grid; gap: 12px; }
+.board-switch { display: none; }
+.board-columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.board-column { display: grid; gap: 8px; padding: 12px; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--card-line); min-width: 0; }
+.board-column h3 { display: flex; align-items: center; justify-content: space-between; margin: 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-2); }
+.board-column h3 small { font-weight: 600; color: var(--text-3); }
+.board-column ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.board-empty { margin: 0; font-size: 13px; }
+.task-card { display: grid; gap: 6px; padding: 10px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--card-line); min-width: 0; }
+.task-card.is-late { border-color: color-mix(in srgb, var(--danger) 60%, var(--card-line)); }
+.task-card strong { font-size: 14.5px; overflow-wrap: anywhere; }
+.task-card p { margin: 0; font-size: 13px; color: var(--text-2); overflow-wrap: anywhere; }
+.task-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; font-size: 12.5px; color: var(--text-3); }
+.task-assignee { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); }
+.task-late { color: var(--danger); font-weight: 600; }
+.task-actions { display: flex; align-items: center; gap: 2px; }
+@media (max-width: 760px) {
+  .board-switch { display: block; }
+  .board-columns { grid-template-columns: minmax(0, 1fr); }
+  .board-column:not(.is-current) { display: none; }
+}
+
+/* Chamada */
+.call-idle { display: grid; gap: 10px; justify-items: start; }
+.call-live { color: var(--success); font-weight: 600; }
+.call-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 8px; }
+.call-tile { position: relative; display: grid; place-items: center; aspect-ratio: 4 / 3; border-radius: 12px; overflow: hidden; background: color-mix(in srgb, var(--surface-2) 70%, #000); }
+.call-tile video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.call-tile.is-me video { transform: scaleX(-1); }
+.call-tile video.is-hidden { visibility: hidden; }
+.call-name { position: absolute; left: 6px; bottom: 6px; display: inline-flex; align-items: center; gap: 4px; max-width: calc(100% - 12px); padding: 2px 8px; border-radius: 8px; font-size: 12px; background: rgba(0, 0, 0, 0.55); color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.call-controls { display: flex; flex-wrap: wrap; gap: 8px; }
