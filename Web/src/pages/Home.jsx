@@ -9,6 +9,7 @@ import { ExamForm, TaskForm } from "../components/forms.jsx";
 import { LessonForm, saveLesson } from "../components/LessonForm.jsx";
 import { AnnouncementBanner } from "../components/Announcements.jsx";
 import Horoscope from "../components/Horoscope.jsx";
+import XpMural from "../components/XpMural.jsx";
 
 // Linha de agenda usada no Início e no Calendário. Tipo sempre aparece em texto e ícone, não só pela cor.
 export function AgendaRow({ item, onOpen, showDate = false }) {
@@ -426,6 +427,7 @@ export default function Home() {
             </div>
           </section>
           <Horoscope />
+          <XpMural />
         </aside>
       </div>
 

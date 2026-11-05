@@ -602,9 +602,9 @@
 
 /* ---------- Feed dos Migles (V3.0): diário visual noturno ----------
    Única área com luz difusa e profundidade (pedido do redesign do Feed). O resto do app segue o padrão de bordas finas. */
-.page.feed { position: relative; isolation: isolate; --feed-lilac: #c9b6f2; --feed-rose: #e8b4cc; --feed-pearl: #f4eff9; --feed-night: #120d1f; --feed-card: #1a1329; --feed-line: rgba(201, 182, 242, 0.18); }
+.page.feed { position: relative; --feed-lilac: #c9b6f2; --feed-rose: #e8b4cc; --feed-pearl: #f4eff9; --feed-night: #120d1f; --feed-card: #1a1329; --feed-line: rgba(201, 182, 242, 0.18); }
 :root[data-theme="light"] .page.feed { --feed-lilac: #6f52a0; --feed-rose: #a8466c; --feed-pearl: #2a1f3d; --feed-night: #f5f0fb; --feed-card: #ffffff; --feed-line: rgba(111, 82, 160, 0.2); }
-.feed-aura { position: absolute; inset: -40px -24px auto; height: 420px; z-index: -1; pointer-events: none; overflow: hidden;
+.feed-aura { position: absolute; inset: -40px -24px auto; height: 420px; z-index: 0; pointer-events: none; overflow: hidden;
   background: radial-gradient(60% 70% at 18% 20%, rgba(141, 112, 184, 0.22), transparent 70%), radial-gradient(45% 60% at 85% 10%, rgba(232, 180, 204, 0.12), transparent 70%);
   -webkit-mask-image: linear-gradient(#000 55%, transparent); mask-image: linear-gradient(#000 55%, transparent); }
 :root[data-theme="light"] .feed-aura { background: radial-gradient(60% 70% at 18% 20%, rgba(111, 82, 160, 0.12), transparent 70%), radial-gradient(45% 60% at 85% 10%, rgba(168, 70, 108, 0.07), transparent 70%); }
@@ -615,7 +615,8 @@
 .feed-head h1 { font-family: var(--font-title); }
 .feed-head p { max-width: 46ch; }
 
-.feed-layout { display: grid; gap: 18px; align-items: start; }
+.feed-layout { position: relative; display: grid; gap: 18px; align-items: start; }
+.feed-head { position: relative; }
 .feed-main { min-width: 0; }
 @media (min-width: 1100px) {
   .feed-layout { grid-template-columns: minmax(0, 600px) 300px; justify-content: center; gap: 28px; }
@@ -643,7 +644,7 @@
 .feed-post-who strong { font-size: 14.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .feed-post-who small { font-size: 12px; color: var(--text-3); }
 .feed-post-expires { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 3px 8px; border-radius: 12px; font-size: 11.5px; color: var(--text-2); border: 1px solid var(--feed-line); }
-.feed-photo { position: relative; margin: 0 8px; border-radius: 14px; overflow: hidden; background: color-mix(in srgb, var(--feed-night) 80%, #000); max-height: 78vh; }
+.feed-photo { position: relative; margin: 0 auto; max-width: calc(100% - 16px); border-radius: 14px; overflow: hidden; background: color-mix(in srgb, var(--feed-night) 80%, #000); max-height: 78vh; }
 .feed-photo img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .feed-photo-missing { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 8px; color: var(--text-3); font-size: 14px; text-align: center; padding: 16px; }
 .feed-heart-burst { position: absolute; left: 50%; top: 50%; font-size: 64px; transform: translate(-50%, -50%) scale(0); pointer-events: none; font-family: "Noto Color Emoji", sans-serif; }
@@ -661,7 +662,7 @@
 .feed-post > :last-child:not(.feed-comments):not(.feed-see-comments) { margin-bottom: 10px; }
 .feed-more { justify-self: center; display: block; margin: 18px auto 0; }
 @media (max-width: 420px) {
-  .feed-photo { margin: 0; border-radius: 0; }
+  .feed-photo { max-width: 100%; border-radius: 0; }
   .feed-post { border-radius: 18px; }
   .feed-reactions { margin-left: 0; width: 100%; }
 }
@@ -696,3 +697,22 @@
 @keyframes feed-heart { 0% { transform: translate(-50%, -50%) scale(0); opacity: 0; } 30% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; } 70% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -60%) scale(0.9); opacity: 0; } }
 @keyframes feed-pop { 0% { transform: scale(1); } 45% { transform: scale(1.35); } 100% { transform: scale(1); } }
 @keyframes feed-spark { 0% { opacity: 1; transform: translate(-50%, -50%) rotate(calc(var(--i) * 36deg)) translateY(0); } 100% { opacity: 0; transform: translate(-50%, -50%) rotate(calc(var(--i) * 36deg)) translateY(-84px); } }
+
+/* Mural de XP (Início) */
+.xp-mural { display: grid; gap: 10px; padding: 16px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--card-line); min-width: 0; }
+.xp-mural h2 { display: flex; align-items: center; gap: 6px; margin: 0; font-family: var(--font-title); font-size: 18px; font-weight: 600; }
+.xp-mural h2 svg { color: var(--gold); }
+.xp-mural > ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.xp-mural-item { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; }
+.xp-mural-body { display: grid; gap: 4px; min-width: 0; }
+.xp-mural-body p { margin: 0; font-size: 14px; overflow-wrap: anywhere; }
+.xp-mural-body > small { font-size: 12px; color: var(--text-3); }
+.xp-mural-reactions { display: flex; flex-wrap: wrap; gap: 4px; }
+.xp-mural-reactions .reaction { min-height: 30px; padding: 2px 8px; font-size: 13px; }
+.xp-rules summary { display: flex; align-items: center; gap: 4px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--link); list-style: none; }
+.xp-rules summary::-webkit-details-marker { display: none; }
+.xp-rules[open] summary svg { transform: rotate(180deg); }
+.xp-rules ul { list-style: none; margin: 10px 0 6px; padding: 0; display: grid; gap: 6px; font-size: 13.5px; }
+.xp-rules li { display: flex; justify-content: space-between; gap: 10px; }
+.xp-rules li strong { color: var(--gold); white-space: nowrap; }
+.xp-rules li strong.is-negative { color: var(--danger); }
