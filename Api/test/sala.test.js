@@ -2,7 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import app from '../app.js';
-import { memory } from '../store.js';
+import { memory, pool } from '../store.js';
+
+// Muda o prazo de uma tarefa no banco de verdade ou na memória.
+const setTask = async (id, fields) => {
+  if (!pool) return Object.assign(memory.studyTasks.find(item => item.id === id), fields);
+  const columns = { dueDate: 'due_date', dueTime: 'due_time', assignedAt: 'assigned_at' };
+  const keys = Object.keys(fields);
+  return pool.query(`UPDATE study_tasks SET ${keys.map((key, index) => `${columns[key]}=$${index + 2}`).join(', ')} WHERE id=$1`, [id, ...keys.map(key => fields[key])]);
+};
 import { applyOverduePenalties, safeUrl } from '../sala.js';
 
 const account = async (name, extra = {}) => {
@@ -63,18 +71,15 @@ test('Sala: quadro de tarefas, lembrete a partir de 1 dia antes e -300 XP uma ve
   assert.equal(tasks[0].status, 'Em andamento');
 
   // O prazo chegou perto: lembrete liberado e chega com a mensagem combinada.
-  const row = memory.studyTasks.find(item => item.id === task.id);
   const soon = Date.now() + 3 * 3600_000;
-  Object.assign(row, { dueDate: isoDay(soon), dueTime: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(soon)) });
+  await setTask(task.id, { dueDate: isoDay(soon), dueTime: new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(soon)) });
   await request(app).post(`/api/v1/shared/${work.id}/tasks/${task.id}/lembrete`).set(dona.auth).expect(200);
   const alerts = (await request(app).get('/api/v1/notifications').set(resp.auth)).body.items;
   assert.ok(alerts.some(item => item.title === 'Ei, sua parte ainda está pendente! O prazo está chegando. 🧙‍♀️'));
 
   // Passou do prazo sem concluir: -300 XP uma vez.
   const before = await xpOf(resp);
-  row.assignedAt = new Date(Date.now() - 3 * 86_400_000);
-  row.dueDate = isoDay(Date.now() - 86_400_000);
-  row.dueTime = '10:00';
+  await setTask(task.id, { assignedAt: new Date(Date.now() - 3 * 86_400_000), dueDate: isoDay(Date.now() - 86_400_000), dueTime: '10:00' });
   await applyOverduePenalties();
   await applyOverduePenalties();
   assert.equal(await xpOf(resp), before - 300);

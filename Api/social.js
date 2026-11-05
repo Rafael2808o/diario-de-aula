@@ -144,7 +144,7 @@ async function listPosts(viewerId, { category, q, mine }) {
     const values = [];
     if (mine) {
       values.push(viewerId);
-      where.push(`p.user_id=${values.length}`);
+      where.push(`p.user_id=$${values.length}`);
     }
     if (category) {
       values.push(category);

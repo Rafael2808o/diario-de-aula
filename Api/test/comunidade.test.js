@@ -2,7 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import app from '../app.js';
-import { memory } from '../store.js';
+import { memory, pool } from '../store.js';
+
+// Vence um registro no banco de verdade ou na memória.
+const expire = async (table, key, id) => (pool ? pool.query(`UPDATE ${table} SET expires_at=NOW() - INTERVAL '1 second' WHERE id=$1`, [id]) : (memory[key].find(item => item.id === id).expiresAt = Date.now() - 1));
+const childCount = async (table, column, key, field, id) => (pool ? Number((await pool.query(`SELECT COUNT(*) FROM ${table} WHERE ${column}=$1`, [id])).rows[0].count) : memory[key].filter(item => item[field] === id).length);
 import { purgeExpired } from '../community.js';
 
 const account = async name => {
@@ -72,11 +76,11 @@ test('Bate-papo: cartinha, reação, resposta avisam o autor e tudo some depois 
   await request(app).delete(`/api/v1/batepapo/${letter.body.id}`).set(bia.auth).expect(404);
 
   // Vence a cartinha e roda a limpeza: some a carta, a resposta e a reação.
-  memory.letters.find(item => item.id === letter.body.id).expiresAt = Date.now() - 1;
+  await expire('chat_letters', 'letters', letter.body.id);
   const purged = await purgeExpired({ force: true });
   assert.ok(purged.letters >= 1);
-  assert.equal(memory.letterComments.some(item => item.letterId === letter.body.id), false);
-  assert.equal(memory.letterReactions.some(item => item.letterId === letter.body.id), false);
+  assert.equal(await childCount('chat_comments', 'letter_id', 'letterComments', 'letterId', letter.body.id), 0);
+  assert.equal(await childCount('chat_reactions', 'letter_id', 'letterReactions', 'letterId', letter.body.id), 0);
   assert.equal((await request(app).get('/api/v1/batepapo').set(ana.auth)).body.some(item => item.id === letter.body.id), false);
 });
 
@@ -139,11 +143,11 @@ test('Feed: +200 XP uma vez por dia, curtida e comentário, e a foto some com tu
   assert.equal(commented.body.comments[0].author.name, 'Bia N.');
   assert.ok((await request(app).get('/api/v1/notifications').set(ana.auth)).body.items.some(item => item.title.includes('curtiu')));
 
-  memory.feedPhotos.find(item => item.id === again.body.id).expiresAt = Date.now() - 1;
+  await expire('feed_photos', 'feedPhotos', again.body.id);
   await purgeExpired({ force: true });
-  assert.equal(memory.feedPhotos.some(item => item.id === again.body.id), false);
-  assert.equal(memory.feedComments.some(item => item.photoId === again.body.id), false);
-  assert.equal(memory.feedReactions.some(item => item.photoId === again.body.id), false);
+  assert.equal(await childCount('feed_photos', 'id', 'feedPhotos', 'id', again.body.id), 0);
+  assert.equal(await childCount('feed_comments', 'photo_id', 'feedComments', 'photoId', again.body.id), 0);
+  assert.equal(await childCount('feed_reactions', 'photo_id', 'feedReactions', 'photoId', again.body.id), 0);
   await request(app).get(`/api/v1/feed/${again.body.id}/foto`).expect(404);
   assert.equal(await xpOf(ana), 200, 'a foto expirar não tira o XP');
 });
