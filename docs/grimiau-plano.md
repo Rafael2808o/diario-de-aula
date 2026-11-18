@@ -113,3 +113,65 @@ Backup antes desta etapa: branch Neon `backup-pre-v3master-20261104` (br-late-mo
 - [ ] Etapa 8 — testes finais, APK 1.6.0 (permissão de câmera para chamadas)
 - Testes da API no Postgres (branch descartável do Neon, 05/11/2026): 42/42 depois de corrigir o filtro
   "meus pedidos" do Conselho, que quebrava só no banco real.
+
+# Versão 4.0 — pedidos do Conselho e novas telas (desde 18/11/2026)
+
+Especificação: "PROMPT MESTRE — ATUALIZAÇÃO E EVOLUÇÃO DA PLATAFORMA GRIMIAU" (seções 1 a 8) com 8 HTMLs de referência
+em `Downloads/`, recebidos em 18/11/2026. O Caderno de Aulas é o padrão visual obrigatório.
+
+## Proteção de dados
+- [x] Branch de backup no Neon: `backup-pre-v4-20261118` (br-misty-mode-ar8xhdmi).
+- [x] Backup JSON: `D:\Codes\_backups_grimiau\neon-pre-v4-20261118.json` (users 15, lessons 126, flashcards 71,
+  study_tasks 13, academic_profiles 7, chat_letters 1, study_sessions 73). Banco com 60 MB (limite grátis 0,5 GB).
+- [ ] Migrações só aditivas, testadas num branch descartável antes do deploy; contagens conferidas depois.
+
+## Diagnóstico
+- Pilha: React 19 + Vite (Web/PWA), Expo WebView (Mobile), Node/Express (Api), Postgres no Neon, Gemini.
+- Testes da API: 42/42 antes de começar.
+- Ritual: `useRitual` já vive no Shell (trocar de página dentro do app não desmonta). O problema relatado é a regra
+  da etapa 2a: pausa ao esconder a aba/bloquear a tela e `recover()` descarta sessões sem ponto de controle há 20 s.
+- Nome/RA: `academic_profiles` já existe, mas o formulário da Sala pré-preenchia o nome completo com o apelido.
+  Produção: 6 de 7 perfis têm `full_name` igual ao nome do app.
+- Cartas (Bate-papo): no tema claro `--tarot` continua escuro e o texto usa `--text` escuro: preto sobre roxo escuro.
+- IA: `buildContext` não envia o Caderno (`annotations`) nem a transcrição para a IA.
+- Cartas do Saber: só filtram por disciplina e prova; não há aula, tema ou conjunto.
+- Agenda: já mostra provas (exams), entregas (tasks) e eventos; faltam AVA, apresentação e lembrete com visual próprio.
+- Tarefas da Sala: um responsável por tarefa (`assignee_id`), penalidade e prazo por tarefa.
+- Tempo real: só polling (chamada WebRTC usa sinalização em memória). Sem WebSocket no Render grátis.
+
+## HTMLs de referência → destino
+| HTML | Finalidade | Destino |
+| --- | --- | --- |
+| Caderno de Aula | Caderno com páginas, abas, figurinhas, janela do grimório | Padrão visual (Playfair + Lexend, papel, abas, carimbos); figurinhas e imagens no Caderno |
+| Registro de Aulas | Registro com calendário lateral e painel por aula | Referência para o Registro (já existe); sem refazer nesta versão |
+| Central de Provas | Provas com destaque da próxima avaliação | Referência para Provas (já existe); sem refazer nesta versão |
+| Estudar com IA | Hub de estudo por intenção | Integra o Caderno como fonte da IA; botão "gerar desta aula" |
+| Comunidade | Bruxinhos, vibes, eventos | Já existe quase tudo; entra o Perguntados e o Foco Compartilhado |
+| Perfil | Capa, música, leitura, matéria favorita, mural | Personalização do perfil (3.11) |
+| Loja da Madrugada | Molduras e cores com Pozinho Mágico | Etapa 4: papéis de carta preparados (coluna `paper`); loja depende de regra de moeda |
+| Administração | Login separado + painel | Não criar login separado; usar sessão + `user_roles` |
+
+## Decisões
+- Padrão visual: o Caderno usa Playfair Display (já é o `--font-title`) e Lexend; o corpo passa de Montserrat
+  para Lexend. Tokens de cor do Caderno escuro são praticamente os atuais; as telas novas usam a linguagem do
+  Caderno (papel com pauta, abas coloridas, carimbos). Telas que não foram pedidas não são redesenhadas.
+- Ritual: o tempo conta por carimbos de relógio mesmo com a aba escondida ou a tela bloqueada. Se a pessoa voltar
+  depois de mais de 2 h sem sinal, o Ritual pergunta se conta o tempo fora (nunca decide sozinho).
+- Nome/RA: nunca sobrescrever. O formulário não pré-preenche mais com o apelido; quem tem nome igual ao apelido
+  recebe um pedido de confirmação. A lista mostra "nome completo não informado".
+- Tarefas da Sala: tabela nova `study_task_assignees` (tarefa, pessoa, data de atribuição, penalidade, status
+  individual), preenchida a partir de `assignee_id`, que continua existindo.
+- Demandas da aula: tabelas novas `class_duties` (tipos de demanda da sala) e `class_rounds` (aula + presentes +
+  distribuição). Sorteio no servidor, rotativo: quem fez uma função por último vai para o fim da fila dela.
+- Imagens no Caderno: tabela `notebook_images` (bytes reduzidos no aparelho, até 650 KB); o HTML só guarda
+  `<img data-img="id">`, que o sanitizador reconstrói; o navegador busca com o token.
+- Foco compartilhado e Perguntados: estado no Postgres + polling curto só com a página aberta. Sem áudio/vídeo.
+- Perguntados: perguntas geradas pela IA a partir do material de quem cria; o servidor guarda a correta e o
+  tempo de cada resposta. Pontos próprios no jogo; no ranking geral entra no máximo +30 XP por partida.
+
+## Andamento
+- [ ] Etapa 1 — Ritual, nome/RA, contraste das cartas, fonte do Caderno
+- [ ] Etapa 2 — Demandas da aula, tarefas com vários responsáveis, imagens no Caderno, lembretes, Cartas do Saber
+  organizadas, Caderno como fonte da IA
+- [ ] Etapa 3 — Foco compartilhado, compartilhar caderno com recados, Perguntados
+- [ ] Etapa 4 — Perfil personalizado, papéis de carta
