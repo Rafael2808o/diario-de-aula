@@ -105,6 +105,37 @@ export function distribute(duties, presentIds, history, locked = new Map()) {
     result.set(duty.id, chosen);
     if (chosen) busy.add(chosen);
   }
+  // A escolha uma a uma pode deixar para o fim só quem fez aquela função na última aula. Corrige trocando pares
+  // (ou trocando por alguém presente sem função) enquanto isso diminuir a repetição. Funções travadas não mudam.
+  const cost = (userId, dutyId) => {
+    if (!userId) return 0;
+    const since = lastDid.get(`${userId}|${dutyId}`);
+    return since === undefined ? 0 : historyRounds + 1 - since;
+  };
+  const free = order.filter(duty => !locked.has(duty.id)).map(duty => duty.id);
+  for (let improved = true, guard = 0; improved && guard < 200; guard += 1) {
+    improved = false;
+    for (const a of free) {
+      for (const b of free) {
+        if (a === b) continue;
+        const ua = result.get(a);
+        const ub = result.get(b);
+        if (cost(ua, a) + cost(ub, b) > cost(ub, a) + cost(ua, b)) {
+          result.set(a, ub);
+          result.set(b, ua);
+          improved = true;
+        }
+      }
+      const idle = presentIds.filter(id => ![...result.values()].includes(id));
+      for (const id of idle) {
+        const ua = result.get(a);
+        if (ua && cost(ua, a) > cost(id, a)) {
+          result.set(a, id);
+          improved = true;
+        }
+      }
+    }
+  }
   return result;
 }
 
