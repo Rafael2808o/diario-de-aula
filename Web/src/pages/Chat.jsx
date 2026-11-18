@@ -8,6 +8,13 @@ import { authorUser, expiresIn, useLiveList, useMarkSeen, when } from "../lib/so
 // (com reações e respostas). A lista se atualiza sozinha a cada 20 segundos.
 const numerals = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX", "XXI"];
 
+// Papéis gratuitos (a lista da API é a mesma). Novos papéis podem vir da Loja da Madrugada.
+const letterPapers = [
+  ["pergaminho", "Pergaminho", "#fbf6ea"],
+  ["lavanda", "Lavanda", "#f3eefc"],
+  ["noite", "Noite", "#1d1533"],
+];
+
 function LetterCard({ letter, index, preview = false, onChange, onRemove }) {
   const { call, toast } = useApp();
   const [open, setOpen] = useState(false);
@@ -35,7 +42,7 @@ function LetterCard({ letter, index, preview = false, onChange, onRemove }) {
     }
   };
   return (
-    <article className="tarot-letter">
+    <article className={`tarot-letter paper-${letter.paper || "pergaminho"}`}>
       <header className="tarot-letter-head">
         <span className="tarot-numeral" aria-hidden="true">{numerals[index % numerals.length]}</span>
         <Avatar user={authorUser(letter.author)} size={34} />
@@ -124,7 +131,8 @@ function LetterEditor({ onClose, onCreated }) {
   const { call, user } = useApp();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const { submit, busy, error } = useSubmit(() => call("/batepapo", { method: "POST", body: { title, body } }), { success: "Cartinha publicada! Ela fica no Bate-papo por 48 horas.", onDone: onCreated });
+  const [paper, setPaper] = useState("pergaminho");
+  const { submit, busy, error } = useSubmit(() => call("/batepapo", { method: "POST", body: { title, body, paper } }), { success: "Cartinha publicada! Ela fica no Bate-papo por 48 horas.", onDone: onCreated });
   return (
     <Modal title="Escrever uma cartinha" onClose={onClose} wide>
       <form className="form letter-editor" onSubmit={(event) => { event.preventDefault(); submit(); }}>
@@ -137,11 +145,21 @@ function LetterEditor({ onClose, onCreated }) {
             Mensagem
             <textarea value={body} rows={6} maxLength={2000} required onChange={(event) => setBody(event.target.value)} placeholder="Escreva sua cartinha para os migles" />
           </label>
+          <fieldset className="plain-fieldset">
+            <legend>Papel da carta</legend>
+            <div className="paper-picker">
+              {letterPapers.map(([id, label, color]) => (
+                <button key={id} type="button" className="paper-swatch" aria-pressed={paper === id} onClick={() => setPaper(id)}>
+                  <i style={{ background: color }} aria-hidden="true" /> {label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
           <p className="hint">Todo mundo da Comunidade vê. A cartinha some sozinha depois de 48 horas.</p>
         </div>
         <div className="letter-editor-preview" aria-label="Pré-visualização da carta">
           <small className="hint">Pré-visualização</small>
-          <LetterCard preview index={0} letter={{ title, body, author: { id: user.id, name: "Você", avatarVersion: user.avatarVersion } }} />
+          <LetterCard preview index={0} letter={{ title, body, paper, author: { id: user.id, name: "Você", avatarVersion: user.avatarVersion } }} />
         </div>
         <FormError>{error}</FormError>
         <div className="form-actions">

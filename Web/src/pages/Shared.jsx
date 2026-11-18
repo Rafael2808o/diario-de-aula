@@ -17,15 +17,18 @@ const profileSkipKey = "grimiau.sala.perfil-depois";
 // ---------- Perfil acadêmico ----------
 function AcademicProfile({ initial, onClose, onSaved }) {
   const { call, user } = useApp();
-  const [form, setForm] = useState({ fullName: initial?.fullName || user.name || "", ra: initial?.ra || "", hasAgency: Boolean(initial?.hasAgency) });
+  const [form, setForm] = useState({ fullName: initial?.fullName || "", ra: initial?.ra || "", hasAgency: Boolean(initial?.hasAgency) });
   const [agency, setAgency] = useState(initial?.agency || []);
   const { submit, busy, error } = useSubmit(() => call("/sala/perfil", { method: "PUT", body: { ...form, agency: agency.map((person) => person.id) } }), { success: "Perfil acadêmico salvo.", onDone: onSaved });
   return (
     <Modal title={initial?.done ? "Meu perfil acadêmico" : "Vamos completar seu perfil acadêmico? ✨"} onClose={onClose}>
       <form className="form" onSubmit={(event) => { event.preventDefault(); submit(); }}>
+        {initial?.needsReview && (
+          <p className="notice">O nome completo salvo é igual ao seu nome de exibição (“{user.name}”). Confira se é o nome da sua matrícula.</p>
+        )}
         <label>
           Nome completo
-          <input value={form.fullName} maxLength={120} required onChange={(event) => setForm({ ...form, fullName: event.target.value })} autoComplete="name" />
+          <input value={form.fullName} maxLength={120} required placeholder="Como está na matrícula" onChange={(event) => setForm({ ...form, fullName: event.target.value })} autoComplete="name" />
         </label>
         <label>
           RA
@@ -309,9 +312,9 @@ function Members({ activity, onChange }) {
   };
   const copyList = async () => {
     try {
-      const { text } = await call(`/shared/${activity.id}/lista`);
+      const { text, pending = [] } = await call(`/shared/${activity.id}/lista`);
       await navigator.clipboard.writeText(text);
-      toast("Lista de integrantes copiada.");
+      toast(pending.length ? `Lista copiada. Confira: ${pending.join(", ")} ainda não ${pending.length === 1 ? "confirmou" : "confirmaram"} o nome completo no Grimiau.` : "Lista de integrantes copiada.");
     } catch (failure) {
       toast(failure.message || "Não foi possível copiar a lista.");
     }
@@ -634,7 +637,7 @@ export default function Shared() {
         </div>
       </header>
       <button type="button" className="link-btn sala-profile-link" onClick={() => setModal({ type: "profile" })}>
-        <Users size={14} /> {profile?.done ? "Meu perfil acadêmico" : "Completar meu perfil acadêmico (nome completo, RA e agência)"}
+        <Users size={14} /> {profile?.needsReview ? "Confirme seu nome completo para a lista de integrantes" : profile?.done ? "Meu perfil acadêmico" : "Completar meu perfil acadêmico (nome completo, RA e agência)"}
       </button>
       {state.status === "loading" ? (
         <p className="quiet">Abrindo a Sala de Estudos...</p>

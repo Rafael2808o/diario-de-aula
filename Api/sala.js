@@ -31,7 +31,10 @@ function initSala() {
         due_date TEXT NOT NULL DEFAULT '', due_time TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'Pendente',
         assigned_at TIMESTAMPTZ, penalized BOOLEAN NOT NULL DEFAULT FALSE, position INTEGER NOT NULL DEFAULT 0,
         created_by TEXT, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW());
-      CREATE INDEX IF NOT EXISTS study_tasks_activity_idx ON study_tasks(activity_id)`);
+      CREATE INDEX IF NOT EXISTS study_tasks_activity_idx ON study_tasks(activity_id);
+      -- Versão 4.0: quem salva o perfil depois desta versão confirmou o nome completo (antes, o formulário vinha
+      -- preenchido com o nome de exibição). Perfis antigos ficam como estão, só sem confirmação.
+      ALTER TABLE academic_profiles ADD COLUMN IF NOT EXISTS name_confirmed BOOLEAN NOT NULL DEFAULT FALSE`);
   })().catch(error => {
     ready = null;
     throw error;
@@ -67,7 +70,7 @@ export function safeUrl(value) {
 async function profileOf(userId) {
   await initSala();
   if (pool) {
-    const row = (await pool.query('SELECT full_name AS "fullName", ra, has_agency AS "hasAgency", agency, updated_at AS "updatedAt" FROM academic_profiles WHERE user_id=$1', [userId])).rows[0];
+    const row = (await pool.query('SELECT full_name AS "fullName", ra, has_agency AS "hasAgency", agency, name_confirmed AS "nameConfirmed", updated_at AS "updatedAt" FROM academic_profiles WHERE user_id=$1', [userId])).rows[0];
     return row ? { ...row, agency: parseList(row.agency) } : null;
   }
   return mem().academicProfiles.get(userId) || null;
@@ -95,7 +98,9 @@ async function rosterOf(activityId) {
   const lines = [];
   for (const member of members) {
     const profile = await profileOf(member.userId);
-    lines.push({ name: (profile?.fullName || member.name || '').toUpperCase(), ra: profile?.ra || '' });
+    // Sem perfil, ou com o nome completo igual ao nome de exibição: a pessoa ainda precisa confirmar.
+    const pending = !profile?.fullName || (!profile.nameConfirmed && profile.fullName.trim().toLowerCase() === String(member.name || '').trim().toLowerCase());
+    lines.push({ name: (profile?.fullName || member.name || '').toUpperCase(), ra: profile?.ra || '', pending, displayName: member.name || '' });
   }
   return lines.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 }
@@ -217,7 +222,8 @@ export function registerSalaRoutes(app, requireAuth) {
   // Perfil acadêmico
   app.get('/api/v1/sala/perfil', requireAuth, route(async (req, res) => {
     const profile = await profileOf(req.user.id);
-    return res.json({ done: Boolean(profile), fullName: profile?.fullName || '', ra: profile?.ra || '', hasAgency: Boolean(profile?.hasAgency), agency: await peopleById(profile?.agency || []) });
+    const needsReview = Boolean(profile?.fullName) && !profile.nameConfirmed && profile.fullName.trim().toLowerCase() === String(req.user.name || '').trim().toLowerCase();
+    return res.json({ done: Boolean(profile), needsReview, fullName: profile?.fullName || '', ra: profile?.ra || '', hasAgency: Boolean(profile?.hasAgency), agency: await peopleById(profile?.agency || []) });
   }));
   app.put('/api/v1/sala/perfil', requireAuth, route(async (req, res) => {
     const fullName = oneLine(req.body?.fullName, 120);
@@ -228,10 +234,10 @@ export function registerSalaRoutes(app, requireAuth) {
     if (ra && !/^[\w.\-/ ]{1,30}$/.test(ra)) return res.status(400).json({ error: 'Use só letras, números, ponto ou traço no RA.' });
     const valid = (await peopleById(agency)).map(person => person.id);
     if (pool) {
-      await pool.query(`INSERT INTO academic_profiles (user_id, full_name, ra, has_agency, agency) VALUES ($1,$2,$3,$4,$5)
-        ON CONFLICT (user_id) DO UPDATE SET full_name=$2, ra=$3, has_agency=$4, agency=$5, updated_at=NOW()`, [req.user.id, fullName, ra, hasAgency, JSON.stringify(valid)]);
-    } else mem().academicProfiles.set(req.user.id, { fullName, ra, hasAgency, agency: valid, updatedAt: new Date() });
-    return res.json({ done: true, fullName, ra, hasAgency, agency: await peopleById(valid) });
+      await pool.query(`INSERT INTO academic_profiles (user_id, full_name, ra, has_agency, agency, name_confirmed) VALUES ($1,$2,$3,$4,$5,TRUE)
+        ON CONFLICT (user_id) DO UPDATE SET full_name=$2, ra=$3, has_agency=$4, agency=$5, name_confirmed=TRUE, updated_at=NOW()`, [req.user.id, fullName, ra, hasAgency, JSON.stringify(valid)]);
+    } else mem().academicProfiles.set(req.user.id, { fullName, ra, hasAgency, agency: valid, nameConfirmed: true, updatedAt: new Date() });
+    return res.json({ done: true, needsReview: false, fullName, ra, hasAgency, agency: await peopleById(valid) });
   }));
 
   // Busca de colegas pelo nome (só nome público e foto).
@@ -306,7 +312,7 @@ export function registerSalaRoutes(app, requireAuth) {
     const found = await member(req, res);
     if (!found) return undefined;
     const lines = await rosterOf(found.activity.id);
-    return res.json({ lines, text: lines.map(line => `${line.name} — RA: ${line.ra || 'não informado'}`).join('\n') });
+    return res.json({ lines, pending: lines.filter(line => line.pending).map(line => line.displayName), text: lines.map(line => `${line.name} — RA: ${line.ra || 'não informado'}`).join('\n') });
   }));
 
   // Quadro de tarefas

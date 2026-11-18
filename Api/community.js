@@ -34,6 +34,7 @@ export function initCommunity() {
         id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         title TEXT NOT NULL DEFAULT '', body TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW(), expires_at TIMESTAMPTZ NOT NULL);
       CREATE INDEX IF NOT EXISTS chat_letters_expires_idx ON chat_letters(expires_at);
+      ALTER TABLE chat_letters ADD COLUMN IF NOT EXISTS paper TEXT NOT NULL DEFAULT 'pergaminho';
       CREATE TABLE IF NOT EXISTS chat_reactions (
         letter_id TEXT NOT NULL REFERENCES chat_letters(id) ON DELETE CASCADE,
         user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, emoji TEXT NOT NULL, PRIMARY KEY (letter_id, user_id, emoji));
@@ -115,13 +116,16 @@ export async function purgeExpired({ force = false } = {}) {
 const purgeQuietly = () => purgeExpired().catch(error => console.error('limpeza', error));
 
 // ---------- Bate-papo ----------
+// Papéis de carta gratuitos. A Loja da Madrugada poderá acrescentar outros nesta lista.
+export const letterPapers = ['pergaminho', 'lavanda', 'noite'];
+
 async function listLetters(viewerId) {
   await initCommunity();
   let letters;
   let reactions;
   let comments;
   if (pool) {
-    letters = (await pool.query(`SELECT l.id, l.user_id AS "userId", l.title, l.body, l.created_at AS "createdAt", l.expires_at AS "expiresAt", u.name, u.avatar_version AS "avatarVersion"
+    letters = (await pool.query(`SELECT l.id, l.user_id AS "userId", l.title, l.body, l.paper, l.created_at AS "createdAt", l.expires_at AS "expiresAt", u.name, u.avatar_version AS "avatarVersion"
       FROM chat_letters l JOIN users u ON u.id=l.user_id WHERE l.expires_at > NOW() ORDER BY l.created_at DESC LIMIT 100`)).rows;
     const ids = letters.map(row => row.id);
     reactions = ids.length ? (await pool.query('SELECT letter_id AS "letterId", user_id AS "userId", emoji FROM chat_reactions WHERE letter_id = ANY($1)', [ids])).rows : [];
@@ -136,7 +140,7 @@ async function listLetters(viewerId) {
   return letters.map(row => {
     const mine = reactions.filter(item => item.letterId === row.id);
     return {
-      id: row.id, title: row.title, body: row.body, createdAt: iso(row.createdAt), expiresAt: iso(row.expiresAt),
+      id: row.id, title: row.title, body: row.body, paper: letterPapers.includes(row.paper) ? row.paper : 'pergaminho', createdAt: iso(row.createdAt), expiresAt: iso(row.expiresAt),
       author: author(row.userId, row.name, row.avatarVersion), mine: row.userId === viewerId,
       reactions: letterEmojis.map(emoji => ({ emoji, count: mine.filter(item => item.emoji === emoji).length, reacted: mine.some(item => item.emoji === emoji && item.userId === viewerId) })),
       comments: comments.filter(item => item.letterId === row.id).map(item => ({ id: item.id, body: item.body, createdAt: iso(item.createdAt), author: author(item.userId, item.name, item.avatarVersion), mine: item.userId === viewerId }))
@@ -308,11 +312,12 @@ export function registerCommunityRoutes(app, requireAuth) {
     await initCommunity();
     const title = oneLine(req.body?.title, 120);
     const body = clean(req.body?.body, 2000);
+    const paper = letterPapers.includes(req.body?.paper) ? req.body.paper : 'pergaminho';
     if (body.length < 2) return res.status(400).json({ error: 'Escreva a mensagem da cartinha.' });
     const id = randomUUID();
     const expiresAt = Date.now() + letterLifetimeMs;
-    if (pool) await pool.query('INSERT INTO chat_letters (id,user_id,title,body,expires_at) VALUES ($1,$2,$3,$4,$5)', [id, req.user.id, title, body, new Date(expiresAt)]);
-    else mem().letters.push({ id, userId: req.user.id, title, body, createdAt: Date.now(), expiresAt });
+    if (pool) await pool.query('INSERT INTO chat_letters (id,user_id,title,body,expires_at,paper) VALUES ($1,$2,$3,$4,$5,$6)', [id, req.user.id, title, body, new Date(expiresAt), paper]);
+    else mem().letters.push({ id, userId: req.user.id, title, body, paper, createdAt: Date.now(), expiresAt });
     return res.status(201).json((await listLetters(req.user.id)).find(item => item.id === id));
   }));
   app.delete('/api/v1/batepapo/:id', requireAuth, handle(async (req, res) => {

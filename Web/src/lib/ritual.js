@@ -1,27 +1,30 @@
 import { useCallback, useEffect, useState } from "react";
 import { nowTime, todayIso } from "./dates.js";
 
-// Ritual de Concentração: o tempo é calculado por intervalos válidos (início do trecho atual + tempo acumulado),
-// nunca somando um contador a cada segundo. Só conta o tempo com o Grimiau aberto e visível:
-// - ao esconder a aba, bloquear a tela, trocar de app ou sair da página, a sessão pausa e guarda o tempo na hora;
-// - enquanto roda, grava um ponto de controle a cada poucos segundos (checkpointAt);
-// - se o app foi encerrado sem aviso (sistema matou o processo), ao abrir de novo a sessão volta pausada
-//   com o tempo só até o último ponto de controle. O período fechado nunca vira tempo de estudo.
+// Ritual de Concentração: o tempo é calculado por carimbos de relógio (início do trecho atual + tempo acumulado),
+// nunca somando um contador a cada segundo. Por isso ele continua certo mesmo quando o navegador congela a página:
+// - trocar de página no Grimiau não mexe na sessão (ela vive no Shell e no localStorage, não no painel);
+// - esconder a aba, bloquear a tela ou trocar de app NÃO pausa: ao voltar, o relógio recalcula pelo horário
+//   (o sistema pode suspender a página, mas o tempo real continua sendo contado pelos carimbos);
+// - enquanto a página está visível, grava um ponto de controle a cada poucos segundos (checkpointAt);
+// - se a pessoa volta depois de muito tempo sem nenhum sinal (mais de 2 h), a sessão fica pausada no último sinal e
+//   o painel pergunta se o tempo fora conta ou não. O Grimiau nunca decide isso sozinho.
+// O navegador não toca aviso com a página suspensa; a meta cumprida aparece quando a pessoa volta.
 // A visibilidade do painel é outro estado, independente.
 const sessionKey = "grimiau.ritual";
 const viewKey = "grimiau.ritual.view";
 
 const idle = { status: "idle" };
 const checkpointEveryMs = 5_000;
-// Sem ponto de controle há mais que isto, a sessão "rodando" salva é de um app que foi encerrado.
-export const staleAfterMs = 20_000;
+// Sem nenhum sinal há mais que isto, pergunta antes de contar o tempo fora.
+export const staleAfterMs = 2 * 3600_000;
 
-// Sessão que estava rodando num app que parou sem aviso: fecha o trecho no último ponto de controle e pausa.
+// Sessão que ficou sem sinal por muito tempo: pausa no último sinal e guarda quanto tempo ficou fora (awayMs).
 export function recover(state, now = Date.now()) {
   if (state?.status !== "running") return state;
   const lastAlive = Math.max(state.segmentStart, state.checkpointAt || state.segmentStart);
   if (now - lastAlive <= staleAfterMs) return state;
-  return { ...state, status: "paused", accumulatedMs: state.accumulatedMs + Math.max(0, lastAlive - state.segmentStart), autoPaused: "closed" };
+  return { ...state, status: "paused", accumulatedMs: state.accumulatedMs + Math.max(0, lastAlive - state.segmentStart), autoPaused: "away", awayMs: now - lastAlive };
 }
 
 function read(key, fallback) {
@@ -90,6 +93,8 @@ export function useRitual() {
     return fixed;
   });
   const [view, setViewState] = useState(() => {
+    // Voltou depois de muito tempo sem sinal: abre o painel para a pergunta sobre o tempo fora.
+    if (read(sessionKey, idle).autoPaused === "away") return "open";
     const saved = read(viewKey, "closed");
     return ["open", "minimized", "closed"].includes(saved) ? saved : "closed";
   });
@@ -108,45 +113,37 @@ export function useRitual() {
     setState(next);
   }, []);
 
-  // Ciclo de vida: pausa ao sair de vista, grava pontos de controle enquanto roda e confere ao voltar.
+  // Ciclo de vida: grava pontos de controle enquanto visível e confere a sessão ao voltar. Nunca pausa sozinho.
   useEffect(() => {
-    const autoPause = (reason) => {
-      const current = read(sessionKey, idle);
-      if (current.status !== "running") return;
-      const now = Date.now();
-      commit({ ...current, status: "paused", accumulatedMs: elapsedMs(current, now), checkpointAt: now, autoPaused: reason });
-    };
     const checkpoint = () => {
       const current = read(sessionKey, idle);
       if (current.status !== "running" || document.visibilityState !== "visible") return;
-      // Se o próprio intervalo atrasou demais (aparelho dormiu sem avisar), trata como encerrado.
       const fixed = recover(current);
       if (fixed !== current) return commit(fixed);
       write(sessionKey, { ...current, checkpointAt: Date.now() });
     };
     const onVisibility = () => {
-      if (document.visibilityState === "hidden") autoPause("hidden");
-      else {
-        const current = read(sessionKey, idle);
-        const fixed = recover(current);
-        if (fixed !== current) commit(fixed);
+      const current = read(sessionKey, idle);
+      if (document.visibilityState === "hidden") {
+        // Último sinal antes de sumir: a contagem segue pelos carimbos.
+        if (current.status === "running") write(sessionKey, { ...current, checkpointAt: Date.now() });
+        return;
       }
+      const fixed = recover(current);
+      if (fixed !== current) {
+        commit(fixed);
+        write(viewKey, "open");
+        setViewState("open");
+      } else setState(current);
     };
-    const onLeave = () => autoPause("left");
-    const onNativeBackground = () => autoPause("hidden");
     checkpoint();
     const timer = setInterval(checkpoint, checkpointEveryMs);
     document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("pagehide", onLeave);
-    document.addEventListener("freeze", onLeave);
-    // O app Android avisa quando vai para segundo plano (Mobile/App.js).
-    window.addEventListener("grimiau:background", onNativeBackground);
+    window.addEventListener("pageshow", onVisibility);
     return () => {
       clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("pagehide", onLeave);
-      document.removeEventListener("freeze", onLeave);
-      window.removeEventListener("grimiau:background", onNativeBackground);
+      window.removeEventListener("pageshow", onVisibility);
     };
   }, [commit]);
 
@@ -172,8 +169,18 @@ export function useRitual() {
     const current = read(sessionKey, idle);
     if (current.status !== "paused") return;
     const now = Date.now();
-    commit({ ...current, status: "running", segmentStart: now, checkpointAt: now, autoPaused: "" });
+    commit({ ...current, status: "running", segmentStart: now, checkpointAt: now, autoPaused: "", awayMs: 0 });
   }, [commit]);
+  // Depois de muito tempo sem sinal: a pessoa escolhe se o tempo fora conta.
+  const settleAway = useCallback(
+    (count) => {
+      const current = read(sessionKey, idle);
+      if (current.status !== "paused" || current.autoPaused !== "away") return;
+      const now = Date.now();
+      commit({ ...current, status: "running", accumulatedMs: current.accumulatedMs + (count ? current.awayMs || 0 : 0), segmentStart: now, checkpointAt: now, autoPaused: "", awayMs: 0 });
+    },
+    [commit],
+  );
   const finish = useCallback(() => {
     const current = recover(read(sessionKey, idle));
     if (current.status !== "running" && current.status !== "paused") return;
@@ -189,5 +196,5 @@ export function useRitual() {
   );
   const reset = useCallback(() => commit(idle), [commit]);
 
-  return { state, view, setView, start, pause, resume, finish, setSubject, reset };
+  return { state, view, setView, start, pause, resume, finish, setSubject, reset, settleAway };
 }

@@ -1,0 +1,70 @@
+/*
+  Versão 4.0 — linguagem visual do Caderno de Aulas aplicada às telas novas:
+  papel com pauta, abas coloridas, carimbos e cartões com borda suave. Playfair nos títulos, Lexend no texto.
+  Os tokens de papel são próprios (não dependem do tema), para o texto ficar sempre legível sobre o papel.
+*/
+:root {
+  --paper: #fffdff;
+  --paper-2: #fbf8ff;
+  --paper-ink: #241a44;
+  --paper-muted: #5f547f;
+  --paper-rule: rgba(106, 73, 196, 0.16);
+  --paper-margin: rgba(194, 54, 92, 0.3);
+  --tab-rose: #f4a0c0;
+  --tab-gold: #f6c46b;
+  --tab-mint: #86dcc0;
+  --tab-lilac: #b7a3f5;
+  --tab-ink: #2a1650;
+}
+:root:not([data-theme="light"]) {
+  --paper: #1a1330;
+  --paper-2: #170f2d;
+  --paper-ink: #ede8ff;
+  --paper-muted: #a99fcf;
+  --paper-rule: rgba(176, 156, 255, 0.12);
+  --paper-margin: rgba(255, 125, 157, 0.3);
+}
+
+/* Cartão de papel com pauta (como a página do Caderno). */
+.paper-card { position: relative; background: var(--paper); color: var(--paper-ink); border: 1px solid var(--card-line); border-radius: var(--radius); padding: 16px; }
+.paper-card.ruled { background-image: repeating-linear-gradient(to bottom, transparent 0 31px, var(--paper-rule) 31px 32px); }
+.paper-card h2, .paper-card h3 { color: var(--paper-ink); }
+.paper-card .hint, .paper-card small { color: var(--paper-muted); }
+.paper-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.paper-label { display: inline-block; padding: 6px 14px; border: 1px solid var(--card-line); border-radius: 8px; background: var(--paper-2); font-size: 11.5px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: var(--paper-ink); }
+
+/* Abas coloridas (as do pé do Caderno). */
+.caderno-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.caderno-tab { min-height: 36px; padding: 6px 14px; border: 0; border-radius: 10px 10px 4px 4px; background: color-mix(in srgb, var(--tab) 32%, var(--surface)); color: var(--text); font: inherit; font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; cursor: pointer; }
+.caderno-tab[aria-pressed="true"], .caderno-tab.active { background: var(--tab); color: var(--tab-ink); }
+.caderno-tab .count { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.55); color: var(--tab-ink); font-size: 11px; letter-spacing: 0; }
+.tab-rose { --tab: var(--tab-rose); } .tab-gold { --tab: var(--tab-gold); } .tab-mint { --tab: var(--tab-mint); } .tab-lilac { --tab: var(--tab-lilac); }
+
+/* Carimbo (IMPORTANTE, CAI NA PROVA...). */
+.stamp { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border: 1.5px dashed currentColor; border-radius: 7px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; background: color-mix(in srgb, currentColor 12%, transparent); }
+.stamp.rose { color: #c2365c; } .stamp.gold { color: #9a6a00; } .stamp.mint { color: #17674a; } .stamp.lilac { color: #6a49c4; } .stamp.sky { color: #1f6f8f; }
+:root:not([data-theme="light"]) .stamp.rose { color: #ff9ab4; }
+:root:not([data-theme="light"]) .stamp.gold { color: #f6c46b; }
+:root:not([data-theme="light"]) .stamp.mint { color: #6fe0b6; }
+:root:not([data-theme="light"]) .stamp.lilac { color: #c9b8ff; }
+:root:not([data-theme="light"]) .stamp.sky { color: #8fd3f0; }
+
+/* ---------- Ritual: tempo fora ---------- */
+.ritual-away { display: grid; gap: 8px; width: 100%; }
+.ritual-away p { margin: 0; font-size: 14px; color: var(--text-2); }
+
+/* ---------- Cartas do Bate-papo: papel próprio, sempre legível ---------- */
+.tarot-letter { --letter-paper: #fbf6ea; --letter-ink: #2a1d3a; --letter-muted: #6b5a7e; --letter-accent: #8a5a00; background: var(--letter-paper); color: var(--letter-ink); }
+.tarot-letter.paper-lavanda { --letter-paper: #f3eefc; --letter-ink: #241a44; --letter-muted: #5f547f; --letter-accent: #6a49c4; }
+.tarot-letter.paper-noite { --letter-paper: #1d1533; --letter-ink: #f0eaf7; --letter-muted: #b9abd3; --letter-accent: #e5c77b; }
+.tarot-letter.paper-pergaminho { background-image: radial-gradient(120% 90% at 50% 0%, rgba(255, 255, 255, 0.5), transparent 60%); }
+.tarot-letter .tarot-author small, .tarot-letter .tarot-expires, .tarot-letter .tarot-reply small { color: var(--letter-muted); }
+.tarot-letter .tarot-title, .tarot-letter .tarot-numeral { color: var(--letter-accent); }
+.tarot-letter .btn, .tarot-letter .chip, .tarot-letter .link-btn { color: var(--letter-ink); }
+.tarot-letter input { background: color-mix(in srgb, var(--letter-paper) 85%, var(--letter-ink)); color: var(--letter-ink); }
+.paper-picker { display: flex; gap: 8px; flex-wrap: wrap; }
+.paper-swatch { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 12px; border-radius: 10px; border: 1px solid var(--card-line); background: var(--surface); color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+.paper-swatch[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.paper-swatch i { width: 18px; height: 18px; border-radius: 5px; border: 1px solid rgba(0, 0, 0, 0.15); }
+.plain-fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; min-width: 0; }
+.plain-fieldset legend { padding: 0; margin-bottom: 6px; font-size: 13.5px; font-weight: 500; color: var(--text-2); }

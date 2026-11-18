@@ -287,7 +287,7 @@ export default function Ritual() {
   };
 
   const mood = celebrate ? "happy" : state.status === "paused" ? "sleepy" : state.status === "running" ? "focused" : state.status === "finished" ? "happy" : "calm";
-  const statusText = { idle: "Silencie o mundo. Concentre-se no que importa.", running: goalMs && remaining < 0 ? "Meta cumprida. O tempo extra também conta." : "Concentração em andamento", paused: state.autoPaused ? "Pausado porque você saiu do Grimiau: o tempo fora não conta" : "Pausado: o tempo parado não conta", finished: "Sessão finalizada" }[state.status];
+  const statusText = { idle: "Silencie o mundo. Concentre-se no que importa.", running: goalMs && remaining < 0 ? "Meta cumprida. O tempo extra também conta." : "Concentração em andamento", paused: state.autoPaused === "away" ? "Você ficou um bom tempo sem abrir o Grimiau" : "Pausado: o tempo parado não conta", finished: "Sessão finalizada" }[state.status];
   const subject = data.subjects.find((item) => item.id === state.subjectId);
 
   return (
@@ -375,7 +375,20 @@ export default function Ritual() {
                 </button>
               </>
             )}
-            {state.status === "paused" && (
+            {state.status === "paused" && state.autoPaused === "away" && (
+              <div className="ritual-away" role="group" aria-label="Tempo fora do Grimiau">
+                <p>
+                  Ficaram <strong>{formatDuration((state.awayMs || 0) / 1000)}</strong> sem sinal do Grimiau (aba fechada, tela bloqueada ou aparelho desligado). Esse tempo foi de estudo?
+                </p>
+                <button type="button" className="btn primary" onClick={() => ritual.settleAway(true)}>
+                  Contar e continuar
+                </button>
+                <button type="button" className="btn" onClick={() => ritual.settleAway(false)}>
+                  Não contar e continuar
+                </button>
+              </div>
+            )}
+            {state.status === "paused" && state.autoPaused !== "away" && (
               <>
                 <button type="button" className="btn primary" onClick={ritual.resume}>
                   <Play size={16} /> Retomar

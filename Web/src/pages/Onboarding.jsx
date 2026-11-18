@@ -3,6 +3,7 @@ import { Check, Plus } from "lucide-react";
 import { useApp } from "../context.js";
 import { applyAppearance, currentTheme, themes } from "../lib/theme.js";
 import { FormError, Logo, Nox, Segmented, useSubmit } from "../ui.jsx";
+import { AcademicIdentityFields, useAcademicIdentity } from "../components/AcademicIdentity.jsx";
 import { AcademicFields, RoutineFields, profileDraft, validProfile } from "../components/ProfileFields.jsx";
 import { SubjectList, useSubjectEditing } from "./Subjects.jsx";
 import SubjectSuggestions from "../components/SubjectSuggestions.jsx";
@@ -17,11 +18,21 @@ export default function Onboarding() {
   const editing = useSubjectEditing();
   const first = user.name.split(" ")[0];
   const { submit, busy, error, setError } = useSubmit((body) => call("/me", { method: "PATCH", body }));
+  const identity = useAcademicIdentity();
 
   // Salva o que já foi respondido a cada avanço; nenhuma pergunta é obrigatória.
   const advance = async (next, finished = false) => {
     const problem = validProfile(draft);
     if (problem) return setError(problem);
+    // Nome completo e RA são opcionais aqui; quando preenchidos, vão para o perfil acadêmico.
+    if (step === 1 && identity.changed && identity.form.fullName.trim()) {
+      if (identity.form.fullName.trim().length < 3) return setError("Informe seu nome completo ou deixe o campo vazio.");
+      try {
+        await identity.save();
+      } catch (failure) {
+        return setError(failure.message);
+      }
+    }
     // Conta nova já começa na 3.0: em vez da apresentação das novidades, recebe o convite do passeio guiado.
     const saved = await submit({ ...draft, ...(finished ? { onboardingDone: true, preferences: { ...(draft.preferences || {}), presentationSeen: "3.0", announcementSeen: "3.0.0", tutorialInvite: true } } : {}) });
     if (!saved) return;
@@ -92,6 +103,7 @@ export default function Onboarding() {
         {step === 1 && (
           <div className="form">
             <AcademicFields value={draft} onChange={setDraft} />
+            {identity.profile && <AcademicIdentityFields identity={identity} />}
           </div>
         )}
         {step === 2 && (

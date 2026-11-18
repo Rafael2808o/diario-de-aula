@@ -12,6 +12,7 @@ import { lessonStatus, subjectById } from "../lib/domain.js";
 import { useRole } from "../lib/social.js";
 import { formatFull, formatShort, nationalHolidays, todayIso } from "../lib/dates.js";
 import { Empty, FormError, Modal, Segmented, useSubmit } from "../ui.jsx";
+import AcademicIdentity from "../components/AcademicIdentity.jsx";
 import { AcademicFields, RoutineFields, profileDraft, validProfile } from "../components/ProfileFields.jsx";
 import { SubjectList, useSubjectEditing } from "./Subjects.jsx";
 
@@ -343,6 +344,7 @@ export default function Settings() {
       <nav className="chip-row settings-index" aria-label="Seções das configurações">
         {[
           ["conta", "Conta"],
+          ["identificacao", "Nome e RA"],
           ["notificacoes", "Notificações"],
           ["aparencia", "Aparência"],
           ["privacidade", "Privacidade"],
@@ -364,13 +366,20 @@ export default function Settings() {
         </div>
       </section>
 
+      <section id="identificacao">
+        <h2 className="section-title">Nome completo e RA</h2>
+        <div className="group form-group">
+          <AcademicIdentity />
+        </div>
+      </section>
+
       <form className="settings-form" onSubmit={save}>
         <section>
           <h2 className="section-title">Dados pessoais</h2>
           <div className="group form-group form">
             <div className="form-row">
               <label>
-                Nome
+                Nome de exibição
                 <input value={draft.name} required maxLength={80} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
               </label>
               <label>
