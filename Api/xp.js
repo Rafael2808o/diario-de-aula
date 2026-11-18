@@ -11,12 +11,16 @@ export const xpValues = {
   'resumo-salvo': 40,
   'feed-diario': 200,
   'tarefa-atrasada': -300,
+  'perguntados-vitoria': 30,
+  'perguntados-partida': 10,
 };
 export const xpTexts = {
   'resumo-compartilhado': 'compartilhou um resumo',
   'resumo-reacao': 'reagiu a um resumo',
   'resumo-salvo': 'salvou um resumo no grimório',
   'feed-diario': 'publicou a foto do dia no Feed dos Migles',
+  'perguntados-vitoria': 'venceu uma partida de Perguntados',
+  'perguntados-partida': 'jogou uma partida de Perguntados',
 };
 
 let ready;
@@ -84,7 +88,7 @@ export async function awardXp(userId, kind, ref, { text, xp = xpValues[kind] } =
   if (fresh && xp > 0 && xpTexts[kind]) await recordActivity(userId, { kind, text: `ganhou +${xp} XP ao ${xpTexts[kind].replace(/^(\S+)/, verb => infinitive[verb] || verb)}`, xp, dedupe: `xp:${kind}:${row.ref}` });
   return fresh;
 }
-const infinitive = { compartilhou: 'compartilhar', reagiu: 'reagir', salvou: 'salvar', publicou: 'publicar' };
+const infinitive = { compartilhou: 'compartilhar', reagiu: 'reagir', salvou: 'salvar', publicou: 'publicar', venceu: 'vencer', jogou: 'jogar' };
 
 export async function listXpEvents(userId) {
   await initXp();

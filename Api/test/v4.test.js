@@ -239,3 +239,76 @@ test('Ritual em grupo: sala com código, pulso com estado, chat, bloco do grupo 
   await request(app).get(`/api/v1/foco/salas/${room.id}`).set(ana.auth).expect(404);
   assert.equal((await request(app).get('/api/v1/foco/salas').set(ana.auth)).body.length, 0);
 });
+
+test('Perguntados: gabarito escondido, tempo medido no servidor, pontos, vencedor e XP com limite', async () => {
+  const { setQuestionGenerator } = await import('../quizgame.js');
+  const fake = Array.from({ length: 5 }, (_, n) => ({ question: `Pergunta ${n + 1} sobre segmentação`, options: [`certa ${n}`, `errada a ${n}`, `errada b ${n}`, `errada c ${n}`], correctIndex: 0, explanation: `Explicação ${n}`, difficulty: 'Média' }));
+  setQuestionGenerator(async input => ({ title: 'x', questions: fake.slice(0, input.quantity) }));
+  try {
+    const ana = await account('Ana Perguntados');
+    const caio = await account('Caio Perguntados');
+    const context = 'Segmentação de mercado divide consumidores em grupos. '.repeat(10);
+    await request(app).post('/api/v1/perguntados').set(ana.auth).send({ subject: 'Marketing', context: 'pouco', userIds: [caio.user.id] }).expect(400);
+    await request(app).post('/api/v1/perguntados').set(ana.auth).send({ subject: 'Marketing', context, userIds: [] }).expect(400);
+    let match = (await request(app).post('/api/v1/perguntados').set(ana.auth).send({ subject: 'Marketing', topic: 'Segmentação', context, quantity: 5, userIds: [caio.user.id] }).expect(202)).body;
+    match = (await request(app).get(`/api/v1/perguntados/${match.id}`).set(caio.auth).expect(200)).body;
+    assert.equal(match.status, 'aberta');
+    assert.equal(match.total, 5);
+    const invites = (await request(app).get('/api/v1/notifications').set(caio.auth)).body.items;
+    assert.ok(invites.some(item => item.kind === 'perguntados'));
+    // A pergunta chega sem gabarito; pedir de novo não reinicia o relógio.
+    const first = (await request(app).post(`/api/v1/perguntados/${match.id}/pergunta`).set(ana.auth).expect(200)).body;
+    assert.equal(first.correctIndex, undefined);
+    assert.equal(first.options.length, 4);
+    const again = (await request(app).post(`/api/v1/perguntados/${match.id}/pergunta`).set(ana.auth).expect(200)).body;
+    assert.ok(again.leftMs <= first.leftMs);
+    // Ana acerta tudo rápido.
+    for (let n = 0; n < 5; n += 1) {
+      const question = (await request(app).post(`/api/v1/perguntados/${match.id}/pergunta`).set(ana.auth).expect(200)).body;
+      const right = question.options.findIndex(option => option.startsWith('certa'));
+      const answer = (await request(app).post(`/api/v1/perguntados/${match.id}/resposta`).set(ana.auth).send({ index: question.index, choice: right }).expect(200)).body;
+      assert.ok(answer.correct);
+      assert.ok(answer.points >= 140);
+    }
+    await request(app).post(`/api/v1/perguntados/${match.id}/resposta`).set(ana.auth).send({ index: 0, choice: 0 }).expect(409);
+    // Placar da Ana escondido do Caio até ele terminar.
+    match = (await request(app).get(`/api/v1/perguntados/${match.id}`).set(caio.auth)).body;
+    assert.equal(match.players.find(player => !player.me).score, undefined);
+    // Caio: erra uma, deixa uma estourar o tempo, acerta o resto.
+    for (let n = 0; n < 5; n += 1) {
+      const question = (await request(app).post(`/api/v1/perguntados/${match.id}/pergunta`).set(caio.auth).expect(200)).body;
+      const right = question.options.findIndex(option => option.startsWith('certa'));
+      if (n === 1) {
+        const late = new Date(Date.now() - 60_000);
+        if (pool) await pool.query('UPDATE quiz_players SET served_at=$3 WHERE match_id=$1 AND user_id=$2', [match.id, caio.user.id, late]);
+        else memory.quizPlayers.find(item => item.matchId === match.id && item.userId === caio.user.id).servedAt = late;
+      }
+      const answer = (await request(app).post(`/api/v1/perguntados/${match.id}/resposta`).set(caio.auth).send({ index: question.index, choice: n === 0 ? (right + 1) % 4 : right }).expect(200)).body;
+      if (n === 0) assert.equal(answer.points, -25);
+      if (n === 1) { assert.ok(answer.late); assert.equal(answer.points, 0); }
+    }
+    match = (await request(app).get(`/api/v1/perguntados/${match.id}`).set(caio.auth)).body;
+    assert.equal(match.status, 'encerrada');
+    assert.equal(match.winner.id, ana.user.id);
+    assert.equal(match.review.length, 5);
+    assert.equal(match.review[0].correct, false);
+    const xpKinds = async who => (await request(app).get('/api/v1/xp-events').set(who.auth)).body.map(item => item.kind);
+    assert.ok((await xpKinds(ana)).includes('perguntados-vitoria'));
+    assert.ok((await xpKinds(caio)).includes('perguntados-partida'));
+    const ranking = (await request(app).get('/api/v1/perguntados/ranking').set(caio.auth)).body;
+    assert.equal(ranking.items.find(item => item.id === ana.user.id).wins, 1);
+    // Limite: no máximo 3 partidas com XP por dia.
+    for (let round = 0; round < 3; round += 1) {
+      const extra = (await request(app).post('/api/v1/perguntados').set(ana.auth).send({ subject: 'Marketing', context, quantity: 5, userIds: [caio.user.id] }).expect(202)).body;
+      for (const who of [ana, caio]) {
+        for (let n = 0; n < 5; n += 1) {
+          const question = (await request(app).post(`/api/v1/perguntados/${extra.id}/pergunta`).set(who.auth).expect(200)).body;
+          await request(app).post(`/api/v1/perguntados/${extra.id}/resposta`).set(who.auth).send({ index: question.index, choice: 0 }).expect(200);
+        }
+      }
+    }
+    assert.equal((await xpKinds(ana)).filter(kind => kind.startsWith('perguntados-')).length, 3);
+  } finally {
+    setQuestionGenerator(null);
+  }
+});

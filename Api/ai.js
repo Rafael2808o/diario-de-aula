@@ -75,7 +75,7 @@ function validQuestions(value, quantity) {
 // Cada ferramenta recebe a entrada já validada e devolve o resultado limpo (ou lança erro).
 const tools = {
   async questions(input) {
-    const level = ['Fácil', 'Média', 'Avançada'].includes(input.difficulty) ? `Todas com dificuldade ${input.difficulty}.` : 'Misture dificuldades Fácil, Média e Avançada.';
+    const level = ['Fácil', 'Média', 'Avançada'].includes(input.difficulty) ? `Todas com dificuldade ${input.difficulty}.` : input.difficulty === 'Desafio' ? 'Misture dificuldades Média e Avançada, sem nenhuma Fácil: é uma competição entre colegas que estudaram a matéria.' : 'Misture dificuldades Fácil, Média e Avançada.';
     const prompt = `Você é um educador brasileiro. Crie ${input.quantity} questões originais de múltipla escolha, em português, para revisar ${input.topic} na disciplina ${input.subject}. Use quatro alternativas por questão, apenas uma correta, uma explicação didática (por que a correta está certa e por que as outras estão erradas) e dificuldade Fácil, Média ou Avançada. ${level} Mesmo as fáceis devem exigir entender o conteúdo, não decorar uma palavra. Baseie as explicações no material do estudante quando ele trouxer a informação e não invente fatos fora dele.
 ${knowledgeFocus}
 ${hardOptions}
@@ -236,6 +236,9 @@ async function jobStatus(id, userId) {
   }
   return { status: job.status, result: job.result, error: job.error };
 }
+
+// Perguntados gera as questões no servidor (quem cria a partida não vê o gabarito).
+export const generateQuestions = input => tools.questions(input);
 
 export async function runJob(id) {
   const job = await claimJob(id);

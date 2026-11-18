@@ -44,6 +44,7 @@ import { registerCommunityRoutes } from './community.js';
 import { registerNotebookRoutes } from './notebook.js';
 import { registerDutyRoutes } from './duties.js';
 import { registerFocusRoutes } from './focus.js';
+import { registerQuizGameRoutes } from './quizgame.js';
 
 const app = express();
 const corsOrigins = (process.env.CORS_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean);
@@ -690,6 +691,7 @@ registerSalaRoutes(app, requireAuth);
 registerNotebookRoutes(app, requireAuth);
 registerDutyRoutes(app, requireAuth);
 registerFocusRoutes(app, requireAuth);
+registerQuizGameRoutes(app, requireAuth, aiRateLimit);
 
 app.get('/api/v1/integrations/spotify/status', (_req, res) =>
   res.json({
