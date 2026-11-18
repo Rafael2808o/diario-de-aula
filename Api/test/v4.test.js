@@ -107,3 +107,43 @@ test('Cartas do Saber: conjunto e aula de origem são salvos; aula de outra pess
   const biaSubject = (await request(app).post('/api/v1/subjects').set(bia.auth).send({ name: 'Outra', color: '#7c5cff', schedule: [] })).body;
   await request(app).post('/api/v1/flashcards').set(bia.auth).send({ subjectId: biaSubject.id, front: 'a?', back: 'b', lessonId: lesson.id }).expect(400);
 });
+
+test('Tarefa compartilhada: vários responsáveis, cada um marca a sua parte e só quem não fez perde XP', async () => {
+  const { applyOverduePenalties } = await import('../sala.js');
+  const dona = await account('Lia Grupo');
+  const bia = await account('Bia Grupo');
+  const caio = await account('Caio Grupo');
+  const work = (await request(app).post('/api/v1/shared').set(dona.auth).send({ title: 'Seminário de Ética' }).expect(201)).body;
+  await request(app).post(`/api/v1/shared/${work.id}/members`).set(dona.auth).send({ userIds: [bia.user.id, caio.user.id] }).expect(200);
+  const far = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(Date.now() + 5 * 86_400_000));
+  let tasks = (await request(app).post(`/api/v1/shared/${work.id}/tasks`).set(dona.auth).send({ title: 'Slides', assigneeIds: [bia.user.id, caio.user.id], dueDate: far }).expect(201)).body;
+  const task = tasks[0];
+  assert.deepEqual(task.assignees.map(person => person.id), [bia.user.id, caio.user.id]);
+  assert.equal(task.assignee.id, bia.user.id);
+  // Tarefa igual aberta não duplica.
+  await request(app).post(`/api/v1/shared/${work.id}/tasks`).set(dona.auth).send({ title: 'slides' }).expect(409);
+  // Quem não é responsável não marca parte; Bia marca a dela.
+  await request(app).patch(`/api/v1/shared/${work.id}/tasks/${task.id}`).set(dona.auth).send({ done: true }).expect(403);
+  tasks = (await request(app).patch(`/api/v1/shared/${work.id}/tasks/${task.id}`).set(bia.auth).send({ done: true }).expect(200)).body;
+  assert.equal(tasks[0].status, 'Em andamento');
+  assert.deepEqual(tasks[0].assignees.map(person => person.done), [true, false]);
+  // Prazo vencido, recebida com antecedência: só o Caio perde 300 XP.
+  const yesterday = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(Date.now() - 86_400_000));
+  if (pool) {
+    await pool.query("UPDATE study_tasks SET due_date=$2, due_time='08:00' WHERE id=$1", [task.id, yesterday]);
+    await pool.query("UPDATE study_task_assignees SET assigned_at=NOW() - INTERVAL '3 days' WHERE task_id=$1", [task.id]);
+  } else {
+    Object.assign(memory.studyTasks.find(item => item.id === task.id), { dueDate: yesterday, dueTime: '08:00' });
+    memory.taskAssignees.filter(item => item.taskId === task.id).forEach(item => { item.assignedAt = new Date(Date.now() - 3 * 86_400_000); });
+  }
+  await applyOverduePenalties();
+  const xp = async (who) => (await request(app).get('/api/v1/xp-events').set(who.auth)).body.filter(item => item.kind === 'tarefa-atrasada').length;
+  assert.equal(await xp(caio), 1);
+  assert.equal(await xp(bia), 0);
+  // Caio terminou depois: com todas as partes feitas, a tarefa vai para Concluído.
+  tasks = (await request(app).patch(`/api/v1/shared/${work.id}/tasks/${task.id}`).set(caio.auth).send({ done: true }).expect(200)).body;
+  assert.equal(tasks[0].status, 'Concluído');
+  // App antigo (assigneeId único) continua funcionando.
+  tasks = (await request(app).patch(`/api/v1/shared/${work.id}/tasks/${task.id}`).set(dona.auth).send({ assigneeId: caio.user.id }).expect(200)).body;
+  assert.deepEqual(tasks[0].assignees.map(person => person.id), [caio.user.id]);
+});

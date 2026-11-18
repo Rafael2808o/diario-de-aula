@@ -123,3 +123,25 @@
   .notebook-sheet { padding: 8px; border-radius: 16px; }
   .notebook-sheet .notebook-page { padding: 10px 12px 20px 40px; min-height: 55vh; background-image: linear-gradient(to right, transparent 28px, var(--paper-margin) 28px, var(--paper-margin) 29.5px, transparent 29.5px), repeating-linear-gradient(to bottom, transparent 0 31px, var(--paper-rule) 31px 32px); }
 }
+
+/* ---------- Agenda: tipos com identidade própria (aula, prova, atividade, lembrete) ---------- */
+.month-item.kind-prova, .week-item.kind-prova { box-shadow: inset 3px 0 0 var(--tab-gold); }
+.month-item.kind-entrega, .week-item.kind-entrega { box-shadow: inset 3px 0 0 var(--tab-mint); }
+.month-item.kind-lembrete, .week-item.kind-lembrete { background: color-mix(in srgb, var(--tab-rose) 18%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tab-rose) 60%, transparent); border-radius: 6px; font-weight: 600; }
+.month-item.kind-lembrete::before { background: transparent; box-shadow: inset 0 0 0 2px #c2365c; }
+:root:not([data-theme="light"]) .month-item.kind-lembrete::before { box-shadow: inset 0 0 0 2px #ff9ab4; }
+@media (max-width: 640px) { .month-item.kind-lembrete { box-shadow: none; } }
+.commitment.kind-lembrete .commitment-icon { background: color-mix(in srgb, var(--tab-rose) 22%, transparent); color: #c2365c; }
+:root:not([data-theme="light"]) .commitment.kind-lembrete .commitment-icon { color: #ff9ab4; }
+.reminder-choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); gap: 8px; }
+.reminder-choice { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 10px 14px; border: 1px solid var(--card-line); border-radius: 12px; background: var(--surface-2); color: var(--text); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+.reminder-choice:hover { border-color: var(--accent); }
+.reminder-choice.kind-prova svg { color: var(--gold); }
+.reminder-choice.kind-entrega svg { color: var(--success); }
+.reminder-choice.kind-lembrete svg { color: var(--sos); }
+
+/* ---------- Tarefa com vários responsáveis ---------- */
+.assignee-picker { display: flex; flex-wrap: wrap; gap: 6px; }
+.task-assignees { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 0; padding: 0; list-style: none; }
+.task-assignee.is-done { color: var(--success); }
+.task-assignee.is-done svg { flex: none; }

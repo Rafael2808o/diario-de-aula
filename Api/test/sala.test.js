@@ -5,7 +5,13 @@ import app from '../app.js';
 import { memory, pool } from '../store.js';
 
 // Muda o prazo de uma tarefa no banco de verdade ou na memória.
-const setTask = async (id, fields) => {
+// A data de atribuição fica por responsável (study_task_assignees) desde a versão 4.0.
+const setTask = async (id, { assignedAt, ...fields }) => {
+  if (assignedAt) {
+    if (pool) await pool.query('UPDATE study_task_assignees SET assigned_at=$2 WHERE task_id=$1', [id, assignedAt]);
+    else memory.taskAssignees.filter(item => item.taskId === id).forEach(item => { item.assignedAt = assignedAt; });
+  }
+  if (!Object.keys(fields).length) return undefined;
   if (!pool) return Object.assign(memory.studyTasks.find(item => item.id === id), fields);
   const columns = { dueDate: 'due_date', dueTime: 'due_time', assignedAt: 'assigned_at' };
   const keys = Object.keys(fields);

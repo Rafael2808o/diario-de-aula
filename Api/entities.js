@@ -95,7 +95,7 @@ export const entities = {
     fields: {
       subjectId: ref('subject_id', 'subjects', 'SET NULL'),
       title: text('title', 160, { required: 'Dê um nome para a atividade.' }),
-      kind: oneOf('kind', ['Trabalho', 'Atividade', 'Entrega', 'Lista de exercícios', 'Outro'], { default: 'Atividade' }),
+      kind: oneOf('kind', ['Trabalho', 'Atividade', 'Entrega', 'Lista de exercícios', 'Atividade do AVA', 'Apresentação', 'Outro'], { default: 'Atividade' }),
       dueDate: date('due_date', { required: 'Informe o prazo.' }),
       dueTime: time('due_time'),
       notes: multiline('notes'),
@@ -107,7 +107,7 @@ export const entities = {
     fields: {
       subjectId: ref('subject_id', 'subjects', 'SET NULL'),
       title: text('title', 160, { required: 'Dê um nome para o evento.' }),
-      kind: oneOf('kind', ['Sessão de estudo', 'Compromisso', 'Outro'], { default: 'Compromisso' }),
+      kind: oneOf('kind', ['Sessão de estudo', 'Compromisso', 'Lembrete', 'Outro'], { default: 'Compromisso' }),
       date: date('event_date', { required: 'Informe a data do evento.' }),
       startTime: time('start_time'),
       endTime: time('end_time'),

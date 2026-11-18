@@ -250,7 +250,7 @@ export function ExamForm({ exam, defaults = {}, onClose, onSaved, onDelete }) {
   );
 }
 
-export const taskKinds = ["Trabalho", "Atividade", "Entrega", "Lista de exercícios", "Outro"];
+export const taskKinds = ["Trabalho", "Atividade", "Entrega", "Lista de exercícios", "Atividade do AVA", "Apresentação", "Outro"];
 
 export function TaskForm({ task, defaults = {}, onClose, onDelete }) {
   const { create, update } = useApp();
@@ -259,7 +259,7 @@ export function TaskForm({ task, defaults = {}, onClose, onDelete }) {
     onDone: onClose,
   });
   return (
-    <Modal title={task ? "Editar atividade" : "Nova atividade"} onClose={onClose}>
+    <Modal title={task ? "Editar atividade" : defaults.kind ? `Nova: ${defaults.kind}` : "Nova atividade"} onClose={onClose}>
       <form
         className="form"
         onSubmit={(event) => {
@@ -274,7 +274,7 @@ export function TaskForm({ task, defaults = {}, onClose, onDelete }) {
         <div className="form-row">
           <label>
             Tipo
-            <select name="kind" defaultValue={task?.kind || "Atividade"}>
+            <select name="kind" defaultValue={task?.kind || defaults.kind || "Atividade"}>
               {taskKinds.map((kind) => (
                 <option key={kind}>{kind}</option>
               ))}
@@ -314,11 +314,11 @@ export const reminderOptions = [
 export function EventForm({ event, defaults = {}, onClose, onDelete }) {
   const { create, update } = useApp();
   const { submit, busy, error, setError } = useSubmit((body) => (event ? update("events", event.id, body) : create("events", body)), {
-    success: event ? "Evento atualizado." : "Evento criado.",
+    success: (event?.kind || defaults.kind) === "Lembrete" ? (event ? "Lembrete atualizado." : "Lembrete criado.") : event ? "Evento atualizado." : "Evento criado.",
     onDone: onClose,
   });
   return (
-    <Modal title={event ? "Editar evento" : "Novo evento"} onClose={onClose}>
+    <Modal title={event ? (event.kind === "Lembrete" ? "Editar lembrete" : "Editar evento") : defaults.kind === "Lembrete" ? "Novo lembrete" : "Novo evento"} onClose={onClose}>
       <form
         className="form"
         onSubmit={(submitEvent) => {
@@ -336,7 +336,7 @@ export function EventForm({ event, defaults = {}, onClose, onDelete }) {
           <label>
             Tipo
             <select name="kind" defaultValue={event?.kind || defaults.kind || "Compromisso"}>
-              {["Sessão de estudo", "Compromisso", "Outro"].map((kind) => (
+              {["Sessão de estudo", "Compromisso", "Lembrete", "Outro"].map((kind) => (
                 <option key={kind}>{kind}</option>
               ))}
             </select>
@@ -359,7 +359,7 @@ export function EventForm({ event, defaults = {}, onClose, onDelete }) {
         </div>
         <label>
           Lembrete
-          <select name="reminderMinutes" defaultValue={event?.reminderMinutes || 0}>
+          <select name="reminderMinutes" defaultValue={event?.reminderMinutes || defaults.reminderMinutes || 0}>
             {reminderOptions.map(([value, label]) => (
               <option key={value} value={value}>
                 {label}

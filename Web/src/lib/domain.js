@@ -1,4 +1,4 @@
-import { BookOpen, CalendarClock, ClipboardCheck, GraduationCap, Sparkles } from "lucide-react";
+import { BellRing, BookOpen, CalendarClock, ClipboardCheck, GraduationCap, Laptop, Presentation, Sparkles, Users } from "lucide-react";
 import { computeProgress } from "./progress.js";
 import { htmlToText } from "./richtext.js";
 import { addDays, classOccurrences, formatFull } from "./dates.js";
@@ -20,7 +20,17 @@ export const itemKinds = {
   entrega: { label: "Entrega", icon: ClipboardCheck, highlight: true },
   estudo: { label: "Sessão de estudo", icon: Sparkles },
   evento: { label: "Compromisso", icon: CalendarClock },
+  lembrete: { label: "Lembrete", icon: BellRing, highlight: true },
 };
+
+// Atividades com tipo próprio (versão 4.0): ícone e rótulo do tipo, mesma cor de "Entrega".
+const taskLooks = {
+  Trabalho: { label: "Trabalho", icon: Users },
+  "Atividade do AVA": { label: "Atividade do AVA", icon: Laptop },
+  "Apresentação": { label: "Apresentação", icon: Presentation },
+};
+// Rótulo e ícone de um item da agenda (o tipo da atividade quando houver).
+export const kindOf = (item) => ({ ...itemKinds[item.kind], ...(item.look || {}) });
 
 export const kindFilters = [
   ["aula", "Aulas"],
@@ -28,6 +38,7 @@ export const kindFilters = [
   ["entrega", "Entregas"],
   ["estudo", "Estudo"],
   ["evento", "Compromissos"],
+  ["lembrete", "Lembretes"],
 ];
 
 export const subjectById = (subjects, id) => subjects.find((subject) => subject.id === id) || null;
@@ -58,13 +69,13 @@ export function agendaItems(data, user, from, to) {
   }
   for (const task of tasks) {
     if (task.dueDate < from || task.dueDate > to) continue;
-    items.push({ id: `entrega-${task.id}`, kind: "entrega", date: task.dueDate, start: task.dueTime, title: task.title, detail: task.kind, subject: subjectById(subjects, task.subjectId), done: task.done, record: task });
+    items.push({ id: `entrega-${task.id}`, kind: "entrega", look: taskLooks[task.kind], date: task.dueDate, start: task.dueTime, title: task.title, detail: task.kind, subject: subjectById(subjects, task.subjectId), done: task.done, record: task });
   }
   for (const event of events) {
     if (event.date < from || event.date > to) continue;
     items.push({
       id: `evento-${event.id}`,
-      kind: event.kind === "Sessão de estudo" ? "estudo" : "evento",
+      kind: event.kind === "Sessão de estudo" ? "estudo" : event.kind === "Lembrete" ? "lembrete" : "evento",
       date: event.date,
       start: event.startTime,
       end: event.endTime,

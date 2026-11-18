@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { BellRing, ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
+import { BellRing, Check, ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
 import { useApp } from "../../context.js";
 import { formatShort } from "../../lib/dates.js";
 import { Avatar, Confirm, FormError, Modal, Segmented, useSubmit } from "../../ui.jsx";
@@ -13,14 +13,14 @@ function TaskForm({ activity, task, onClose, onSaved }) {
   const [form, setForm] = useState({
     title: task?.title || "",
     description: task?.description || "",
-    assigneeId: task?.assignee?.id || "",
+    assigneeIds: (task?.assignees || (task?.assignee ? [task.assignee] : [])).map((person) => person.id),
     dueDate: task?.dueDate || "",
     dueTime: task?.dueTime || "",
     status: task?.status || "Pendente",
   });
   const set = (key) => (event) => setForm({ ...form, [key]: event.target.value });
   const { submit, busy, error } = useSubmit(
-    () => call(task ? `/shared/${activity.id}/tasks/${task.id}` : `/shared/${activity.id}/tasks`, { method: task ? "PATCH" : "POST", body: { ...form, assigneeId: form.assigneeId || null } }),
+    () => call(task ? `/shared/${activity.id}/tasks/${task.id}` : `/shared/${activity.id}/tasks`, { method: task ? "PATCH" : "POST", body: form }),
     { onDone: onSaved },
   );
   return (
@@ -34,18 +34,25 @@ function TaskForm({ activity, task, onClose, onSaved }) {
           Descrição
           <textarea value={form.description} rows={3} maxLength={2000} onChange={set("description")} />
         </label>
-        <label>
-          Responsável
-          <select value={form.assigneeId} onChange={set("assigneeId")}>
-            <option value="">Sem responsável</option>
-            {activity.members.map((member) => (
-              <option key={member.id} value={member.id}>
-                {member.name}
-                {member.me ? " (você)" : ""}
-              </option>
-            ))}
-          </select>
-        </label>
+        <fieldset className="plain-fieldset">
+          <legend>Responsáveis (pode escolher mais de uma pessoa)</legend>
+          <div className="assignee-picker">
+            {activity.members.map((member) => {
+              const chosen = form.assigneeIds.includes(member.id);
+              return (
+                <button
+                  key={member.id}
+                  type="button"
+                  className={`person-chip ${chosen ? "active" : ""}`}
+                  aria-pressed={chosen}
+                  onClick={() => setForm({ ...form, assigneeIds: chosen ? form.assigneeIds.filter((id) => id !== member.id) : [...form.assigneeIds, member.id] })}
+                >
+                  <Avatar user={member} size={22} /> {member.me ? "Você" : member.name} {chosen && <Check size={14} aria-hidden="true" />}
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
         <div className="form-row">
           <label>
             Prazo
@@ -64,7 +71,7 @@ function TaskForm({ activity, task, onClose, onSaved }) {
             ))}
           </select>
         </label>
-        <p className="hint">Se a tarefa passar do prazo sem ser concluída, o responsável perde 300 XP (uma vez por tarefa).</p>
+        <p className="hint">Cada responsável marca a própria parte. Quem deixar a sua parte passar do prazo perde 300 XP (uma vez por tarefa).</p>
         <FormError>{error}</FormError>
         <div className="form-actions">
           <button type="button" className="btn" onClick={onClose}>
@@ -79,22 +86,29 @@ function TaskForm({ activity, task, onClose, onSaved }) {
   );
 }
 
-function TaskCard({ task, activity, onMove, onEdit, onDelete, onRemind }) {
+function TaskCard({ task, activity, onMove, onEdit, onDelete, onRemind, onMine }) {
   const { user } = useApp();
   const due = dueMs(task);
   const now = Date.now();
   const late = due && now > due && task.status !== "Concluído";
-  const canRemind = task.assignee && task.assignee.id !== user.id && task.status !== "Concluído" && due && now >= due - 86_400_000 && !activity.closed;
+  const people = task.assignees || (task.assignee ? [task.assignee] : []);
+  const mine = people.find((person) => person.id === user.id);
+  const canRemind = people.some((person) => person.id !== user.id && !person.done) && task.status !== "Concluído" && due && now >= due - 86_400_000 && !activity.closed;
   const index = columns.indexOf(task.status);
   return (
     <li className={`task-card ${late ? "is-late" : ""}`}>
       <strong>{task.title}</strong>
       {task.description && <p className="prewrap">{task.description}</p>}
       <div className="task-meta">
-        {task.assignee ? (
-          <span className="task-assignee">
-            <Avatar user={task.assignee} size={22} /> {task.assignee.id === user.id ? "Você" : task.assignee.name}
-          </span>
+        {people.length ? (
+          <ul className="task-assignees" aria-label="Responsáveis">
+            {people.map((person) => (
+              <li key={person.id} className={`task-assignee ${person.done ? "is-done" : ""}`} title={person.done ? "Parte feita" : "Parte pendente"}>
+                <Avatar user={person} size={22} /> {person.id === user.id ? "Você" : person.name}
+                {person.done && <Check size={13} aria-label="parte feita" />}
+              </li>
+            ))}
+          </ul>
         ) : (
           <span className="quiet">Sem responsável</span>
         )}
@@ -115,6 +129,11 @@ function TaskCard({ task, activity, onMove, onEdit, onDelete, onRemind }) {
             <ChevronRight size={16} />
           </button>
           <span className="spacer" />
+          {mine && people.length > 1 && task.status !== "Concluído" && (
+            <button type="button" className="btn small soft" aria-pressed={Boolean(mine.done)} onClick={() => onMine(task, !mine.done)}>
+              <Check size={14} /> {mine.done ? "Minha parte feita" : "Marcar minha parte"}
+            </button>
+          )}
           {canRemind && (
             <button type="button" className="btn small soft" onClick={() => onRemind(task)}>
               <BellRing size={14} /> Lembrar
@@ -151,10 +170,17 @@ export default function Board({ activity }) {
       toast(failure.message);
     }
   };
+  const markMine = async (task, done) => {
+    try {
+      setTasks(await call(`/shared/${activity.id}/tasks/${task.id}`, { method: "PATCH", body: { done } }));
+    } catch (failure) {
+      toast(failure.message);
+    }
+  };
   const remind = async (task) => {
     try {
-      await call(`/shared/${activity.id}/tasks/${task.id}/lembrete`, { method: "POST" });
-      toast(`Lembrete enviado para ${task.assignee.name}.`);
+      const result = await call(`/shared/${activity.id}/tasks/${task.id}/lembrete`, { method: "POST" });
+      toast(`Lembrete enviado para ${(result.names || [task.assignee?.name]).filter(Boolean).join(", ")}.`);
     } catch (failure) {
       toast(failure.message);
     }
@@ -190,7 +216,7 @@ export default function Board({ activity }) {
                 {items.length ? (
                   <ul>
                     {items.map((task) => (
-                      <TaskCard key={task.id} task={task} activity={activity} onMove={move} onEdit={setEditing} onDelete={setDeleting} onRemind={remind} />
+                      <TaskCard key={task.id} task={task} activity={activity} onMove={move} onEdit={setEditing} onDelete={setDeleting} onRemind={remind} onMine={markMine} />
                     ))}
                   </ul>
                 ) : (

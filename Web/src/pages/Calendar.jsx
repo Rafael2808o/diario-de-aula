@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, ClipboardPlus, Plus } from "lucide-react";
+import { BellRing, ChevronLeft, ChevronRight, ClipboardPlus, GraduationCap, Laptop, Plus, Presentation, Users } from "lucide-react";
 import { useApp } from "../context.js";
 import {
   addDays,
@@ -14,9 +14,9 @@ import {
   todayIso,
   weekdays,
 } from "../lib/dates.js";
-import { agendaItems, itemKinds, kindFilters } from "../lib/domain.js";
-import { Confirm, Empty, Segmented } from "../ui.jsx";
-import { EventForm, TaskForm } from "../components/forms.jsx";
+import { agendaItems, itemKinds, kindOf, kindFilters } from "../lib/domain.js";
+import { Confirm, Empty, Modal, Segmented } from "../ui.jsx";
+import { EventForm, ExamForm, TaskForm } from "../components/forms.jsx";
 import { LessonForm } from "../components/LessonForm.jsx";
 import { AgendaRow } from "./Home.jsx";
 
@@ -89,9 +89,12 @@ export default function Calendar() {
       <header className="page-head">
         <div>
           <h1>Agenda</h1>
-          <p>Aulas, provas, entregas, compromissos e sessões de estudo no mesmo calendário.</p>
+          <p>Aulas, provas, trabalhos, atividades do AVA, lembretes e sessões de estudo no mesmo calendário.</p>
         </div>
         <div className="page-actions">
+          <button className="btn soft" onClick={() => setModal({ type: "add" })}>
+            <BellRing size={16} /> Lembrete
+          </button>
           <button className="btn soft" onClick={() => setModal({ type: "task", defaults: { date: cursor } })}>
             <ClipboardPlus size={16} /> Atividade
           </button>
@@ -159,7 +162,7 @@ export default function Calendar() {
                 </button>
                 <div className="month-items">
                   {dayItems.slice(0, 3).map((item) => {
-                    const Icon = itemKinds[item.kind].icon;
+                    const Icon = kindOf(item).icon;
                     return (
                       <button
                         type="button"
@@ -167,7 +170,7 @@ export default function Calendar() {
                         className={`month-item kind-${item.kind} ${item.status === "cancelada" ? "cancelled" : ""}`}
                         style={{ "--subject": item.subject?.color || "var(--accent)" }}
                         onClick={() => open(item)}
-                        title={`${itemKinds[item.kind].label}: ${item.title}`}
+                        title={`${kindOf(item).label}: ${item.title}`}
                       >
                         <Icon size={11} aria-hidden="true" />
                         <span>{item.title}</span>
@@ -199,7 +202,7 @@ export default function Calendar() {
                   <button key={item.id} type="button" className={`week-item kind-${item.kind} ${item.status === "cancelada" || item.done ? "is-muted" : ""}`} style={{ "--subject": item.subject?.color || "var(--accent)" }} onClick={() => open(item)}>
                     <span>{item.start || "Dia todo"}</span>
                     <strong>{item.title}</strong>
-                    <small>{itemKinds[item.kind].label}</small>
+                    <small>{kindOf(item).label}</small>
                   </button>
                 ))}
                 {!(byDay[day] || []).length && <p className="quiet">Livre</p>}
@@ -238,6 +241,26 @@ export default function Calendar() {
         </div>
       )}
 
+      {modal?.type === "add" && (
+        <Modal title="O que você quer lembrar?" onClose={() => setModal(null)}>
+          <div className="reminder-choices">
+            {[
+              ["Prova", GraduationCap, "kind-prova", () => setModal({ type: "exam" })],
+              ["Trabalho", Users, "kind-entrega", () => setModal({ type: "task", defaults: { date: cursor, kind: "Trabalho" } })],
+              ["Atividade do AVA", Laptop, "kind-entrega", () => setModal({ type: "task", defaults: { date: cursor, kind: "Atividade do AVA" } })],
+              ["Prazo de entrega", ClipboardPlus, "kind-entrega", () => setModal({ type: "task", defaults: { date: cursor, kind: "Entrega" } })],
+              ["Apresentação", Presentation, "kind-entrega", () => setModal({ type: "task", defaults: { date: cursor, kind: "Apresentação" } })],
+              ["Outro lembrete", BellRing, "kind-lembrete", () => setModal({ type: "event", defaults: { date: cursor, kind: "Lembrete", reminderMinutes: 1440 } })],
+            ].map(([label, Icon, tone, action]) => (
+              <button key={label} type="button" className={`reminder-choice ${tone}`} onClick={action}>
+                <Icon size={18} aria-hidden="true" /> {label}
+              </button>
+            ))}
+          </div>
+          <p className="hint">Provas vão para a página Provas; trabalhos, AVA, entregas e apresentações viram atividades; tudo aparece aqui na Agenda.</p>
+        </Modal>
+      )}
+      {modal?.type === "exam" && <ExamForm defaults={{ date: cursor }} onClose={() => setModal(null)} onSaved={(saved) => go("provas", { id: saved.id })} />}
       {modal?.type === "lesson" && <LessonForm occurrence={modal.occurrence} onClose={() => setModal(null)} />}
       {modal?.type === "task" && (
         <TaskForm

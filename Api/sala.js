@@ -34,7 +34,19 @@ function initSala() {
       CREATE INDEX IF NOT EXISTS study_tasks_activity_idx ON study_tasks(activity_id);
       -- Versão 4.0: quem salva o perfil depois desta versão confirmou o nome completo (antes, o formulário vinha
       -- preenchido com o nome de exibição). Perfis antigos ficam como estão, só sem confirmação.
-      ALTER TABLE academic_profiles ADD COLUMN IF NOT EXISTS name_confirmed BOOLEAN NOT NULL DEFAULT FALSE`);
+      ALTER TABLE academic_profiles ADD COLUMN IF NOT EXISTS name_confirmed BOOLEAN NOT NULL DEFAULT FALSE;
+      -- Versão 4.0: uma tarefa pode ter várias pessoas. Cada uma tem data de atribuição, penalidade e "minha parte
+      -- feita" próprias. assignee_id continua sendo o primeiro responsável (compatibilidade); o preenchimento abaixo
+      -- só copia o responsável antigo e não repete linhas.
+      CREATE TABLE IF NOT EXISTS study_task_assignees (
+        task_id TEXT NOT NULL REFERENCES study_tasks(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        assigned_at TIMESTAMPTZ DEFAULT NOW(), penalized BOOLEAN NOT NULL DEFAULT FALSE,
+        done BOOLEAN NOT NULL DEFAULT FALSE, done_at TIMESTAMPTZ, PRIMARY KEY (task_id, user_id));
+      CREATE INDEX IF NOT EXISTS study_task_assignees_user_idx ON study_task_assignees(user_id);
+      INSERT INTO study_task_assignees (task_id, user_id, assigned_at, penalized, done)
+        SELECT id, assignee_id, COALESCE(assigned_at, created_at), penalized, status = 'Concluído' FROM study_tasks WHERE assignee_id IS NOT NULL
+        ON CONFLICT DO NOTHING`);
   })().catch(error => {
     ready = null;
     throw error;
@@ -47,6 +59,7 @@ const oneLine = (value, max) => clean(value, max).replace(/\s+/g, ' ');
 const mem = () => {
   memory.academicProfiles ||= new Map();
   memory.studyTasks ||= [];
+  memory.taskAssignees ||= [];
   return memory;
 };
 const memoryUser = id => memory.users.find(user => user.id === id) || {};
@@ -106,66 +119,110 @@ async function rosterOf(activityId) {
 }
 
 // ---------- Tarefas ----------
+// Responsáveis de cada tarefa (study_task_assignees), na ordem em que foram escolhidos.
+async function assigneesOf(taskIds) {
+  if (!taskIds.length) return [];
+  if (pool) {
+    return (await pool.query(`SELECT a.task_id AS "taskId", a.user_id AS "userId", a.assigned_at AS "assignedAt", a.penalized, a.done, u.name, u.avatar_version AS "avatarVersion"
+      FROM study_task_assignees a JOIN users u ON u.id=a.user_id WHERE a.task_id = ANY($1) ORDER BY a.assigned_at, u.name`, [taskIds])).rows;
+  }
+  return mem().taskAssignees.filter(item => taskIds.includes(item.taskId)).map(item => ({ ...item, name: memoryUser(item.userId).name, avatarVersion: memoryUser(item.userId).avatar_version }));
+}
+
 async function tasksOf(activityId) {
   await initSala();
   const rows = pool
-    ? (await pool.query(`SELECT t.id, t.title, t.description, t.assignee_id AS "assigneeId", t.due_date AS "dueDate", t.due_time AS "dueTime", t.status,
-        t.assigned_at AS "assignedAt", t.penalized, t.created_at AS "createdAt", t.updated_at AS "updatedAt", u.name AS "assigneeName", u.avatar_version AS "avatarVersion"
-        FROM study_tasks t LEFT JOIN users u ON u.id=t.assignee_id WHERE t.activity_id=$1 ORDER BY t.created_at`, [activityId])).rows
-    : mem().studyTasks.filter(item => item.activityId === activityId).map(item => ({ ...item, assigneeName: memoryUser(item.assigneeId).name, avatarVersion: memoryUser(item.assigneeId).avatar_version }));
-  return rows.map(row => ({
-    id: row.id, title: row.title, description: row.description, dueDate: row.dueDate, dueTime: row.dueTime, status: row.status, penalized: Boolean(row.penalized),
-    assignee: row.assigneeId ? { id: row.assigneeId, name: publicName(row.assigneeName || ''), avatarVersion: row.avatarVersion || '' } : null,
-    updatedAt: new Date(row.updatedAt || row.createdAt || Date.now()).toISOString()
-  }));
+    ? (await pool.query(`SELECT t.id, t.title, t.description, t.due_date AS "dueDate", t.due_time AS "dueTime", t.status, t.penalized, t.created_at AS "createdAt", t.updated_at AS "updatedAt"
+        FROM study_tasks t WHERE t.activity_id=$1 ORDER BY t.created_at`, [activityId])).rows
+    : mem().studyTasks.filter(item => item.activityId === activityId);
+  const assignees = await assigneesOf(rows.map(row => row.id));
+  return rows.map(row => {
+    const people = assignees.filter(item => item.taskId === row.id).map(item => ({ id: item.userId, name: publicName(item.name || ''), avatarVersion: item.avatarVersion || '', done: Boolean(item.done) }));
+    return {
+      id: row.id, title: row.title, description: row.description, dueDate: row.dueDate, dueTime: row.dueTime, status: row.status, penalized: Boolean(row.penalized),
+      assignees: people,
+      // Compatibilidade com o app antigo: o primeiro responsável.
+      assignee: people[0] ? { id: people[0].id, name: people[0].name, avatarVersion: people[0].avatarVersion } : null,
+      updatedAt: new Date(row.updatedAt || row.createdAt || Date.now()).toISOString()
+    };
+  });
 }
 
 async function taskRow(activityId, taskId) {
-  if (pool) return (await pool.query('SELECT id, title, description, assignee_id AS "assigneeId", due_date AS "dueDate", due_time AS "dueTime", status, assigned_at AS "assignedAt", penalized FROM study_tasks WHERE id=$1 AND activity_id=$2', [taskId, activityId])).rows[0];
-  return mem().studyTasks.find(item => item.id === taskId && item.activityId === activityId);
+  const row = pool
+    ? (await pool.query('SELECT id, title, description, due_date AS "dueDate", due_time AS "dueTime", status FROM study_tasks WHERE id=$1 AND activity_id=$2', [taskId, activityId])).rows[0]
+    : mem().studyTasks.find(item => item.id === taskId && item.activityId === activityId);
+  if (!row) return null;
+  return { ...row, assignees: await assigneesOf([row.id]) };
 }
 
-function taskInput(body, activeIds) {
+// Aceita assigneeIds (vários) ou assigneeId (app antigo). Todos precisam ser integrantes ativos.
+function taskInput(body, activeIds, current = []) {
   const title = oneLine(body?.title, 160);
   const dueDate = oneLine(body?.dueDate, 10);
   const dueTime = oneLine(body?.dueTime, 5);
   const status = oneLine(body?.status, 20) || 'Pendente';
-  const assigneeId = body?.assigneeId ? String(body.assigneeId) : null;
+  const raw = Array.isArray(body?.assigneeIds) ? body.assigneeIds : body?.assigneeId !== undefined ? (body.assigneeId ? [body.assigneeId] : []) : current;
+  const assigneeIds = [...new Set(raw.map(String))].slice(0, 30);
   if (title.length < 2) return { error: 'Dê um título para a tarefa.' };
   if (dueDate && !isDate(dueDate)) return { error: 'Use uma data válida para o prazo.' };
   if (dueTime && !isTime(dueTime)) return { error: 'Use um horário válido.' };
   if (!taskStatuses.includes(status)) return { error: 'Escolha Pendente, Em andamento ou Concluído.' };
-  if (assigneeId && !activeIds.includes(assigneeId)) return { error: 'O responsável precisa ser integrante do trabalho.' };
-  return { task: { title, description: clean(body?.description, 2000), dueDate, dueTime, status, assigneeId } };
+  if (assigneeIds.some(id => !activeIds.includes(id))) return { error: 'Os responsáveis precisam ser integrantes do trabalho.' };
+  return { task: { title, description: clean(body?.description, 2000), dueDate, dueTime, status, assigneeIds } };
 }
 
-// -300 XP para quem tinha a tarefa e deixou passar do prazo sem concluir. Uma vez por tarefa
-// (o registro de XP é único por tarefa), só se a pessoa recebeu a tarefa com pelo menos 12 h de antecedência.
+// Grava a lista de responsáveis: quem saiu perde a linha, quem entrou começa agora (para a regra das 12 h).
+async function saveAssignees(taskId, ids, { resetPenalty = false } = {}) {
+  const before = (await assigneesOf([taskId])).map(item => item.userId);
+  const added = ids.filter(id => !before.includes(id));
+  if (pool) {
+    await pool.query('DELETE FROM study_task_assignees WHERE task_id=$1 AND NOT (user_id = ANY($2))', [taskId, ids]);
+    for (const id of added) await pool.query('INSERT INTO study_task_assignees (task_id,user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [taskId, id]);
+    if (resetPenalty) await pool.query('UPDATE study_task_assignees SET penalized=FALSE WHERE task_id=$1', [taskId]);
+    await pool.query('UPDATE study_tasks SET assignee_id=$2, assigned_at=CASE WHEN $2::text IS NULL THEN NULL ELSE COALESCE(assigned_at, NOW()) END WHERE id=$1', [taskId, ids[0] || null]);
+  } else {
+    memory.taskAssignees = mem().taskAssignees.filter(item => item.taskId !== taskId || ids.includes(item.userId));
+    for (const id of added) memory.taskAssignees.push({ taskId, userId: id, assignedAt: new Date(), penalized: false, done: false });
+    if (resetPenalty) memory.taskAssignees.filter(item => item.taskId === taskId).forEach(item => { item.penalized = false; });
+    const task = mem().studyTasks.find(item => item.id === taskId);
+    if (task) task.assigneeId = ids[0] || null;
+  }
+  return added;
+}
+
+// -300 XP para cada responsável que deixou passar do prazo sem concluir a sua parte. Uma vez por pessoa e tarefa
+// (o registro de XP é único por pessoa + tarefa), só se a pessoa recebeu a tarefa com pelo menos 12 h de antecedência.
 export async function applyOverduePenalties(now = Date.now()) {
   await initSala();
   const rows = pool
-    ? (await pool.query(`SELECT t.id, t.activity_id AS "activityId", t.title, t.assignee_id AS "assigneeId", t.due_date AS "dueDate", t.due_time AS "dueTime", t.assigned_at AS "assignedAt"
-        FROM study_tasks t JOIN shared_activities a ON a.id=t.activity_id
-        WHERE NOT t.penalized AND t.status <> 'Concluído' AND t.assignee_id IS NOT NULL AND t.due_date <> '' AND NOT a.closed`)).rows
-    : mem().studyTasks.filter(item => !item.penalized && item.status !== 'Concluído' && item.assigneeId && item.dueDate && !memory.sharedActivities?.find(a => a.id === item.activityId)?.closed);
+    ? (await pool.query(`SELECT t.id, t.activity_id AS "activityId", t.title, t.due_date AS "dueDate", t.due_time AS "dueTime", s.user_id AS "userId", s.assigned_at AS "assignedAt"
+        FROM study_task_assignees s JOIN study_tasks t ON t.id=s.task_id JOIN shared_activities a ON a.id=t.activity_id
+        WHERE NOT s.penalized AND NOT s.done AND t.status <> 'Concluído' AND t.due_date <> '' AND NOT a.closed`)).rows
+    : mem().taskAssignees.filter(item => !item.penalized && !item.done).flatMap(item => {
+      const task = mem().studyTasks.find(row => row.id === item.taskId);
+      if (!task || task.status === 'Concluído' || !task.dueDate || memory.sharedActivities?.find(a => a.id === task.activityId)?.closed) return [];
+      return [{ id: task.id, activityId: task.activityId, title: task.title, dueDate: task.dueDate, dueTime: task.dueTime, userId: item.userId, assignedAt: item.assignedAt }];
+    });
   let applied = 0;
   for (const task of rows) {
     const due = dueAt(task.dueDate, task.dueTime);
     if (!due || now <= due) continue;
     const assignedAt = task.assignedAt ? new Date(task.assignedAt).getTime() : null;
     const members = await membersOf(task.activityId);
-    const stillMember = members.some(member => member.userId === task.assigneeId && !member.removed);
+    const stillMember = members.some(member => member.userId === task.userId && !member.removed);
     const fair = stillMember && assignedAt !== null && assignedAt <= due - penaltyNoticeMs;
-    if (pool) await pool.query('UPDATE study_tasks SET penalized=TRUE WHERE id=$1', [task.id]);
-    else Object.assign(mem().studyTasks.find(item => item.id === task.id) || {}, { penalized: true });
+    if (pool) await pool.query('UPDATE study_task_assignees SET penalized=TRUE WHERE task_id=$1 AND user_id=$2', [task.id, task.userId]);
+    else Object.assign(mem().taskAssignees.find(item => item.taskId === task.id && item.userId === task.userId) || {}, { penalized: true });
     if (!fair) continue;
-    if (await awardXp(task.assigneeId, 'tarefa-atrasada', task.id, { text: `Tarefa atrasada: ${task.title}` })) {
+    if (await awardXp(task.userId, 'tarefa-atrasada', task.id, { text: `Tarefa atrasada: ${task.title}` })) {
       applied += 1;
-      await notify(task.assigneeId, { kind: 'compartilhada', key: `tarefa-atrasada:${task.id}`, title: 'A tarefa passou do prazo: -300 XP', body: task.title, link: { page: 'compartilhadas', params: { id: task.activityId } } }).catch(() => {});
+      await notify(task.userId, { kind: 'compartilhada', key: `tarefa-atrasada:${task.id}`, title: 'A tarefa passou do prazo: -300 XP', body: task.title, link: { page: 'compartilhadas', params: { id: task.activityId } } }).catch(() => {});
     }
   }
   return applied;
 }
+
 let lastPenaltyCheck = 0;
 const checkPenaltiesQuietly = () => {
   if (Date.now() - lastPenaltyCheck < 60_000) return;
@@ -329,14 +386,17 @@ export function registerSalaRoutes(app, requireAuth) {
     const activeIds = found.members.filter(item => !item.removed).map(item => item.userId);
     const { task, error } = taskInput(req.body, activeIds);
     if (error) return res.status(400).json({ error });
+    // Evita duas tarefas abertas iguais no mesmo trabalho.
+    const same = (await tasksOf(found.activity.id)).find(item => item.status !== 'Concluído' && item.title.toLowerCase() === task.title.toLowerCase());
+    if (same) return res.status(409).json({ error: `Já existe a tarefa “${same.title}” neste trabalho. Abra a tarefa e adicione mais responsáveis.` });
     const id = randomUUID();
-    const assignedAt = task.assigneeId ? new Date() : null;
     if (pool) {
-      await pool.query(`INSERT INTO study_tasks (id,activity_id,title,description,assignee_id,due_date,due_time,status,assigned_at,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-        [id, found.activity.id, task.title, task.description, task.assigneeId, task.dueDate, task.dueTime, task.status, assignedAt, req.user.id]);
-    } else mem().studyTasks.push({ id, activityId: found.activity.id, ...task, assignedAt, penalized: false, createdBy: req.user.id, createdAt: new Date(), updatedAt: new Date() });
-    if (task.assigneeId && task.assigneeId !== req.user.id) {
-      await notify(task.assigneeId, { kind: 'compartilhada', key: `sala-tarefa:${id}`, title: `Nova tarefa para você: ${task.title}`, body: found.activity.title, link: { page: 'compartilhadas', params: { id: found.activity.id } } }).catch(() => {});
+      await pool.query(`INSERT INTO study_tasks (id,activity_id,title,description,due_date,due_time,status,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [id, found.activity.id, task.title, task.description, task.dueDate, task.dueTime, task.status, req.user.id]);
+    } else mem().studyTasks.push({ id, activityId: found.activity.id, title: task.title, description: task.description, dueDate: task.dueDate, dueTime: task.dueTime, status: task.status, penalized: false, createdBy: req.user.id, createdAt: new Date(), updatedAt: new Date() });
+    const added = await saveAssignees(id, task.assigneeIds);
+    for (const userId of added.filter(item => item !== req.user.id)) {
+      await notify(userId, { kind: 'compartilhada', key: `sala-tarefa:${id}:${userId}`, title: `Nova tarefa para você: ${task.title}`, body: found.activity.title, link: { page: 'compartilhadas', params: { id: found.activity.id } } }).catch(() => {});
     }
     return res.status(201).json(await tasksOf(found.activity.id));
   }));
@@ -345,20 +405,37 @@ export function registerSalaRoutes(app, requireAuth) {
     if (!found) return undefined;
     const row = await taskRow(found.activity.id, req.params.taskId);
     if (!row) return res.status(404).json({ error: 'Tarefa não encontrada.' });
+    const currentIds = row.assignees.map(item => item.userId);
+    // "Minha parte": cada responsável marca só a própria parte. Com todas feitas, a tarefa vai para Concluído.
+    if (typeof req.body?.done === 'boolean' && Object.keys(req.body).length === 1) {
+      if (!currentIds.includes(req.user.id)) return res.status(403).json({ error: 'Só quem é responsável marca a própria parte.' });
+      if (pool) await pool.query('UPDATE study_task_assignees SET done=$3, done_at=CASE WHEN $3 THEN NOW() ELSE NULL END WHERE task_id=$1 AND user_id=$2', [row.id, req.user.id, req.body.done]);
+      else Object.assign(mem().taskAssignees.find(item => item.taskId === row.id && item.userId === req.user.id), { done: req.body.done });
+      const after = await assigneesOf([row.id]);
+      const status = after.every(item => item.done) ? 'Concluído' : row.status === 'Concluído' ? 'Em andamento' : row.status === 'Pendente' && req.body.done ? 'Em andamento' : row.status;
+      if (pool) await pool.query('UPDATE study_tasks SET status=$2, updated_at=NOW() WHERE id=$1', [row.id, status]);
+      else Object.assign(mem().studyTasks.find(item => item.id === row.id), { status, updatedAt: new Date() });
+      return res.json(await tasksOf(found.activity.id));
+    }
     const activeIds = found.members.filter(item => !item.removed).map(item => item.userId);
-    const current = { title: row.title, description: row.description, dueDate: row.dueDate, dueTime: row.dueTime, status: row.status, assigneeId: row.assigneeId };
-    const { task, error } = taskInput({ ...current, ...req.body }, activeIds);
+    // Quem saiu do trabalho continua aparecendo na tarefa até alguém trocar os responsáveis.
+    const { task, error } = taskInput({ title: row.title, description: row.description, dueDate: row.dueDate, dueTime: row.dueTime, status: row.status, ...req.body }, [...activeIds, ...currentIds], currentIds);
     if (error) return res.status(400).json({ error });
-    const reassigned = task.assigneeId !== row.assigneeId;
-    const assignedAt = reassigned ? (task.assigneeId ? new Date() : null) : row.assignedAt;
-    // Prazo novo ou novo responsável: a penalidade volta a valer para o prazo atual.
-    const resetPenalty = reassigned || task.dueDate !== row.dueDate || task.dueTime !== row.dueTime;
+    if (task.assigneeIds.some(id => !currentIds.includes(id) && !activeIds.includes(id))) return res.status(400).json({ error: 'Os responsáveis precisam ser integrantes do trabalho.' });
+    // Prazo novo: a penalidade volta a valer para o prazo atual.
+    const resetPenalty = task.dueDate !== row.dueDate || task.dueTime !== row.dueTime;
     if (pool) {
-      await pool.query(`UPDATE study_tasks SET title=$2, description=$3, assignee_id=$4, due_date=$5, due_time=$6, status=$7, assigned_at=$8, penalized=CASE WHEN $9 THEN FALSE ELSE penalized END, updated_at=NOW() WHERE id=$1`,
-        [row.id, task.title, task.description, task.assigneeId, task.dueDate, task.dueTime, task.status, assignedAt, resetPenalty]);
-    } else Object.assign(row, task, { assignedAt, updatedAt: new Date() }, resetPenalty ? { penalized: false } : {});
-    if (reassigned && task.assigneeId && task.assigneeId !== req.user.id) {
-      await notify(task.assigneeId, { kind: 'compartilhada', key: `sala-tarefa:${row.id}:${task.assigneeId}`, title: `Nova tarefa para você: ${task.title}`, body: found.activity.title, link: { page: 'compartilhadas', params: { id: found.activity.id } } }).catch(() => {});
+      await pool.query(`UPDATE study_tasks SET title=$2, description=$3, due_date=$4, due_time=$5, status=$6, penalized=CASE WHEN $7 THEN FALSE ELSE penalized END, updated_at=NOW() WHERE id=$1`,
+        [row.id, task.title, task.description, task.dueDate, task.dueTime, task.status, resetPenalty]);
+    } else Object.assign(mem().studyTasks.find(item => item.id === row.id), { title: task.title, description: task.description, dueDate: task.dueDate, dueTime: task.dueTime, status: task.status, updatedAt: new Date() }, resetPenalty ? { penalized: false } : {});
+    // Tarefa movida para Concluído no quadro: todas as partes contam como feitas.
+    if (task.status === 'Concluído' && row.status !== 'Concluído') {
+      if (pool) await pool.query('UPDATE study_task_assignees SET done=TRUE, done_at=COALESCE(done_at, NOW()) WHERE task_id=$1', [row.id]);
+      else mem().taskAssignees.filter(item => item.taskId === row.id).forEach(item => { item.done = true; });
+    }
+    const added = await saveAssignees(row.id, task.assigneeIds, { resetPenalty });
+    for (const userId of added.filter(item => item !== req.user.id)) {
+      await notify(userId, { kind: 'compartilhada', key: `sala-tarefa:${row.id}:${userId}`, title: `Nova tarefa para você: ${task.title}`, body: found.activity.title, link: { page: 'compartilhadas', params: { id: found.activity.id } } }).catch(() => {});
     }
     return res.json(await tasksOf(found.activity.id));
   }));
@@ -366,28 +443,36 @@ export function registerSalaRoutes(app, requireAuth) {
     const found = await member(req, res);
     if (!found) return undefined;
     if (pool) await pool.query('DELETE FROM study_tasks WHERE id=$1 AND activity_id=$2', [req.params.taskId, found.activity.id]);
-    else memory.studyTasks = mem().studyTasks.filter(item => !(item.id === req.params.taskId && item.activityId === found.activity.id));
+    else {
+      memory.studyTasks = mem().studyTasks.filter(item => !(item.id === req.params.taskId && item.activityId === found.activity.id));
+      memory.taskAssignees = mem().taskAssignees.filter(item => item.taskId !== req.params.taskId);
+    }
     return res.json(await tasksOf(found.activity.id));
   }));
-  // Lembrete para o responsável: a partir de 1 dia antes do prazo, um por pessoa por tarefa a cada dia.
+  // Lembrete para quem ainda não fez a sua parte: a partir de 1 dia antes do prazo, um por pessoa por tarefa a cada dia.
   app.post('/api/v1/shared/:id/tasks/:taskId/lembrete', requireAuth, route(async (req, res) => {
     const found = await member(req, res);
     if (!found) return undefined;
     const row = await taskRow(found.activity.id, req.params.taskId);
     if (!row) return res.status(404).json({ error: 'Tarefa não encontrada.' });
-    if (!row.assigneeId) return res.status(400).json({ error: 'Esta tarefa ainda não tem responsável.' });
-    if (row.assigneeId === req.user.id) return res.status(400).json({ error: 'A tarefa é sua: não dá para lembrar você mesmo.' });
+    if (!row.assignees.length) return res.status(400).json({ error: 'Esta tarefa ainda não tem responsável.' });
+    const pending = row.assignees.filter(item => !item.done && item.userId !== req.user.id);
+    if (!pending.length) return res.status(400).json({ error: row.assignees.some(item => item.userId === req.user.id && !item.done) ? 'A parte que falta é sua: não dá para lembrar você mesmo.' : 'Todos já fizeram a sua parte.' });
     if (row.status === 'Concluído') return res.status(400).json({ error: 'Esta tarefa já foi concluída.' });
     const due = dueAt(row.dueDate, row.dueTime);
     if (!due) return res.status(400).json({ error: 'Defina um prazo para a tarefa antes de enviar lembretes.' });
     if (Date.now() < due - reminderWindowMs) return res.status(400).json({ error: 'Os lembretes ficam disponíveis a partir de 1 dia antes do prazo.' });
     const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
-    const sent = await notify(row.assigneeId, {
-      kind: 'compartilhada', key: `sala-lembrete:${row.id}:${req.user.id}:${day}`,
-      title: 'Ei, sua parte ainda está pendente! O prazo está chegando. 🧙‍♀️', body: `${row.title} · ${found.activity.title} · lembrete de ${publicName(req.user.name)}`,
-      link: { page: 'compartilhadas', params: { id: found.activity.id } }
-    });
-    return res.json({ sent: sent !== false });
+    let sent = 0;
+    for (const person of pending) {
+      const ok = await notify(person.userId, {
+        kind: 'compartilhada', key: `sala-lembrete:${row.id}:${req.user.id}:${person.userId}:${day}`,
+        title: 'Ei, sua parte ainda está pendente! O prazo está chegando. 🧙‍♀️', body: `${row.title} · ${found.activity.title} · lembrete de ${publicName(req.user.name)}`,
+        link: { page: 'compartilhadas', params: { id: found.activity.id } }
+      });
+      if (ok !== false) sent += 1;
+    }
+    return res.json({ sent: sent > 0, count: sent, names: pending.map(person => publicName(person.name)) });
   }));
 
   // Chamada em grupo

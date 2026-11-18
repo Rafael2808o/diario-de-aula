@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { AlarmClock, BookOpen, ChevronRight, ClipboardPlus, Flame, GraduationCap, LifeBuoy } from "lucide-react";
 import { useApp } from "../context.js";
 import { addDays, countdown, formatFull, formatShort, nowTime, todayIso } from "../lib/dates.js";
-import { agendaItems, itemKinds, lessonStatus, lessonsWithoutMaterial, pendingLessons, progressOf, subjectById, subjectProgress } from "../lib/domain.js";
+import { agendaItems, itemKinds, kindOf, lessonStatus, lessonsWithoutMaterial, pendingLessons, progressOf, subjectById, subjectProgress } from "../lib/domain.js";
 import { Empty } from "../ui.jsx";
 import { NoxPose, ProgressRing } from "../components/Art.jsx";
 import { ExamForm, TaskForm } from "../components/forms.jsx";
@@ -13,7 +13,7 @@ import XpMural from "../components/XpMural.jsx";
 
 // Linha de agenda usada no Início e no Calendário. Tipo sempre aparece em texto e ícone, não só pela cor.
 export function AgendaRow({ item, onOpen, showDate = false }) {
-  const kind = itemKinds[item.kind];
+  const kind = kindOf(item);
   const Icon = kind.icon;
   const status = item.kind === "aula" ? lessonStatus[item.status].short : item.done ? "Concluída" : kind.label;
   return (
@@ -369,7 +369,7 @@ export default function Home() {
             {upcoming.length ? (
               <ul className="group commitments">
                 {upcoming.map((item) => {
-                  const Icon = itemKinds[item.kind].icon;
+                  const Icon = kindOf(item).icon;
                   return (
                     <li key={item.id}>
                       <button
@@ -385,7 +385,7 @@ export default function Home() {
                           <strong>{item.title}</strong>
                           <small>{[whenLabel(item, today), item.kind !== "aula" && item.subject?.name].filter(Boolean).join(" · ")}</small>
                         </span>
-                        <span className={`row-tag tag-${item.kind}`}>{itemKinds[item.kind].label}</span>
+                        <span className={`row-tag tag-${item.kind}`}>{kindOf(item).label}</span>
                       </button>
                     </li>
                   );
