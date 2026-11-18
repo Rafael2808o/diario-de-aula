@@ -140,7 +140,10 @@ export const entities = {
       level: oneOf('level', ['nova', 'difícil', 'dúvida', 'fácil'], { default: 'nova' }),
       reviews: int('reviews', 0, 10000),
       reviewedOn: date('reviewed_on'),
-      origin: oneOf('origin', ['Criado por você', 'Sugestão da IA'], { default: 'Criado por você' })
+      origin: oneOf('origin', ['Criado por você', 'Sugestão da IA'], { default: 'Criado por você' }),
+      // Versão 4.0: organização. Aula de origem e conjunto (tema) escolhido pela pessoa; cartões antigos ficam sem os dois.
+      lessonId: ref('lesson_id', 'lessons', 'SET NULL'),
+      deck: text('deck', 80)
     }
   },
   'quiz-results': {

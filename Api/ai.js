@@ -283,7 +283,7 @@ export function registerAiRoutes(app, requireAuth, aiRateLimit) {
     const topic = text(req.body.topic, 180);
     if (!subject || !topic) return res.status(400).json({ error: 'Disciplina e conteúdo são obrigatórios.' });
     const quantity = Math.max(1, Math.min(10, Number.parseInt(req.body.quantity, 10) || 5));
-    return enqueue(req, res, 'questions', { subject, topic, quantity, difficulty: text(req.body.difficulty, 20), context: text(req.body.context, 6000) });
+    return enqueue(req, res, 'questions', { subject, topic, quantity, difficulty: text(req.body.difficulty, 20), context: text(req.body.context, 9000) });
   });
 
   app.post('/api/v1/ai/study', requireAuth, aiRateLimit, async (req, res) => {
@@ -294,7 +294,7 @@ export function registerAiRoutes(app, requireAuth, aiRateLimit) {
     if (!subject) return res.status(400).json({ error: 'Escolha a disciplina.' });
     if (kind === 'explicar' && !topic) return res.status(400).json({ error: 'Informe o que você não entendeu.' });
     const quantity = Math.max(3, Math.min(20, Number.parseInt(req.body.quantity, 10) || 8));
-    return enqueue(req, res, kind, { subject, topic, depth: text(req.body.depth, 20), level: text(req.body.level, 20), quantity, context: text(req.body.context, 6000) });
+    return enqueue(req, res, kind, { subject, topic, depth: text(req.body.depth, 20), level: text(req.body.level, 20), quantity, context: text(req.body.context, 9000) });
   });
 
   // Áudio chega em base64 dentro do JSON (até 3 MB de arquivo, para caber no limite de corpo do proxy da Vercel).

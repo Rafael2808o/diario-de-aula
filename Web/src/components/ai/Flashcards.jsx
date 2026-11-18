@@ -4,13 +4,17 @@ import { useApp } from "../../context.js";
 import { todayIso } from "../../lib/dates.js";
 import { Confirm, Empty, FormError, Modal, Segmented, useSubmit } from "../../ui.jsx";
 import { TarotBack } from "../Art.jsx";
-import { BasisHint, SourceNote, SubjectTopicFields, buildContext, postAi, AiProgress } from "./shared.jsx";
+import { BasisHint, SourceNote, SubjectTopicFields, buildContext, lessonSourceText, postAi, AiProgress } from "./shared.jsx";
+import { formatShort } from "../../lib/dates.js";
 
 // Ordem de revisão: o que pede revisão e as dúvidas antes; o que você já sabe vai para o fim.
 const order = { difícil: 0, dúvida: 1, nova: 2, fácil: 3 };
 
-function CardForm({ card, subjectId, onClose }) {
-  const { create, update } = useApp();
+function CardForm({ card, subjectId, defaults = {}, onClose }) {
+  const { create, update, data } = useApp();
+  const subject = card?.subjectId || subjectId;
+  const decks = deckNames(data.flashcards.filter((item) => item.subjectId === subject));
+  const lessons = lessonsWithContent(data, subject);
   const { submit, busy, error } = useSubmit((body) => (card ? update("flashcards", card.id, body) : create("flashcards", body)), {
     success: card ? "Cartão atualizado." : "Cartão criado.",
     onDone: onClose,
@@ -22,7 +26,7 @@ function CardForm({ card, subjectId, onClose }) {
         onSubmit={(event) => {
           event.preventDefault();
           const values = Object.fromEntries(new FormData(event.currentTarget));
-          submit({ ...values, subjectId: card?.subjectId || subjectId });
+          submit({ ...values, lessonId: values.lessonId || null, subjectId: subject });
         }}
       >
         <label>
@@ -33,6 +37,28 @@ function CardForm({ card, subjectId, onClose }) {
           Resposta
           <textarea name="back" required rows={4} maxLength={1200} defaultValue={card?.back} />
         </label>
+        <div className="form-row">
+          <label>
+            Conjunto ou tema
+            <input name="deck" maxLength={80} list="card-decks" defaultValue={card?.deck ?? defaults.deck ?? ""} placeholder="Ex.: Segmentação de mercado" />
+            <datalist id="card-decks">
+              {decks.map((deck) => (
+                <option key={deck} value={deck} />
+              ))}
+            </datalist>
+          </label>
+          <label>
+            Aula de origem
+            <select name="lessonId" defaultValue={card?.lessonId ?? defaults.lessonId ?? ""}>
+              <option value="">Nenhuma aula específica</option>
+              {lessons.map((lesson) => (
+                <option key={lesson.id} value={lesson.id}>
+                  {lessonLabel(lesson)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         <FormError>{error}</FormError>
         <div className="form-actions">
           <span className="spacer" />
@@ -46,6 +72,25 @@ function CardForm({ card, subjectId, onClose }) {
       </form>
     </Modal>
   );
+}
+
+// Organização das cartas: conjunto (tema escrito pela pessoa), aula de origem e prova.
+const noDeck = "Sem conjunto";
+export const deckNames = (cards) => [...new Set(cards.map((card) => (card.deck || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+const lessonLabel = (lesson) => `Aula de ${formatShort(lesson.date)}${lesson.theme ? ` · ${lesson.theme}` : ""}`;
+const lessonsWithContent = (data, subjectId) => data.lessons.filter((lesson) => lesson.subjectId === subjectId && lesson.status !== "cancelada" && lessonSourceText(lesson));
+
+// Lista agrupada pelo conjunto; sem conjunto, pela aula de origem; o resto em "Sem conjunto".
+function groupByDeck(cards, data) {
+  const groups = new Map();
+  for (const card of cards) {
+    const deck = (card.deck || "").trim();
+    const lesson = !deck && card.lessonId ? data.lessons.find((item) => item.id === card.lessonId) : null;
+    const key = deck ? `deck:${deck}` : lesson ? `aula:${lesson.id}` : "sem";
+    if (!groups.has(key)) groups.set(key, { key, title: deck || (lesson ? lessonLabel(lesson) : noDeck), cards: [] });
+    groups.get(key).cards.push(card);
+  }
+  return [...groups.values()].sort((a, b) => (a.key === "sem") - (b.key === "sem") || a.title.localeCompare(b.title, "pt-BR"));
 }
 
 export const levelLabel = { nova: "Nova", difícil: "Não sei", dúvida: "Revisar", fácil: "Dominei" };
@@ -212,18 +257,41 @@ function Review({ cards }) {
 export default function Flashcards({ preset = {} }) {
   const { data, session, create, remove, toast } = useApp();
   const [subjectId, setSubjectId] = useState(preset.subjectId || data.subjects[0]?.id || "");
-  const [mode, setMode] = useState("revisar");
+  const [mode, setMode] = useState(preset.mode === "criar" ? "criar" : "revisar");
   const [topic, setTopic] = useState(preset.topic || "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [stage, setStage] = useState(null);
   const [draft, setDraft] = useState(null);
   const [modal, setModal] = useState(null);
-  const plan = useMemo(() => buildContext(data, subjectId, topic), [data, subjectId, topic]);
+  // Fonte da geração: todas as aulas da disciplina ou uma aula só (inclui o Caderno da aula).
+  const [sourceLesson, setSourceLesson] = useState(preset.lessonId || "");
+  const plan = useMemo(() => buildContext(data, subjectId, topic, undefined, { lessonId: sourceLesson }), [data, subjectId, topic, sourceLesson]);
   const subject = data.subjects.find((item) => item.id === subjectId);
-  const [examFilter, setExamFilter] = useState(preset.examId || "");
-  const subjectExams = data.exams.filter((exam) => exam.subjectId === subjectId && data.flashcards.some((card) => card.examId === exam.id));
-  const cards = data.flashcards.filter((card) => card.subjectId === subjectId && (!examFilter || card.examId === examFilter));
+  // Filtro único: "deck:Nome", "aula:id", "prova:id", "sem" ou "" (todas).
+  const [filter, setFilter] = useState(() => (preset.examId ? `prova:${preset.examId}` : preset.lessonId && data.flashcards.some((card) => card.lessonId === preset.lessonId) ? `aula:${preset.lessonId}` : ""));
+  const [search, setSearch] = useState("");
+  const [deckDraft, setDeckDraft] = useState("");
+  const subjectCards = data.flashcards.filter((card) => card.subjectId === subjectId);
+  const decks = deckNames(subjectCards);
+  const subjectExams = data.exams.filter((exam) => exam.subjectId === subjectId && subjectCards.some((card) => card.examId === exam.id));
+  const cardLessons = data.lessons.filter((lesson) => lesson.subjectId === subjectId && subjectCards.some((card) => card.lessonId === lesson.id));
+  const sourceLessons = lessonsWithContent(data, subjectId);
+  const isLoose = (card) => !(card.deck || "").trim() && !card.lessonId && !card.examId;
+  const inFilter = (card) => {
+    if (!filter) return true;
+    if (filter === "sem") return isLoose(card);
+    const split = filter.indexOf(":");
+    const [kind, value] = [filter.slice(0, split), filter.slice(split + 1)];
+    if (kind === "deck") return (card.deck || "").trim() === value;
+    if (kind === "aula") return card.lessonId === value;
+    if (kind === "prova") return card.examId === value;
+    return true;
+  };
+  const term = search.trim().toLowerCase();
+  const cards = subjectCards.filter((card) => inFilter(card) && (!term || `${card.front} ${card.back} ${card.deck || ""}`.toLowerCase().includes(term)));
+  const looseCount = subjectCards.filter(isLoose).length;
+  const lesson = data.lessons.find((item) => item.id === sourceLesson);
 
   const generate = async (event) => {
     event.preventDefault();
@@ -232,7 +300,8 @@ export default function Flashcards({ preset = {} }) {
     setError("");
     setStage(null);
     try {
-      const payload = await postAi(session, "/ai/study", { tool: "flashcards", subject: subject.name, topic, quantity: 8, context: plan.context }, setStage);
+      const payload = await postAi(session, "/ai/study", { tool: "flashcards", subject: subject.name, topic: topic || lesson?.theme || "", quantity: 8, context: plan.context }, setStage);
+      setDeckDraft(topic.trim() || lesson?.theme || "");
       setDraft({ ...payload, keep: payload.cards.map(() => true), sources: plan.sources, generic: plan.generic });
     } catch (failure) {
       setError(failure.message);
@@ -245,7 +314,7 @@ export default function Flashcards({ preset = {} }) {
     const chosen = draft.cards.filter((_, index) => draft.keep[index]);
     setLoading(true);
     try {
-      for (const card of chosen) await create("flashcards", { subjectId, front: card.front, back: card.back, origin: "Sugestão da IA", examId: preset.examId || null });
+      for (const card of chosen) await create("flashcards", { subjectId, front: card.front, back: card.back, origin: "Sugestão da IA", examId: preset.examId || null, lessonId: sourceLesson || null, deck: deckDraft.trim() });
       toast(`${chosen.length} ${chosen.length === 1 ? "cartão salvo" : "cartões salvos"}.`);
       setDraft(null);
       setMode("revisar");
@@ -261,7 +330,7 @@ export default function Flashcards({ preset = {} }) {
       <div className="toolbar">
         <label className="inline-field">
           Disciplina
-          <select value={subjectId} onChange={(event) => { setSubjectId(event.target.value); setExamFilter(""); }}>
+          <select value={subjectId} onChange={(event) => { setSubjectId(event.target.value); setFilter(""); setSourceLesson(""); }}>
             {data.subjects.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name}
@@ -269,16 +338,39 @@ export default function Flashcards({ preset = {} }) {
             ))}
           </select>
         </label>
-        {subjectExams.length > 0 && (
+        {(decks.length > 0 || cardLessons.length > 0 || subjectExams.length > 0) && (
           <label className="inline-field">
-            Assunto
-            <select value={examFilter} onChange={(event) => setExamFilter(event.target.value)}>
-              <option value="">Todas as cartas</option>
-              {subjectExams.map((exam) => (
-                <option key={exam.id} value={exam.id}>
-                  {exam.title}
-                </option>
-              ))}
+            Conjunto
+            <select value={filter} onChange={(event) => setFilter(event.target.value)}>
+              <option value="">Todas as cartas ({subjectCards.length})</option>
+              {decks.length > 0 && (
+                <optgroup label="Conjuntos e temas">
+                  {decks.map((deck) => (
+                    <option key={deck} value={`deck:${deck}`}>
+                      {deck} ({subjectCards.filter((card) => (card.deck || "").trim() === deck).length})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {cardLessons.length > 0 && (
+                <optgroup label="Aulas">
+                  {cardLessons.map((item) => (
+                    <option key={item.id} value={`aula:${item.id}`}>
+                      {lessonLabel(item)}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {subjectExams.length > 0 && (
+                <optgroup label="Provas">
+                  {subjectExams.map((exam) => (
+                    <option key={exam.id} value={`prova:${exam.id}`}>
+                      {exam.title}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {looseCount > 0 && looseCount < subjectCards.length && <option value="sem">{noDeck} ({looseCount})</option>}
             </select>
           </label>
         )}
@@ -287,9 +379,9 @@ export default function Flashcards({ preset = {} }) {
 
       {mode === "revisar" &&
         (cards.length ? (
-          <Review key={subjectId + examFilter} cards={cards} />
+          <Review key={subjectId + filter} cards={cards} />
         ) : (
-          <Empty compact title="Nenhum cartão nesta disciplina.">
+          <Empty compact title={subjectCards.length ? "Nenhum cartão neste conjunto." : "Nenhum cartão nesta disciplina."}>
             Crie cartões manualmente ou peça para a IA sugerir a partir das suas aulas.
             <button className="btn small" onClick={() => setMode("criar")}>
               Criar cartões
@@ -301,6 +393,19 @@ export default function Flashcards({ preset = {} }) {
         <>
           <form className="form" onSubmit={generate}>
             <SubjectTopicFields subjectId={subjectId} setSubjectId={setSubjectId} topic={topic} setTopic={setTopic} topicLabel="Assunto (opcional)" placeholder="Deixe vazio para usar todas as aulas" />
+            {sourceLessons.length > 0 && (
+              <label>
+                Usar as anotações de
+                <select value={sourceLesson} onChange={(event) => setSourceLesson(event.target.value)}>
+                  <option value="">Todas as aulas da disciplina</option>
+                  {sourceLessons.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {lessonLabel(item)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <BasisHint plan={plan} />
             <FormError>{error}</FormError>
             <div className="form-actions">
@@ -317,6 +422,15 @@ export default function Flashcards({ preset = {} }) {
             <section className="ai-result">
               <SourceNote sources={draft.sources} generic={draft.generic} />
               <p className="hint">Desmarque o que não quiser guardar. Você pode editar os cartões depois de salvar.</p>
+              <label className="inline-field">
+                Guardar no conjunto
+                <input value={deckDraft} maxLength={80} list="draft-decks" placeholder="Ex.: Segmentação de mercado" onChange={(event) => setDeckDraft(event.target.value)} />
+                <datalist id="draft-decks">
+                  {decks.map((deck) => (
+                    <option key={deck} value={deck} />
+                  ))}
+                </datalist>
+              </label>
               <ul className="group">
                 {draft.cards.map((card, index) => (
                   <li key={index} className="row draft-card">
@@ -338,33 +452,53 @@ export default function Flashcards({ preset = {} }) {
         </>
       )}
 
-      {mode === "lista" &&
-        (cards.length ? (
-          <ul className="group">
-            {cards.map((card) => (
-              <li key={card.id} className="row">
-                <span className="row-main">
-                  <strong>{card.front}</strong>
-                  <small>{card.back}</small>
-                  <small>
-                    {levelLabel[card.level]}, {card.reviews} {card.reviews === 1 ? "revisão" : "revisões"}
-                    {card.origin === "Sugestão da IA" ? ", sugerido pela IA" : ""}
-                  </small>
-                </span>
-                <button className="icon-btn" aria-label="Editar cartão" onClick={() => setModal({ type: "card", card })}>
-                  <PenLine size={15} />
-                </button>
-                <button className="icon-btn" aria-label="Excluir cartão" onClick={() => setModal({ type: "delete", card })}>
-                  <Trash2 size={15} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="quiet">Nenhum cartão ainda.</p>
-        ))}
+      {mode === "lista" && (
+        <>
+          {subjectCards.length > 0 && (
+            <label className="inline-field card-search">
+              Buscar
+              <input type="search" value={search} placeholder="Pergunta, resposta ou conjunto" onChange={(event) => setSearch(event.target.value)} />
+            </label>
+          )}
+          {cards.length ? (
+            groupByDeck(cards, data).map((group) => (
+              <section key={group.key} className="deck-group">
+                <h3 className="deck-title">
+                  {group.title} <small>{group.cards.length} {group.cards.length === 1 ? "carta" : "cartas"}</small>
+                </h3>
+                <ul className="group">
+                  {group.cards.map((card) => {
+                    const origin = card.lessonId && data.lessons.find((item) => item.id === card.lessonId);
+                    return (
+                      <li key={card.id} className="row">
+                        <span className="row-main">
+                          <strong>{card.front}</strong>
+                          <small>{card.back}</small>
+                          <small>
+                            {levelLabel[card.level]}, {card.reviews} {card.reviews === 1 ? "revisão" : "revisões"}
+                            {card.origin === "Sugestão da IA" ? ", sugerido pela IA" : ""}
+                            {origin && (card.deck || "").trim() ? `, ${lessonLabel(origin)}` : ""}
+                          </small>
+                        </span>
+                        <button className="icon-btn" aria-label="Editar cartão" onClick={() => setModal({ type: "card", card })}>
+                          <PenLine size={15} />
+                        </button>
+                        <button className="icon-btn" aria-label="Excluir cartão" onClick={() => setModal({ type: "delete", card })}>
+                          <Trash2 size={15} />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))
+          ) : (
+            <p className="quiet">{subjectCards.length ? "Nenhum cartão encontrado." : "Nenhum cartão ainda."}</p>
+          )}
+        </>
+      )}
 
-      {modal?.type === "card" && <CardForm card={modal.card} subjectId={subjectId} onClose={() => setModal(null)} />}
+      {modal?.type === "card" && <CardForm card={modal.card} subjectId={subjectId} defaults={{ deck: filter.startsWith("deck:") ? filter.slice(5) : "", lessonId: filter.startsWith("aula:") ? filter.slice(5) : sourceLesson }} onClose={() => setModal(null)} />}
       {modal?.type === "delete" && (
         <Confirm
           title="Excluir cartão?"

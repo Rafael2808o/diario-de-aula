@@ -113,7 +113,17 @@ function StudyTool() {
   const examFromLink = params.exam ? data.exams.find((exam) => exam.id === params.exam) : null;
   const [tool, setTool] = useState(tools.some((item) => item.id === params.tool) ? params.tool : examFromLink ? "simulado" : "socorro");
   const subjectFromLink = data.subjects.some((item) => item.id === params.subject) ? params.subject : "";
-  const [preset, setPreset] = useState(examFromLink ? { subjectId: examFromLink.subjectId, examId: examFromLink.id, topic: examFromLink.topics.find((topic) => topic.status !== "Dominado")?.title || "" } : subjectFromLink ? { subjectId: subjectFromLink } : {});
+  // Aberto do Caderno de uma aula (?lesson=): as ferramentas usam só as anotações daquela aula.
+  const lessonFromLink = params.lesson ? data.lessons.find((lesson) => lesson.id === params.lesson) : null;
+  const [preset, setPreset] = useState(
+    examFromLink
+      ? { subjectId: examFromLink.subjectId, examId: examFromLink.id, topic: examFromLink.topics.find((topic) => topic.status !== "Dominado")?.title || "" }
+      : lessonFromLink
+        ? { subjectId: lessonFromLink.subjectId, lessonId: lessonFromLink.id }
+        : subjectFromLink
+          ? { subjectId: subjectFromLink }
+          : {},
+  );
   const [examId, setExamId] = useState(params.exam || "");
   const active = tools.find((item) => item.id === tool);
   const switchTool = (id, nextPreset = {}) => {

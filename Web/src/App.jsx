@@ -71,10 +71,10 @@ const extraPages = [
   { id: "compartilhadas", label: "Sala de Estudos", title: "Sala de Estudos", icon: Users, page: Shared },
   { id: "historico-xp", label: "Histórico de XP", title: "Histórico de XP", icon: ScrollText, page: XpHistory },
   { id: "relatorio", label: "Relatório mensal", title: "Relatório mensal de estudos", icon: ChartColumn, page: Report },
-  { id: "caderno", label: "Caderno da aula", title: "Caderno da aula", icon: NotebookText, page: Notebook },
+  { id: "caderno", label: "Cadernos", title: "Caderno de aula", icon: NotebookText, page: Notebook },
 ];
 const allPages = [...nav, ...extraPages];
-const shortcuts = ["aulas", "provas", "cartoes", "lua", "compartilhadas", "migles", "ranking", "configuracoes"];
+const shortcuts = ["aulas", "caderno", "provas", "cartoes", "lua", "compartilhadas", "migles", "ranking", "configuracoes"];
 const sectionOf = (page) => nav.find((item) => item.group.includes(page))?.id;
 // Endereços das versões anteriores continuam funcionando.
 const legacyPages = { central: "inicio", diario: "aulas", prova: "ia", estudos: "calendario", biblioteca: "conteudos", desempenho: "perfil" };

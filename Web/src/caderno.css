@@ -68,3 +68,58 @@
 .paper-swatch i { width: 18px; height: 18px; border-radius: 5px; border: 1px solid rgba(0, 0, 0, 0.15); }
 .plain-fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; min-width: 0; }
 .plain-fieldset legend { padding: 0; margin-bottom: 6px; font-size: 13.5px; font-weight: 500; color: var(--text-2); }
+
+/* ---------- Cartas do Saber: conjuntos ---------- */
+.deck-group { display: grid; gap: 8px; margin-top: 14px; }
+.deck-title { display: flex; align-items: baseline; gap: 8px; margin: 0; font-family: var(--font-title); font-size: 18px; font-weight: 600; }
+.deck-title small { font-family: var(--font); font-size: 12.5px; font-weight: 500; color: var(--text-3); }
+.card-search { max-width: 420px; }
+
+/* ---------- Caderno de aula (referência visual da versão 4.0) ---------- */
+.notebook-sheet { position: relative; padding: 14px; border-radius: 22px; background: linear-gradient(160deg, var(--tab-lilac), color-mix(in srgb, var(--tab-lilac) 70%, var(--accent))); box-shadow: 0 10px 30px rgba(60, 35, 120, 0.18); }
+:root:not([data-theme="light"]) .notebook-sheet { background: linear-gradient(160deg, #33267a, #1f1552); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45); }
+.notebook-sheet .notebook-page {
+  --rule-gap: 32px;
+  min-height: 62vh; padding: 14px 18px 24px 64px; border: 0; border-radius: 12px;
+  background-color: var(--paper); color: var(--paper-ink);
+  background-image:
+    linear-gradient(to right, transparent 46px, var(--paper-margin) 46px, var(--paper-margin) 47.5px, transparent 47.5px),
+    repeating-linear-gradient(to bottom, transparent 0 calc(var(--rule-gap) - 1px), var(--paper-rule) calc(var(--rule-gap) - 1px) var(--rule-gap));
+  background-attachment: local;
+  line-height: var(--rule-gap); font-size: 16px;
+}
+.notebook-sheet .notebook-page h2 { margin: 6px 0 0; line-height: var(--rule-gap); font-size: 24px; color: var(--paper-ink); }
+.notebook-sheet .notebook-page h3 { margin: 0; line-height: var(--rule-gap); color: var(--paper-ink); }
+.notebook-sheet .notebook-page p, .notebook-sheet .notebook-page div, .notebook-sheet .notebook-page ul, .notebook-sheet .notebook-page ol { margin: 0; }
+.notebook-sheet .notebook-page blockquote { margin: 0; color: var(--paper-muted); }
+.notebook-sheet .notebook-page:empty::before { color: var(--paper-muted); }
+.notebook-page img[data-img] { display: block; max-width: min(100%, 560px); max-height: 70vh; margin: 8px 0; border-radius: 10px; border: 6px solid #fff; box-shadow: 0 6px 18px rgba(36, 26, 68, 0.22); transform: rotate(-0.6deg); background: var(--paper-2); }
+.notebook-page img[data-img]:nth-of-type(even) { transform: rotate(0.6deg); }
+.notebook-page img.is-loading { min-height: 120px; min-width: 160px; }
+.notebook-page img.is-missing { min-height: 60px; min-width: 160px; opacity: 0.6; }
+.notebook-page.is-readonly { outline: none; }
+.notebook-photo-btn { margin-left: 4px; }
+.notebook-side .caderno-tabs { margin-bottom: -2px; }
+.notebook-panel { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--card-line); border-radius: 4px 14px 14px 14px; background: var(--surface); }
+.notebook-actions { display: grid; gap: 8px; }
+.notebook-actions .btn { justify-content: flex-start; }
+.notebook-notes { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.notebook-notes li { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; }
+.notebook-notes p { margin: 4px 0 0; overflow-wrap: anywhere; }
+.notebook-notes small { color: var(--text-3); }
+.sticker-picker { display: flex; flex-wrap: wrap; gap: 6px; }
+.sticker-option { display: inline-grid; place-items: center; min-width: 44px; min-height: 44px; padding: 4px 6px; border: 1px solid var(--card-line); border-radius: 10px; background: var(--surface-2); cursor: pointer; }
+.sticker-option[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.sticker { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; color: var(--tone); background: color-mix(in srgb, var(--tone) 16%, transparent); }
+.sticker.tone-gold { --tone: #b8860b; } .sticker.tone-lilac { --tone: #6a49c4; } .sticker.tone-mint { --tone: #17674a; } .sticker.tone-sky { --tone: #1f6f8f; } .sticker.tone-rose { --tone: #c2365c; }
+:root:not([data-theme="light"]) .sticker.tone-gold { --tone: #f6c46b; }
+:root:not([data-theme="light"]) .sticker.tone-lilac { --tone: #c9b8ff; }
+:root:not([data-theme="light"]) .sticker.tone-mint { --tone: #6fe0b6; }
+:root:not([data-theme="light"]) .sticker.tone-sky { --tone: #8fd3f0; }
+:root:not([data-theme="light"]) .sticker.tone-rose { --tone: #ff9ab4; }
+.row-link { display: grid; gap: 2px; text-align: left; background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; }
+.row-link:hover strong { text-decoration: underline; }
+@media (max-width: 640px) {
+  .notebook-sheet { padding: 8px; border-radius: 16px; }
+  .notebook-sheet .notebook-page { padding: 10px 12px 20px 40px; min-height: 55vh; background-image: linear-gradient(to right, transparent 28px, var(--paper-margin) 28px, var(--paper-margin) 29.5px, transparent 29.5px), repeating-linear-gradient(to bottom, transparent 0 31px, var(--paper-rule) 31px 32px); }
+}

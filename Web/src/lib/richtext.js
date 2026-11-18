@@ -1,5 +1,7 @@
 // Anotações da aula em texto formatado. Só passam as marcações do editor, sempre sem atributos:
 // assim não sobra script, estilo, link nem evento, e o texto é exibido com segurança no navegador.
+// Imagens do Caderno: só <img data-img="id">, refeita aqui a partir do id (o arquivo fica em notebook_images;
+// o navegador busca com o token). Qualquer outro atributo, src incluído, é descartado.
 // Este arquivo não importa nada: é o mesmo em Web/src/lib/richtext.js e Api/richtext.js (o teste confere que são iguais).
 
 export const allowedTags = ["p", "br", "h2", "h3", "strong", "b", "em", "i", "u", "ul", "ol", "li", "blockquote", "div"];
@@ -18,7 +20,9 @@ export function sanitizeHtml(value, max = 60000) {
   for (let match = tag.exec(source); match; match = tag.exec(source)) {
     out += escapeText(source.slice(last, match.index));
     const name = match[2].toLowerCase();
-    if (allowed.has(name)) out += name === "br" ? "<br>" : `<${match[1]}${name}>`;
+    const image = name === "img" && !match[1] ? /^<img(?:\s+[a-z-]+(?:="[^"]*"|='[^']*'|=[^\s>]*)?)*?\s+data-img="([0-9a-f-]{36})"/i.exec(match[0]) : null;
+    if (image) out += `<img data-img="${image[1].toLowerCase()}">`;
+    else if (allowed.has(name)) out += name === "br" ? "<br>" : `<${match[1]}${name}>`;
     last = tag.lastIndex;
   }
   out += escapeText(source.slice(last));

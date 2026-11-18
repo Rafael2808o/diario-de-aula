@@ -5,6 +5,7 @@ import { apiBase, fileToBase64 } from "../lib/api.js";
 import { afterPostMessage, kantinhoImage, kantinhoSmall, todaysInspiration } from "../lib/kantinho.js";
 import { authorUser, expiresIn, when } from "../lib/social.js";
 import { Avatar, Confirm, FormError, Modal } from "../ui.jsx";
+import { preparePhoto as preparePhotoBase } from "../lib/photo.js";
 
 // Feed dos Migles: fotos de estudo de toda a comunidade, que somem em 24 horas.
 // O Kantinho traz uma inspiração por dia; a primeira foto do dia vale +200 XP.
@@ -14,27 +15,7 @@ const maxBytes = 650 * 1024;
 const likeEmoji = "❤️";
 const pollEvery = 30_000;
 
-// Reduz a foto no próprio aparelho (respeitando a orientação da câmera) e devolve um JPEG leve.
-async function preparePhoto(file) {
-  if (!file.type.startsWith("image/")) throw new Error("Escolha uma imagem (JPG, PNG, WEBP ou foto da câmera).");
-  let bitmap;
-  try {
-    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
-  } catch {
-    throw new Error("Não foi possível abrir esta imagem. Tente uma foto em JPG ou PNG.");
-  }
-  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close?.();
-  for (const quality of [0.85, 0.75, 0.65, 0.55]) {
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
-    if (blob && blob.size <= maxBytes) return { blob, width: canvas.width, height: canvas.height };
-  }
-  throw new Error("A foto ficou grande demais mesmo reduzida. Tente outra imagem.");
-}
+const preparePhoto = (file) => preparePhotoBase(file, { maxSide, maxBytes });
 
 // Proporção da moldura: entre 4:5 (vertical) e 1,91:1 (horizontal). A foto aparece inteira dentro dela.
 const frameRatio = (photo) => {

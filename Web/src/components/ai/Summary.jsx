@@ -19,7 +19,9 @@ export default function Summary({ preset = {} }) {
   const [error, setError] = useState("");
   const [stage, setStage] = useState(null);
   const [result, setResult] = useState(null);
-  const plan = useMemo(() => buildContext(data, subjectId, topic), [data, subjectId, topic]);
+  // Aberto a partir de uma aula (Caderno): usa só as anotações dela enquanto a disciplina for a mesma.
+  const lessonId = subjectId === preset.subjectId ? preset.lessonId || "" : "";
+  const plan = useMemo(() => buildContext(data, subjectId, topic, undefined, { lessonId }), [data, subjectId, topic, lessonId]);
   const subject = data.subjects.find((item) => item.id === subjectId);
 
   const generate = async (event) => {

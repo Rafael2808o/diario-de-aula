@@ -2,33 +2,54 @@ import { useEffect, useState } from "react";
 import { useApp } from "../../context.js";
 import { apiBase } from "../../lib/api.js";
 import { formatFull } from "../../lib/dates.js";
+import { htmlToText } from "../../lib/richtext.js";
 import { Empty, Nox } from "../../ui.jsx";
 
 const normalize = (value) => String(value || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 // Reúne os registros da disciplina como texto rotulado pela origem, para a IA citar de onde veio cada ponto.
-// Com assunto informado, prioriza as aulas que o mencionam; sem nenhuma, usa todas as aulas da disciplina.
-export function buildContext(data, subjectId, topic = "", limit = 6000) {
+// Fontes de cada aula: o que foi ensinado, o Caderno da aula (anotações feitas durante a explicação), conteúdo perdido,
+// observações e avisos de prova. A transcrição só entra quando a aula não tem nada escrito, para não repetir o mesmo
+// conteúdo duas vezes. Com assunto informado, prioriza as aulas que o mencionam; sem nenhuma, usa todas as da disciplina.
+// Com lessonId, usa só aquela aula (ex.: "gerar cartas desta aula").
+const blockMax = 2200;
+const clip = (text, max = blockMax) => (text.length > max ? `${text.slice(0, max).replace(/\s+\S*$/, "")}…` : text);
+export function lessonSourceText(lesson) {
+  const parts = [];
+  const add = (text, prefix = "") => {
+    const clean = String(text || "").trim();
+    if (!clean) return;
+    // Evita mandar duas vezes o mesmo trecho (ex.: o caderno colado no campo "o que foi ensinado").
+    if (parts.some((part) => part.includes(clean.slice(0, 160)))) return;
+    parts.push(prefix + clean);
+  };
+  add(lesson.taught);
+  add(htmlToText(lesson.annotations), "Caderno da aula: ");
+  add(lesson.missedContent);
+  add(lesson.notes);
+  if (lesson.examInfo) add(lesson.examInfo, "Sobre a prova: ");
+  if (!parts.length) add(lesson.transcript, "Transcrição: ");
+  return clip(parts.join("\n"));
+}
+
+export function buildContext(data, subjectId, topic = "", limit = 9000, { lessonId = "" } = {}) {
   const term = normalize(topic.trim());
-  const lessons = data.lessons.filter((lesson) => lesson.subjectId === subjectId && lesson.status !== "cancelada");
+  const lessons = data.lessons.filter((lesson) => lesson.subjectId === subjectId && lesson.status !== "cancelada" && (!lessonId || lesson.id === lessonId));
   const matches = (texts) => !term || texts.some((text) => normalize(text).includes(term));
-  const relevant = lessons.filter((lesson) => matches([lesson.theme, lesson.taught, lesson.notes, lesson.examInfo, lesson.missedContent, lesson.transcript]));
+  const relevant = lessons.filter((lesson) => matches([lesson.theme, lesson.taught, lesson.notes, lesson.examInfo, lesson.missedContent, htmlToText(lesson.annotations), lesson.transcript]));
   const chosen = relevant.length ? relevant : lessons;
-  const notes = data["teacher-notes"].filter((note) => note.subjectId === subjectId);
-  const materials = data.materials.filter((material) => material.subjectId === subjectId && material.notes);
+  const notes = lessonId ? [] : data["teacher-notes"].filter((note) => note.subjectId === subjectId);
+  const materials = lessonId ? [] : data.materials.filter((material) => material.subjectId === subjectId && material.notes);
   const blocks = [
-    ...chosen.map((lesson) => ({
-      label: `Aula de ${formatFull(lesson.date)}${lesson.theme ? `: ${lesson.theme}` : ""}`,
-      text: [lesson.taught, lesson.missedContent, lesson.notes, lesson.examInfo && `Sobre a prova: ${lesson.examInfo}`].filter(Boolean).join("\n"),
-    })),
-    ...notes.map((note) => ({ label: `Cofre do professor, ${note.informedOn ? formatFull(note.informedOn) : "sem data"} (${note.confirmation})`, text: note.content })),
-    ...materials.map((material) => ({ label: `Material: ${material.title}`, text: material.notes })),
+    ...chosen.map((lesson) => ({ label: `Aula de ${formatFull(lesson.date)}${lesson.theme ? `: ${lesson.theme}` : ""}`, text: lessonSourceText(lesson) })),
+    ...notes.map((note) => ({ label: `Cofre do professor, ${note.informedOn ? formatFull(note.informedOn) : "sem data"} (${note.confirmation})`, text: clip(note.content) })),
+    ...materials.map((material) => ({ label: `Material: ${material.title}`, text: clip(material.notes) })),
   ].filter((block) => block.text);
   let context = "";
   const sources = [];
   for (const block of blocks) {
     const piece = `[${block.label}]\n${block.text}\n\n`;
-    if (context.length + piece.length > limit) break;
+    if (context.length + piece.length > limit) continue;
     context += piece;
     sources.push(block.label);
   }

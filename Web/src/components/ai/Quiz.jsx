@@ -18,7 +18,9 @@ export default function Quiz({ preset = {}, mode = "praticar" }) {
   const [result, setResult] = useState(null);
   const [answers, setAnswers] = useState({});
   const [saved, setSaved] = useState(false);
-  const plan = useMemo(() => buildContext(data, subjectId, topic), [data, subjectId, topic]);
+  // Aberto a partir de uma aula (Caderno): usa só as anotações dela enquanto a disciplina for a mesma.
+  const lessonId = subjectId === preset.subjectId ? preset.lessonId || "" : "";
+  const plan = useMemo(() => buildContext(data, subjectId, topic, undefined, { lessonId }), [data, subjectId, topic, lessonId]);
   const subject = data.subjects.find((item) => item.id === subjectId);
 
   const generate = async (event) => {
