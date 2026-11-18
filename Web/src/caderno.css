@@ -145,3 +145,23 @@
 .task-assignees { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 0; padding: 0; list-style: none; }
 .task-assignee.is-done { color: var(--success); }
 .task-assignee.is-done svg { flex: none; }
+
+/* ---------- Demandas da aula ---------- */
+.sala-duties { display: grid; gap: 12px; }
+.duty-head-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.duty-rounds { display: grid; gap: 12px; }
+.duty-round { display: grid; gap: 10px; padding: 14px 16px; }
+.duty-round-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.duty-round-head h3 { margin: 2px 0 0; font-family: var(--font-title); font-size: 19px; }
+.duty-items { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.duty-items li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 0; border-top: 1px dashed var(--card-line); }
+.duty-items li.is-done .duty-item-main strong { text-decoration: line-through; opacity: 0.7; }
+.duty-item-main { display: grid; gap: 4px; min-width: 0; }
+.duty-item-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.duty-round-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.duty-empty { display: grid; gap: 10px; padding: 16px; }
+.duty-empty p { margin: 0; }
+.duty-names { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.duty-names li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-radius: 10px; background: var(--surface-2); }
+.duty-add { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+.duty-add .grow { flex: 1 1 220px; }

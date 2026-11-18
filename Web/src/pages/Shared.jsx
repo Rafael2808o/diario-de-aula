@@ -5,6 +5,7 @@ import { formatFull, todayIso } from "../lib/dates.js";
 import { Avatar, Confirm, Empty, FormError, Modal, Segmented, useSubmit } from "../ui.jsx";
 import { PeopleList, PeoplePicker } from "../components/sala/People.jsx";
 import Board from "../components/sala/Board.jsx";
+import Duties from "../components/sala/Duties.jsx";
 import GroupCall from "../components/sala/Call.jsx";
 
 // Sala de Estudos 📚 (antigas Atividades compartilhadas): os trabalhos antigos continuam aqui, com os mesmos dados.
@@ -446,6 +447,7 @@ function WorkDetail({ activity, onChange, onEdit, onLeft }) {
         </p>
       )}
       <DocumentLink activity={activity} onChange={onChange} />
+      <Duties activity={activity} />
       <Board activity={activity} />
       <div className="sala-columns">
         <Members activity={activity} onChange={onChange} />

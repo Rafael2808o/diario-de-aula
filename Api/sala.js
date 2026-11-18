@@ -433,6 +433,11 @@ export function registerSalaRoutes(app, requireAuth) {
       if (pool) await pool.query('UPDATE study_task_assignees SET done=TRUE, done_at=COALESCE(done_at, NOW()) WHERE task_id=$1', [row.id]);
       else mem().taskAssignees.filter(item => item.taskId === row.id).forEach(item => { item.done = true; });
     }
+    // Voltou de Concluído no quadro: as partes deixam de contar como feitas (o prazo e a penalidade voltam a valer).
+    if (task.status !== 'Concluído' && row.status === 'Concluído') {
+      if (pool) await pool.query('UPDATE study_task_assignees SET done=FALSE, done_at=NULL WHERE task_id=$1', [row.id]);
+      else mem().taskAssignees.filter(item => item.taskId === row.id).forEach(item => { item.done = false; });
+    }
     const added = await saveAssignees(row.id, task.assigneeIds, { resetPenalty });
     for (const userId of added.filter(item => item !== req.user.id)) {
       await notify(userId, { kind: 'compartilhada', key: `sala-tarefa:${row.id}:${userId}`, title: `Nova tarefa para você: ${task.title}`, body: found.activity.title, link: { page: 'compartilhadas', params: { id: found.activity.id } } }).catch(() => {});

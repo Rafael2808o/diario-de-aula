@@ -147,3 +147,52 @@ test('Tarefa compartilhada: vários responsáveis, cada um marca a sua parte e s
   tasks = (await request(app).patch(`/api/v1/shared/${work.id}/tasks/${task.id}`).set(dona.auth).send({ assigneeId: caio.user.id }).expect(200)).body;
   assert.deepEqual(tasks[0].assignees.map(person => person.id), [caio.user.id]);
 });
+
+test('Demandas da aula: sorteio entre presentes, rodízio, troca e falta', async () => {
+  const dona = await account('Mariana Demanda');
+  const victor = await account('Victor Demanda');
+  const lucas = await account('Lucas Demanda');
+  const fora = await account('Fora Demanda');
+  const work = (await request(app).post('/api/v1/shared').set(dona.auth).send({ title: 'Grupo de Marketing' }).expect(201)).body;
+  await request(app).post(`/api/v1/shared/${work.id}/members`).set(dona.auth).send({ userIds: [victor.user.id, lucas.user.id] }).expect(200);
+  await request(app).get(`/api/v1/shared/${work.id}/demandas`).set(fora.auth).expect(404);
+  // Sem funções cadastradas não sorteia.
+  await request(app).post(`/api/v1/shared/${work.id}/demandas/aulas`).set(dona.auth).send({ date: '2026-11-18', label: 'Khan' }).expect(400);
+  let state = (await request(app).put(`/api/v1/shared/${work.id}/demandas/tipos`).set(victor.auth).send({ names: ['Fotografar os slides', 'Gravar a aula', 'Registrar o conteúdo no Caderno'] }).expect(200)).body;
+  assert.equal(state.duties.length, 3);
+  const ids = [dona.user.id, victor.user.id, lucas.user.id];
+  // Aula 1: todos presentes, cada um com uma função diferente.
+  state = (await request(app).post(`/api/v1/shared/${work.id}/demandas/aulas`).set(dona.auth).send({ date: '2026-11-18', label: 'Aula do professor Khan', presentIds: ids }).expect(201)).body;
+  const first = state.rounds[0];
+  assert.equal(new Set(first.items.map(item => item.person.id)).size, 3);
+  await request(app).post(`/api/v1/shared/${work.id}/demandas/aulas`).set(lucas.auth).send({ date: '2026-11-18', label: 'Aula do professor Khan', presentIds: ids }).expect(409);
+  // Aula 2: rodízio — ninguém repete a função da aula anterior.
+  state = (await request(app).post(`/api/v1/shared/${work.id}/demandas/aulas`).set(dona.auth).send({ date: '2026-11-18', label: 'Aula do professor Chade', presentIds: ids }).expect(201)).body;
+  const second = state.rounds.find(round => round.label === 'Aula do professor Chade');
+  for (const item of second.items) assert.notEqual(item.person.id, first.items.find(row => row.dutyId === item.dutyId).person.id);
+  // Aula 3: Lucas ausente desde o começo; nenhuma função vai para ele e uma fica sem responsável.
+  state = (await request(app).post(`/api/v1/shared/${work.id}/demandas/aulas`).set(dona.auth).send({ date: '2026-11-19', label: 'Khan', presentIds: [dona.user.id, victor.user.id] }).expect(201)).body;
+  const third = state.rounds.find(round => round.label === 'Khan');
+  assert.ok(third.items.every(item => item.person?.id !== lucas.user.id));
+  assert.equal(third.items.filter(item => !item.person).length, 1);
+  // Victor marca a dele como feita e depois falta: a feita continua dele; nada novo vai para ele.
+  const victorItem = third.items.find(item => item.person?.id === victor.user.id);
+  state = (await request(app).patch(`/api/v1/shared/${work.id}/demandas/itens/${victorItem.id}`).set(victor.auth).send({ done: true }).expect(200)).body;
+  state = (await request(app).post(`/api/v1/shared/${work.id}/demandas/aulas/${third.id}/faltou`).set(dona.auth).send({ userId: victor.user.id }).expect(200)).body;
+  const after = state.rounds.find(round => round.id === third.id);
+  assert.equal(after.items.find(item => item.id === victorItem.id).person.id, victor.user.id);
+  assert.ok(after.items.find(item => item.id === victorItem.id).done);
+  assert.ok(!after.present.some(person => person.id === victor.user.id));
+  // Troca só com quem está presente.
+  const empty = after.items.find(item => !item.person);
+  await request(app).patch(`/api/v1/shared/${work.id}/demandas/itens/${empty.id}`).set(dona.auth).send({ userId: lucas.user.id }).expect(400);
+  // Falta na aula 1: a função não feita da Mariana passa para outra pessoa presente.
+  const marianaItem = first.items.find(item => item.person.id === dona.user.id);
+  state = (await request(app).post(`/api/v1/shared/${work.id}/demandas/aulas/${first.id}/faltou`).set(victor.auth).send({ userId: dona.user.id }).expect(200)).body;
+  const reassigned = state.rounds.find(round => round.id === first.id).items.find(item => item.id === marianaItem.id);
+  assert.ok(reassigned.person === null || reassigned.person.id !== dona.user.id);
+  // Remover função arquiva sem apagar o histórico.
+  state = (await request(app).put(`/api/v1/shared/${work.id}/demandas/tipos`).set(dona.auth).send({ names: ['Fotografar os slides'] }).expect(200)).body;
+  assert.equal(state.duties.length, 1);
+  assert.equal(state.rounds.find(round => round.id === first.id).items.length, 3);
+});

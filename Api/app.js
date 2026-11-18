@@ -42,6 +42,7 @@ import { registerXpRoutes } from './xp.js';
 import { registerRoleRoutes } from './roles.js';
 import { registerCommunityRoutes } from './community.js';
 import { registerNotebookRoutes } from './notebook.js';
+import { registerDutyRoutes } from './duties.js';
 
 const app = express();
 const corsOrigins = (process.env.CORS_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean);
@@ -686,6 +687,7 @@ registerNotificationRoutes(app, requireAuth);
 registerSharedRoutes(app, requireAuth);
 registerSalaRoutes(app, requireAuth);
 registerNotebookRoutes(app, requireAuth);
+registerDutyRoutes(app, requireAuth);
 
 app.get('/api/v1/integrations/spotify/status', (_req, res) =>
   res.json({
