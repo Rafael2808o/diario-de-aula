@@ -165,3 +165,38 @@
 .duty-names li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-radius: 10px; background: var(--surface-2); }
 .duty-add { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
 .duty-add .grow { flex: 1 1 220px; }
+
+/* ---------- Ritual em grupo ---------- */
+.focus-lobby { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 14px; }
+.focus-lobby .form { gap: 10px; }
+.focus-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 360px); gap: 16px; align-items: start; }
+@media (max-width: 900px) { .focus-layout { grid-template-columns: 1fr; } }
+.focus-main { display: grid; gap: 14px; min-width: 0; }
+.focus-block, .focus-me { display: grid; gap: 8px; }
+.focus-clock { font-family: var(--font-display); font-size: clamp(40px, 9vw, 64px); line-height: 1; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+.focus-my-clock { font-family: var(--font-display); font-size: 26px; font-variant-numeric: tabular-nums; }
+.focus-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.focus-people { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.focus-person { display: grid; justify-items: center; gap: 3px; padding: 14px 10px; border-radius: 16px; border: 1px solid var(--card-line); background: var(--surface); text-align: center; min-width: 0; }
+.focus-person strong { overflow-wrap: anywhere; }
+.focus-person small { color: var(--text-2); overflow-wrap: anywhere; }
+.focus-avatar { display: inline-grid; padding: 3px; border-radius: 50%; box-shadow: 0 0 0 2px var(--ring, var(--card-line)); }
+.focus-person.is-focando { --ring: var(--success); }
+.focus-person.is-focando .focus-state { color: var(--success); font-weight: 600; }
+.focus-person.is-pausa { --ring: var(--warning); }
+.focus-person.is-pausa .focus-state { color: var(--warning); }
+.focus-person.is-presente { --ring: var(--accent); }
+.focus-person.is-fora { opacity: 0.55; }
+@media (prefers-reduced-motion: no-preference) {
+  .focus-person.is-focando .focus-avatar { animation: focus-glow 2.4s ease-in-out infinite; }
+  @keyframes focus-glow { 50% { box-shadow: 0 0 0 2px var(--success), 0 0 14px color-mix(in srgb, var(--success) 50%, transparent); } }
+}
+.focus-chat { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; height: min(70vh, 560px); position: sticky; top: 70px; }
+@media (max-width: 900px) { .focus-chat { position: static; height: 420px; } }
+.focus-messages { display: grid; align-content: start; gap: 10px; margin: 0; padding: 0 2px; list-style: none; overflow-y: auto; }
+.focus-messages li { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: start; }
+.focus-messages li p { margin: 2px 0 0; overflow-wrap: anywhere; }
+.focus-messages li.is-system { display: block; font-size: 13px; color: var(--paper-muted); font-style: italic; text-align: center; }
+.focus-chat-end { min-height: 1px; }
+.focus-send { display: flex; gap: 6px; grid-template-columns: none; }
+.focus-send input { flex: 1; min-width: 0; }

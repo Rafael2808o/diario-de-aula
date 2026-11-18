@@ -196,3 +196,46 @@ test('Demandas da aula: sorteio entre presentes, rodízio, troca e falta', async
   assert.equal(state.duties.length, 1);
   assert.equal(state.rounds.find(round => round.id === first.id).items.length, 3);
 });
+
+test('Ritual em grupo: sala com código, pulso com estado, chat, bloco do grupo e saída', async () => {
+  const ana = await account('Ana Foco');
+  const beto = await account('Beto Foco');
+  const intruso = await account('Intruso Foco');
+  await request(app).post('/api/v1/foco/salas').set(ana.auth).send({ name: 'x' }).expect(400);
+  let room = (await request(app).post('/api/v1/foco/salas').set(ana.auth).send({ name: 'Turma da noite' }).expect(201)).body;
+  assert.match(room.code, /^[A-Z2-9]{6}$/);
+  await request(app).get(`/api/v1/foco/salas/${room.id}`).set(intruso.auth).expect(404);
+  await request(app).post('/api/v1/foco/salas/entrar').set(beto.auth).send({ code: 'NADA00' }).expect(404);
+  room = (await request(app).post('/api/v1/foco/salas/entrar').set(beto.auth).send({ code: room.code.toLowerCase() }).expect(200)).body;
+  assert.equal(room.people.length, 2);
+  assert.ok(room.people.every(person => !person.online));
+  // Pulso: Ana focando em Marketing aparece para o Beto; data no futuro é ignorada.
+  const since = new Date(Date.now() - 10 * 60_000).toISOString();
+  await request(app).post(`/api/v1/foco/salas/${room.id}/pulso`).set(ana.auth).send({ state: 'focando', subject: 'Marketing', since }).expect(200);
+  room = (await request(app).post(`/api/v1/foco/salas/${room.id}/pulso`).set(beto.auth).send({ state: 'qualquer', since: new Date(Date.now() + 3600_000).toISOString() }).expect(200)).body;
+  const ana2 = room.people.find(person => person.name.startsWith('Ana'));
+  assert.equal(ana2.state, 'focando');
+  assert.equal(ana2.subject, 'Marketing');
+  assert.equal(ana2.since, since);
+  assert.equal(room.people.find(person => person.me).state, 'presente');
+  assert.equal(room.people.find(person => person.me).since, null);
+  // Chat e bloco.
+  await request(app).post(`/api/v1/foco/salas/${room.id}/mensagens`).set(beto.auth).send({ body: '   ' }).expect(400);
+  room = (await request(app).post(`/api/v1/foco/salas/${room.id}/mensagens`).set(beto.auth).send({ body: 'Bora estudar!' }).expect(201)).body;
+  assert.equal(room.messages.at(-1).body, 'Bora estudar!');
+  await request(app).post(`/api/v1/foco/salas/${room.id}/bloco`).set(ana.auth).send({ minutes: 30 }).expect(400);
+  room = (await request(app).post(`/api/v1/foco/salas/${room.id}/bloco`).set(ana.auth).send({ minutes: 25 }).expect(200)).body;
+  assert.equal(room.block.minutes, 25);
+  assert.ok(room.messages.at(-1).system);
+  const after = room.messages.at(-1).createdAt;
+  room = (await request(app).get(`/api/v1/foco/salas/${room.id}?after=${encodeURIComponent(after)}`).set(beto.auth).expect(200)).body;
+  assert.equal(room.messages.length, 0);
+  // Convite avisa; sair; o último a sair apaga a sala.
+  room = (await request(app).post(`/api/v1/foco/salas/${room.id}/convidar`).set(ana.auth).send({ userIds: [intruso.user.id] }).expect(200)).body;
+  assert.equal(room.people.length, 3);
+  const alerts = (await request(app).get('/api/v1/notifications').set(intruso.auth)).body.items;
+  assert.ok(alerts.some(item => item.kind === 'foco'));
+  for (const who of [ana, beto, intruso]) await request(app).post(`/api/v1/foco/salas/${room.id}/sair`).set(who.auth).expect(200);
+  await request(app).get(`/api/v1/foco/salas/${room.id}`).set(ana.auth).expect(404);
+  assert.equal((await request(app).get('/api/v1/foco/salas').set(ana.auth)).body.length, 0);
+});

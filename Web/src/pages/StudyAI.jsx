@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, BookOpenCheck, Brain, ChartLine, ChevronRight, CircleHelp, Hourglass, Layers, LifeBuoy, MessagesSquare, Mic, Music, NotebookPen, Route, Trophy, Camera } from "lucide-react";
+import { ArrowLeft, BookOpenCheck, Brain, ChartLine, ChevronRight, CircleHelp, Hourglass, Layers, LifeBuoy, MessagesSquare, Mic, Music, NotebookPen, Route, Trophy, Camera, Users } from "lucide-react";
 import { useApp } from "../context.js";
 import { apiBase } from "../lib/api.js";
 import { Empty, FormError } from "../ui.jsx";
@@ -52,6 +52,7 @@ function StudyHub() {
     { icon: CircleHelp, title: "Simulado com tempo", action: () => go("ia", { tool: "simulado" }) },
     { icon: Route, title: "Plano de estudos", action: () => go("ia", { tool: "plano" }) },
     { icon: Hourglass, title: "Ritual de Foco", action: () => ritual.setView("open") },
+    { icon: Users, title: "Ritual em grupo", action: () => go("foco") },
     { icon: Layers, title: "Cartas do Saber", action: () => go("cartoes") },
     { icon: MessagesSquare, title: "Comunidade", action: () => go("comunidade") },
     { icon: Camera, title: "Feed dos Migles", action: () => go("migles") },

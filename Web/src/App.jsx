@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BookOpen, Camera, CalendarDays, ChartColumn, GraduationCap, Heart, Home as HomeIcon, Layers, LibraryBig, Megaphone, MessagesSquare, Moon as MoonIcon, NotebookPen, NotebookText, ScrollText, Settings as SettingsIcon, Sparkles, Trophy, UserRound, Users, X } from "lucide-react";
+import { BookOpen, Camera, CalendarDays, Hourglass, ChartColumn, GraduationCap, Heart, Home as HomeIcon, Layers, LibraryBig, Megaphone, MessagesSquare, Moon as MoonIcon, NotebookPen, NotebookText, ScrollText, Settings as SettingsIcon, Sparkles, Trophy, UserRound, Users, X } from "lucide-react";
 import { AppContext, useApp } from "./context.js";
 import { readSession, request, storeSession, useAcademicData } from "./lib/api.js";
 import { useLocalNotifications } from "./lib/notify.js";
@@ -44,12 +44,13 @@ import Ranking from "./pages/Ranking.jsx";
 import Settings from "./pages/Settings.jsx";
 import StudyAI from "./pages/StudyAI.jsx";
 import Subjects from "./pages/Subjects.jsx";
+import FocusRoom from "./pages/FocusRoom.jsx";
 
 // Seis seções fixas em todas as telas. Cada seção reúne as páginas que abre (group), para o menu marcar a certa.
 const nav = [
   { id: "inicio", label: "Início", title: "Início", icon: HomeIcon, page: Home, group: ["inicio"] },
   { id: "conteudos", label: "Grimório", title: "Meu Grimório", icon: BookOpen, page: Subjects, group: ["conteudos", "aulas", "provas", "caderno"] },
-  { id: "ia", label: "Estudar", title: "Estudar", icon: Sparkles, page: StudyAI, group: ["ia", "cartoes", "ranking", "lua", "compartilhadas"] },
+  { id: "ia", label: "Estudar", title: "Estudar", icon: Sparkles, page: StudyAI, group: ["ia", "cartoes", "ranking", "lua", "compartilhadas", "foco"] },
   { id: "comunidade", label: "Comunidade", short: "Social", title: "Comunidade", icon: Heart, page: CommunityHub, group: ["comunidade", "conselho", "batepapo", "comunicados", "resumos", "migles"] },
   { id: "calendario", label: "Agenda", title: "Agenda", icon: CalendarDays, page: Calendar, group: ["calendario"] },
   { id: "perfil", label: "Perfil", title: "Perfil", icon: UserRound, page: Profile, group: ["perfil", "configuracoes", "historico", "historico-xp", "relatorio"] },
@@ -72,9 +73,10 @@ const extraPages = [
   { id: "historico-xp", label: "Histórico de XP", title: "Histórico de XP", icon: ScrollText, page: XpHistory },
   { id: "relatorio", label: "Relatório mensal", title: "Relatório mensal de estudos", icon: ChartColumn, page: Report },
   { id: "caderno", label: "Cadernos", title: "Caderno de aula", icon: NotebookText, page: Notebook },
+  { id: "foco", label: "Ritual em grupo", title: "Ritual em grupo", icon: Hourglass, page: FocusRoom },
 ];
 const allPages = [...nav, ...extraPages];
-const shortcuts = ["aulas", "caderno", "provas", "cartoes", "lua", "compartilhadas", "migles", "ranking", "configuracoes"];
+const shortcuts = ["aulas", "caderno", "provas", "cartoes", "lua", "compartilhadas", "foco", "migles", "ranking", "configuracoes"];
 const sectionOf = (page) => nav.find((item) => item.group.includes(page))?.id;
 // Endereços das versões anteriores continuam funcionando.
 const legacyPages = { central: "inicio", diario: "aulas", prova: "ia", estudos: "calendario", biblioteca: "conteudos", desempenho: "perfil" };
