@@ -1,32 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, Plus, PlusCircle } from "lucide-react";
 import { useApp } from "../context.js";
-import { addDays, addMonths, classOccurrences, endOfMonth, formatFull, formatLong, formatMonth, range, startOfMonth, startOfWeek, todayIso, weekdays } from "../lib/dates.js";
+import { addDays, addMonths, classOccurrences, endOfMonth, formatLong, formatMonth, formatShort, range, startOfMonth, startOfWeek, todayIso, weekdays } from "../lib/dates.js";
 import { lessonStatus } from "../lib/domain.js";
-import { Card, Empty, FormError, Modal, SubjectTag } from "../ui.jsx";
+import { Empty, FormError, Modal } from "../ui.jsx";
 import { SubjectSelect } from "../components/forms.jsx";
 import { LessonForm } from "../components/LessonForm.jsx";
-
-function OccurrenceRow({ occurrence, onOpen }) {
-  const status = occurrence.lesson?.status || (occurrence.holiday ? "feriado" : "pendente");
-  return (
-    <button type="button" className="occurrence" style={{ "--subject": occurrence.subject.color }} onClick={() => onOpen(occurrence)}>
-      <span className="subject-dot" aria-hidden="true" />
-      <span>
-        <strong>{occurrence.subject.name}</strong>
-        <small>
-          {formatLong(occurrence.date)}
-          {occurrence.start ? `, ${occurrence.start}${occurrence.end ? `–${occurrence.end}` : ""}` : ""}
-          {occurrence.lesson?.theme ? `, ${occurrence.lesson.theme}` : ""}
-          {occurrence.lesson?.draft ? ", rascunho" : ""}
-          {occurrence.extra ? ", fora da grade" : ""}
-          {occurrence.holiday ? `, ${occurrence.holiday}` : ""}
-        </small>
-      </span>
-      <span className={`status status-${status}`}>{lessonStatus[status].short}</span>
-    </button>
-  );
-}
 
 export default function Lessons() {
   const { data, user, params } = useApp();
@@ -35,6 +14,7 @@ export default function Lessons() {
   const [selected, setSelected] = useState(cursor);
   const [open, setOpen] = useState(null);
   const [extra, setExtra] = useState(false);
+  const [dayFilter, setDayFilter] = useState("todas");
   const monthStart = startOfWeek(startOfMonth(cursor));
   const monthEnd = addDays(startOfWeek(endOfMonth(cursor)), 6);
   const occurrences = useMemo(() => classOccurrences(data.subjects, data.lessons, user, monthStart, monthEnd), [data.subjects, data.lessons, user, monthStart, monthEnd]);
@@ -61,13 +41,25 @@ export default function Lessons() {
     lesson: data.lessons.find((lesson) => lesson.subjectId === open.subject.id && lesson.date === open.date && lesson.startTime === (open.start || "")) || open.lesson,
   };
   const dayItems = occurrences.filter((item) => item.date === selected);
+  const written = (item) => Boolean(item.lesson && !item.lesson.draft);
+  const toWrite = (item) => !item.holiday && !written(item);
+  const shown = dayItems.filter((item) => (dayFilter === "pendentes" ? toWrite(item) : dayFilter === "registradas" ? written(item) : true));
+  const countable = dayItems.filter((item) => !item.holiday && item.lesson?.status !== "cancelada");
+  const doneCount = countable.filter(written).length;
+  // Páginas em branco: dias recentes com aula ainda sem registro (ou só rascunho), do mais recente para o mais antigo.
+  const blankDays = [...recent.reduce((map, item) => map.set(item.date, (map.get(item.date) || 0) + 1), new Map())];
+  const pick = (day) => {
+    setCursor(day);
+    setSelected(day);
+    setDayFilter("todas");
+  };
 
   return (
-    <div className="page">
+    <div className="page lessons-v4">
       <header className="page-head">
         <div>
           <h1>Registro de aulas</h1>
-          <p>Cada aula da sua grade, com o que foi ensinado, faltas e materiais.</p>
+          <p>Cada aula registrada é uma página nova no seu grimório.</p>
         </div>
         <div className="page-actions">
           <button className="btn soft" onClick={() => setExtra(true)} disabled={!data.subjects.length}>
@@ -79,76 +71,140 @@ export default function Lessons() {
       {!data.subjects.length ? (
         <Empty title="Cadastre suas disciplinas primeiro">Com os dias e horários de cada matéria, a Grimiau monta todas as aulas do semestre aqui.</Empty>
       ) : (
-        <div className="lessons-layout">
-          <Card className="lessons-calendar">
-            <div className="calendar-nav">
-              <button className="icon-btn" aria-label="Mês anterior" onClick={() => setCursor(addMonths(cursor, -1))}>
-                <ChevronLeft size={18} />
-              </button>
-              <h2>{formatMonth(cursor)}</h2>
-              <button className="icon-btn" aria-label="Próximo mês" onClick={() => setCursor(addMonths(cursor, 1))}>
-                <ChevronRight size={18} />
-              </button>
-              <button className="btn ghost small" onClick={() => { setCursor(today); setSelected(today); }}>
-                Hoje
-              </button>
-            </div>
-            <div className="mini-month">
-              {weekdays.map((day) => (
-                <span key={day} className="month-head">{day.slice(0, 1)}</span>
-              ))}
-              {range(monthStart, monthEnd).map((day) => {
-                const items = occurrences.filter((item) => item.date === day);
-                return (
-                  <button
-                    key={day}
-                    type="button"
-                    className={`${day.slice(0, 7) !== cursor.slice(0, 7) ? "outside" : ""} ${day === today ? "today" : ""} ${day === selected ? "picked" : ""}`}
-                    onClick={() => setSelected(day)}
-                    aria-label={`${formatLong(day)}: ${items.length} aulas`}
-                  >
-                    {Number(day.slice(8))}
-                    <span className="dots" aria-hidden="true">
-                      {items.slice(0, 3).map((item) => (
-                        <i key={item.key} className={`dot status-dot-${item.lesson?.status || (item.holiday ? "feriado" : "pendente")}`} style={{ "--subject": item.subject.color }} />
-                      ))}
-                    </span>
+        <div className="lr-layout">
+          <div className="lr-side">
+            <section className="lr-card lessons-calendar">
+              <div className="lr-month">
+                <h2>{formatMonth(cursor)}</h2>
+                <div>
+                  <button className="icon-btn" aria-label="Mês anterior" onClick={() => setCursor(addMonths(cursor, -1))}>
+                    <ChevronLeft size={17} />
                   </button>
-                );
-              })}
-            </div>
-            <p className="hint legend">
-              <i className="dot status-dot-pendente" /> pendente <i className="dot status-dot-presente" /> registrada <i className="dot status-dot-falta" /> falta <i className="dot status-dot-cancelada" /> cancelada <i className="dot status-dot-feriado" /> feriado
-            </p>
-          </Card>
+                  <button className="btn ghost small" onClick={() => pick(today)}>
+                    Hoje
+                  </button>
+                  <button className="icon-btn" aria-label="Próximo mês" onClick={() => setCursor(addMonths(cursor, 1))}>
+                    <ChevronRight size={17} />
+                  </button>
+                </div>
+              </div>
+              <div className="mini-month">
+                {weekdays.map((day) => (
+                  <span key={day} className="month-head">
+                    {day.slice(0, 1)}
+                  </span>
+                ))}
+                {range(monthStart, monthEnd).map((day) => {
+                  const items = occurrences.filter((item) => item.date === day);
+                  const blank = day <= today && items.some(toWrite);
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      className={`${day.slice(0, 7) !== cursor.slice(0, 7) ? "outside" : ""} ${day === today ? "today" : ""} ${day === selected ? "picked" : ""} ${blank ? "blank" : ""}`}
+                      onClick={() => setSelected(day)}
+                      aria-label={`${formatLong(day)}: ${items.length} aulas`}
+                    >
+                      {Number(day.slice(8))}
+                      <span className="dots" aria-hidden="true">
+                        {items.slice(0, 3).map((item) => (
+                          <i key={item.key} className={`dot status-dot-${item.lesson?.status || (item.holiday ? "feriado" : "pendente")}`} style={{ "--subject": item.subject.color }} />
+                        ))}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="hint legend">
+                <i className="dot status-dot-pendente" /> pendente <i className="dot status-dot-presente" /> registrada <i className="dot status-dot-falta" /> falta <i className="dot status-dot-cancelada" /> cancelada <i className="dot status-dot-feriado" /> feriado
+              </p>
+            </section>
 
-          <Card title={formatLong(selected)}>
-            {dayItems.length ? (
-              <div className="occurrence-list">
-                {dayItems.map((item) => (
-                  <OccurrenceRow key={item.key} occurrence={item} onOpen={setOpen} />
+            <section className="lr-card">
+              <p className="eyebrow">Páginas em branco</p>
+              {blankDays.length ? (
+                <div className="lr-blank">
+                  {blankDays.slice(0, 9).map(([day, count]) => (
+                    <button key={day} type="button" className={day === selected ? "on" : ""} onClick={() => pick(day)}>
+                      {formatShort(day)} · {count} {count === 1 ? "pendente" : "pendentes"}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="hint">Tudo em dia. Nenhuma aula das últimas três semanas está sem registro.</p>
+              )}
+            </section>
+          </div>
+
+          <section className="lr-day" aria-labelledby="lr-day-title">
+            <p className="eyebrow">Aulas do dia</p>
+            <h2 id="lr-day-title">{formatLong(selected)}</h2>
+            {countable.length > 0 && (
+              <div className="lr-progress">
+                <span className="lr-progress-track" aria-hidden="true">
+                  <i style={{ width: `${(doneCount / countable.length) * 100}%` }} />
+                </span>
+                <small>
+                  {doneCount} de {countable.length} {countable.length === 1 ? "página escrita" : "páginas escritas"}
+                </small>
+              </div>
+            )}
+            {dayItems.length > 0 && (
+              <div className="lr-filters" role="group" aria-label="Filtrar aulas do dia">
+                {[
+                  ["todas", "Todas", dayItems.length],
+                  ["pendentes", "Para registrar", dayItems.filter(toWrite).length],
+                  ["registradas", "Registradas", dayItems.filter(written).length],
+                ].map(([id, label, count]) => (
+                  <button key={id} type="button" aria-pressed={dayFilter === id} className={dayFilter === id ? "on" : ""} onClick={() => setDayFilter(id)}>
+                    {label} <b>{count}</b>
+                  </button>
                 ))}
               </div>
+            )}
+            {shown.length ? (
+              <ol className="lr-timeline">
+                {shown.map((item) => {
+                  const status = item.lesson?.status || (item.holiday ? "feriado" : "pendente");
+                  const pending = toWrite(item);
+                  return (
+                    <li key={item.key}>
+                      <span className="lr-time">
+                        <strong>{item.start || "—"}</strong>
+                        {item.end && <small>{item.end}</small>}
+                      </span>
+                      <button type="button" className={`lr-lesson ${pending ? "pending" : ""}`} style={{ "--subject": item.subject.color }} onClick={() => setOpen(item)}>
+                        <span className="lr-lesson-head">
+                          <i aria-hidden="true" />
+                          <span>
+                            <strong>{item.subject.name}</strong>
+                            <small>
+                              {[item.room, item.extra ? "fora da grade" : "", item.holiday, item.lesson?.draft ? "rascunho" : ""].filter(Boolean).join(" · ") || (pending ? "Toque para registrar" : lessonStatus[status].short)}
+                            </small>
+                          </span>
+                          <span className={`lr-chip ${pending ? "todo" : `is-${status}`}`}>
+                            {pending ? <PlusCircle size={15} aria-hidden="true" /> : <BookOpen size={15} aria-hidden="true" />}
+                            {pending ? "Para registrar" : status === "presente" ? "Registrada" : lessonStatus[status].short}
+                          </span>
+                        </span>
+                        {item.lesson?.theme && (
+                          <span className="lr-theme">
+                            <small>Tema</small> {item.lesson.theme}
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            ) : dayItems.length ? (
+              <p className="hint">Nenhuma aula neste filtro.</p>
             ) : (
               <Empty compact title="Nenhuma aula neste dia" mood="sleepy">
                 {user.termStart || data.subjects.some((subject) => subject.startDate) ? "Escolha outro dia no calendário." : "Defina o semestre letivo em Configurações para gerar as aulas."}
               </Empty>
             )}
-          </Card>
-
-          <Card title="Para registrar" className="pending-card">
-            {recent.length ? (
-              <div className="occurrence-list">
-                {recent.slice(0, 8).map((item) => (
-                  <OccurrenceRow key={item.key} occurrence={item} onOpen={setOpen} />
-                ))}
-              </div>
-            ) : (
-              <Empty compact title="Tudo em dia" mood="happy">
-                Nenhuma aula das últimas três semanas está sem registro.
-              </Empty>
-            )}
-          </Card>
+          </section>
         </div>
       )}
 

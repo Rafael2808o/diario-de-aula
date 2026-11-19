@@ -1,14 +1,35 @@
 import { useState } from "react";
-import { ArrowLeft, BookOpen, CircleHelp, Layers, Link2, LifeBuoy, ListPlus, PenLine, Plus, Route, Search, Unlink } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronRight, Moon, CircleHelp, Layers, Link2, LifeBuoy, ListPlus, PenLine, Plus, Route, Search, Unlink } from "lucide-react";
 import { useApp } from "../context.js";
-import { countdown, formatFull, formatLong, monthShort, todayIso } from "../lib/dates.js";
+import { countdown, daysBetween, formatFull, formatLong, monthShort, todayIso } from "../lib/dates.js";
 import { examLessons, lessonHasContent, lessonsMentioning, subjectById } from "../lib/domain.js";
-import { Confirm, Empty, Modal, Segmented, SubjectTag } from "../ui.jsx";
+import { Confirm, Empty, Modal, Nox, Segmented, SubjectTag } from "../ui.jsx";
 import { ExamForm, MaterialForm, MaterialLinks, NoteForm } from "../components/forms.jsx";
 import { PlanBuilder } from "../components/ai/ExamTools.jsx";
 
 export const topicStates = ["Não iniciado", "Em estudo", "Revisado", "Dominado"];
 export const originClass = (confirmation) => (confirmation === "Confirmado pelo professor" ? "prof" : confirmation === "Hipótese pessoal" ? "self" : "ai");
+
+const revisedCount = (exam) => exam.topics.filter((topic) => topic.status === "Revisado" || topic.status === "Dominado").length;
+const prepTone = { "Não iniciada": "idle", "Em andamento": "doing", "Revisão final": "final", Pronto: "done" };
+
+function TopicBar({ exam }) {
+  const total = exam.topics.length;
+  if (!total) return <small className="ex-bar-empty">Nenhum assunto ainda</small>;
+  const done = revisedCount(exam);
+  return (
+    <span className="ex-bar" role="img" aria-label={`${done} de ${total} assuntos revisados`}>
+      <span className="ex-bar-track">
+        {exam.topics.slice(0, 12).map((topic, index) => (
+          <i key={index} className={topic.status === "Revisado" || topic.status === "Dominado" ? "on" : ""} />
+        ))}
+      </span>
+      <small>
+        {done} de {total} revisados
+      </small>
+    </span>
+  );
+}
 
 export default function Exams() {
   const { data, params, go } = useApp();
@@ -18,16 +39,29 @@ export default function Exams() {
   const exam = params.id ? data.exams.find((item) => item.id === params.id) : null;
   if (params.id && exam) return <ExamDetail exam={exam} />;
 
+  const upcoming = data.exams.filter((item) => item.date >= today).sort((a, b) => a.date.localeCompare(b.date));
+  const next = upcoming[0];
+  // A próxima prova fica em destaque e não se repete na lista de futuras.
   const list = data.exams
-    .filter((item) => (filter === "futuras" ? item.date >= today : filter === "concluidas" ? item.date < today : true))
+    .filter((item) => (filter === "futuras" ? item.date >= today && item.id !== next?.id : filter === "concluidas" ? item.date < today : true))
     .sort((a, b) => (filter === "concluidas" ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date)));
+  const nextSubject = next ? subjectById(data.subjects, next.subjectId) : null;
+  const nextPending = next ? next.topics.filter((topic) => topic.status === "Não iniciado" || topic.status === "Em estudo").length : 0;
+  const daysLeft = next ? daysBetween(today, next.date) : 0;
+  const topicsTotal = upcoming.reduce((sum, item) => sum + item.topics.length, 0);
+  const topicsDone = upcoming.reduce((sum, item) => sum + revisedCount(item), 0);
+  const examSubjects = new Set(upcoming.map((item) => item.subjectId));
+  const sessions = data["study-sessions"].filter((session) => examSubjects.has(session.subjectId)).length;
 
   return (
-    <div className="page">
+    <div className="page exams-v4">
       <header className="page-head">
-        <h1>Provas</h1>
+        <div>
+          <h1>Provas</h1>
+          <p>Um passo de cada vez. Seu conhecimento está sendo construído.</p>
+        </div>
         <div className="page-actions">
-          <button className="btn" onClick={() => go("ia", { tool: "socorro" })}>
+          <button className="btn ex-sos" onClick={() => go("ia", { tool: "socorro" })}>
             <LifeBuoy size={16} /> Socorro, tenho prova!
           </button>
           <button className="btn primary" onClick={() => setCreating(true)} disabled={!data.subjects.length}>
@@ -36,38 +70,130 @@ export default function Exams() {
         </div>
       </header>
       {params.id && !exam && <p className="notice">Esta avaliação foi excluída.</p>}
-      <Segmented label="Filtrar avaliações" value={filter} onChange={setFilter} options={[["futuras", "Futuras"], ["concluidas", "Concluídas"], ["todas", "Todas"]]} />
+
+      {next && (
+        <div className="ex-top">
+          <section className="ex-next" style={{ "--subject": nextSubject?.color }} aria-labelledby="ex-next-title">
+            <p className="eyebrow">
+              <Moon size={13} /> Próxima avaliação
+            </p>
+            <div className="ex-next-head">
+              <div>
+                <h2 id="ex-next-title">{next.title}</h2>
+                <p>
+                  {nextSubject?.name || "Sem disciplina"} · {formatLong(next.date)}
+                  {next.time ? ` · ${next.time}` : ""}
+                  {next.location ? ` · ${next.location}` : ""}
+                </p>
+              </div>
+              <div className="ex-days" aria-label={countdown(next.date, today)}>
+                <strong>{daysLeft === 0 ? "Hoje" : daysLeft}</strong>
+                <small>{daysLeft === 0 ? "é o dia" : daysLeft === 1 ? "dia restante" : "dias restantes"}</small>
+              </div>
+            </div>
+            <div className="ex-next-facts">
+              <span>
+                <b>{next.topics.length}</b> {next.topics.length === 1 ? "assunto cadastrado" : "assuntos cadastrados"}
+              </span>
+              <span>
+                <b>{revisedCount(next)}</b> {revisedCount(next) === 1 ? "assunto revisado" : "assuntos revisados"}
+              </span>
+              <span className={`ex-prep ${prepTone[next.prepStatus] || "idle"}`}>{next.prepStatus}</span>
+            </div>
+            <TopicBar exam={next} />
+            <div className="ex-next-actions">
+              <button className="btn primary" onClick={() => go("provas", { id: next.id })}>
+                Entrar na sala de preparação
+              </button>
+              <button className="btn ghost" onClick={() => go("ia", { exam: next.id })}>
+                Revisar com a IA
+              </button>
+            </div>
+          </section>
+          <aside className="ex-corner">
+            <h2>
+              <Nox size={34} mood="focused" /> Seu cantinho de estudos
+            </h2>
+            {next.topics.length ? (
+              nextPending ? (
+                <p>
+                  <strong>Que tal revisar {nextSubject?.name || "a matéria"}?</strong> A prova é {countdown(next.date, today)} e ainda {nextPending === 1 ? "falta 1 assunto" : `faltam ${nextPending} assuntos`}.
+                </p>
+              ) : (
+                <p>
+                  <strong>Tudo revisado. 💜</strong> Faça um simulado para conferir se ficou mesmo.
+                </p>
+              )
+            ) : (
+              <p>
+                <strong>Cadastre os assuntos da prova.</strong> Com eles, a IA monta o roteiro e as questões certas.
+              </p>
+            )}
+            <button className="btn ghost" onClick={() => go("ia", nextPending || !next.topics.length ? { tool: "socorro" } : { tool: "simulado", exam: next.id })}>
+              {nextPending || !next.topics.length ? "Começar a estudar" : "Fazer um simulado"}
+            </button>
+          </aside>
+        </div>
+      )}
+
+      {upcoming.length > 0 && (
+        <dl className="ex-stats">
+          <div>
+            <dt>avaliações futuras</dt>
+            <dd>{upcoming.length}</dd>
+          </div>
+          <div>
+            <dt>assuntos cadastrados</dt>
+            <dd>{topicsTotal}</dd>
+          </div>
+          <div>
+            <dt>assuntos revisados</dt>
+            <dd>{topicsDone}</dd>
+          </div>
+          <div>
+            <dt>sessões de foco nessas matérias</dt>
+            <dd>{sessions}</dd>
+          </div>
+          <div className={topicsTotal - topicsDone ? "warn" : ""}>
+            <dt>assuntos pendentes</dt>
+            <dd>{topicsTotal - topicsDone}</dd>
+          </div>
+        </dl>
+      )}
+
+      <div className="ex-list-head">
+        <h2 className="section-title">Agenda de avaliações</h2>
+        <Segmented label="Filtrar avaliações" value={filter} onChange={setFilter} options={[["futuras", "Futuras"], ["concluidas", "Concluídas"], ["todas", "Todas"]]} />
+      </div>
       {list.length ? (
-        <ul className="group exam-list">
+        <ul className="ex-list">
           {list.map((item) => {
             const subject = subjectById(data.subjects, item.subjectId);
-            const revised = item.topics.filter((topic) => topic.status === "Revisado" || topic.status === "Dominado").length;
             return (
               <li key={item.id}>
-                <button type="button" className="row exam-row" style={{ "--subject": subject?.color }} onClick={() => go("provas", { id: item.id })}>
-                  <span className="date-block" aria-hidden="true">
-                    <strong>{Number(item.date.slice(8))}</strong>
+                <button type="button" style={{ "--subject": subject?.color }} onClick={() => go("provas", { id: item.id })}>
+                  <span className="ex-date" aria-hidden="true">
                     <small>{monthShort(item.date)}</small>
+                    <strong>{Number(item.date.slice(8))}</strong>
                   </span>
-                  <span className="row-main">
+                  <span className="ex-main">
                     <strong>{item.title}</strong>
-                    <SubjectTag subject={subject} small />
                     <small>
-                      {formatLong(item.date)}
-                      {item.time ? ` às ${item.time}` : ""}
-                      {item.location ? `, ${item.location}` : ""}
+                      <i aria-hidden="true" /> {subject?.name || "Sem disciplina"}
+                      {item.time ? ` · ${item.time}` : ""}
                     </small>
                   </span>
-                  <span className="row-end">
-                    <span className="countdown">{countdown(item.date, today)}</span>
-                    <small>{item.topics.length ? `${revised} de ${item.topics.length} assuntos revisados` : "Assuntos não informados"}</small>
-                    <small>Preparação: {item.prepStatus.toLowerCase()}</small>
-                  </span>
+                  <span className="ex-when">{countdown(item.date, today)}</span>
+                  <TopicBar exam={item} />
+                  <span className={`ex-prep ${prepTone[item.prepStatus] || "idle"}`}>{item.prepStatus}</span>
+                  <ChevronRight size={17} className="ex-go" aria-hidden="true" />
                 </button>
               </li>
             );
           })}
         </ul>
+      ) : next && filter === "futuras" ? (
+        <p className="hint">Só a prova em destaque está marcada por enquanto.</p>
       ) : (
         <Empty
           title={data.subjects.length ? (filter === "futuras" ? "Nenhuma prova marcada." : "Nenhuma avaliação neste filtro.") : "Cadastre uma disciplina primeiro."}
@@ -86,6 +212,7 @@ export default function Exams() {
           {filter === "futuras" && data.subjects.length ? "Quando o professor marcar uma prova, cadastre a data e os assuntos confirmados." : null}
         </Empty>
       )}
+      {list.length > 0 && filter === "futuras" && next && <p className="hint ex-foot">A próxima avaliação aparece em destaque acima e não se repete na agenda.</p>}
       {creating && <ExamForm onClose={() => setCreating(false)} onSaved={(saved) => go("provas", { id: saved.id })} />}
     </div>
   );

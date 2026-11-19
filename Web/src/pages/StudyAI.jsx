@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { ArrowLeft, BookOpenCheck, Brain, ChartLine, ChevronRight, CircleHelp, Hourglass, Layers, LifeBuoy, MessagesSquare, Mic, Music, NotebookPen, Route, Trophy, Camera, Users, Swords } from "lucide-react";
+import { ArrowLeft, ArrowRight, NotebookText, RefreshCw, Sparkles, Timer, BookOpenCheck, Brain, ChartLine, ChevronRight, CircleHelp, Hourglass, Layers, LifeBuoy, MessagesSquare, Mic, Music, NotebookPen, Route, Trophy, Camera, Users, Swords } from "lucide-react";
 import { useApp } from "../context.js";
 import { apiBase } from "../lib/api.js";
+import { addDays, countdown, formatShort, range, toDate, todayIso, weekdayOf } from "../lib/dates.js";
 import { Empty, FormError } from "../ui.jsx";
 import { NoxPose } from "../components/Art.jsx";
 import SpotifyPlayer from "../SpotifyPlayer.jsx";
@@ -45,66 +46,232 @@ export default function StudyAI() {
   return <StudyTool />;
 }
 
+// Métodos de estudo com evidência (conteúdo fixo de apoio, não é dado de ninguém). Um por dia; dá para trocar.
+const methods = [
+  { name: "Interrogação Elaborativa", text: "Pergunte “por quê?”, “como?” e “qual a relação?” sobre cada conceito, e responda com as suas palavras.", time: "15–20 min", steps: ["Escolha um conceito da aula.", "Responda “por que isso acontece?” e “como funciona?”.", "Relacione com outro conceito da disciplina."], tool: "explicar", cta: "Explicar com a IA" },
+  { name: "Técnica Feynman", text: "Explique o assunto como se fosse para alguém que nunca ouviu falar. Onde travar, é o ponto a estudar.", time: "20 min", steps: ["Escreva o assunto no topo de uma folha.", "Explique em linguagem simples, sem jargão.", "Volte nas aulas onde a explicação travou."], tool: "explicar", cta: "Pedir uma explicação" },
+  { name: "Recordação Ativa", text: "Tente lembrar sem olhar a matéria. Puxar da memória fixa mais do que reler.", time: "15 min", steps: ["Feche o caderno.", "Responda questões sobre a aula.", "Confira e anote o que esqueceu."], tool: "questoes", cta: "Praticar questões" },
+  { name: "Repetição Espaçada", text: "Revise pouco e várias vezes, com intervalos cada vez maiores. As Cartas do Saber cuidam do intervalo.", time: "10 min", steps: ["Abra as Cartas do Saber.", "Revise as que estão para hoje.", "Marque com sinceridade o que já domina."], page: "cartoes", cta: "Revisar cartas" },
+  { name: "Pomodoro", text: "Blocos curtos de foco total com pausas. Bom para começar quando falta vontade.", time: "25 + 5 min", steps: ["Escolha uma tarefa só.", "Foque 25 minutos sem celular.", "Pause 5 minutos e repita."], ritual: true, cta: "Começar um Ritual" },
+  { name: "Prática Intercalada", text: "Misture assuntos diferentes na mesma sessão em vez de estudar um de cada vez. Prepara melhor para a prova.", time: "30 min", steps: ["Junte dois ou três assuntos da prova.", "Resolva questões misturadas.", "Veja em quais você mais erra."], tool: "simulado", cta: "Fazer um simulado" },
+];
+
+const modes = [
+  { tool: "explicar", icon: Brain, label: "Entender um conteúdo" },
+  { tool: "flashcards", icon: Layers, label: "Memorizar" },
+  { tool: "questoes", icon: NotebookPen, label: "Praticar" },
+  { tool: "socorro", icon: LifeBuoy, label: "Preparar para prova" },
+];
+
+function WeekFocus() {
+  const { data } = useApp();
+  const today = todayIso();
+  const start = addDays(today, -((toDate(today).getUTCDay() + 6) % 7));
+  const days = range(start, addDays(start, 6)).map((date) => ({
+    date,
+    minutes: Math.round(data["study-sessions"].filter((session) => session.date === date).reduce((sum, session) => sum + (session.durationSeconds || 0), 0) / 60),
+  }));
+  const total = days.reduce((sum, day) => sum + day.minutes, 0);
+  const top = Math.max(30, ...days.map((day) => day.minutes));
+  return (
+    <section className="sh-card">
+      <h2>Seu foco na semana</h2>
+      <p className="sh-big">{total >= 60 ? `${Math.floor(total / 60)} h${total % 60 ? ` ${total % 60} min` : ""}` : `${total} min`}</p>
+      <p className="hint">salvos no Ritual desde segunda</p>
+      <ol className="sh-bars" aria-label="Minutos de foco por dia">
+        {days.map((day) => (
+          <li key={day.date} className={day.date === today ? "today" : ""} title={`${weekdayOf(day.date)}: ${day.minutes} min`}>
+            <i style={{ height: `${Math.max(4, (day.minutes / top) * 100)}%` }} />
+            <span>{weekdayOf(day.date).charAt(0)}</span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 function StudyHub() {
-  const { go, ritual } = useApp();
+  const { go, ritual, data } = useApp();
+  const today = todayIso();
+  const [subjectId, setSubjectId] = useState("");
+  const [methodIndex, setMethodIndex] = useState(() => Math.floor(Date.parse(today) / 86400000) % methods.length);
+  const method = methods[methodIndex % methods.length];
+  const exams = data.exams.filter((exam) => exam.date >= today).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 3);
+  const lastLesson = [...data.lessons].filter((lesson) => lesson.date <= today).sort((a, b) => b.date.localeCompare(a.date))[0];
+  const subjectName = (id) => data.subjects.find((subject) => subject.id === id)?.name || "Sem disciplina";
+  const startMethod = () => {
+    if (method.ritual) return ritual.setView("open");
+    if (method.page) return go(method.page);
+    return go("ia", { tool: method.tool, subject: subjectId });
+  };
   const more = [
     { icon: BookOpenCheck, title: "Resumir minhas aulas", action: () => go("ia", { tool: "resumo" }) },
     { icon: CircleHelp, title: "Simulado com tempo", action: () => go("ia", { tool: "simulado" }) },
     { icon: Route, title: "Plano de estudos", action: () => go("ia", { tool: "plano" }) },
-    { icon: Hourglass, title: "Ritual de Foco", action: () => ritual.setView("open") },
+    { icon: Mic, title: "Gravar e transcrever aula", action: () => go("ia", { tool: "gravar" }) },
     { icon: Users, title: "Ritual em grupo", action: () => go("foco") },
     { icon: Swords, title: "Perguntados", action: () => go("perguntados") },
     { icon: Layers, title: "Cartas do Saber", action: () => go("cartoes") },
-    { icon: MessagesSquare, title: "Comunidade", action: () => go("comunidade") },
-    { icon: Camera, title: "Feed dos Migles", action: () => go("migles") },
     { icon: Trophy, title: "Ranking dos Bruxinhos", action: () => go("ranking") },
     { icon: ChartLine, title: "Histórico de aprendizagem", action: () => go("historico") },
   ];
   return (
-    <div className="page study-hub">
-      <header className="page-head with-nox">
-        <div>
-          <h1>Estudar com IA</h1>
-          <p>Seu assistente parte das suas aulas, do cofre do professor e dos seus materiais. O que a IA gera aparece marcado como sugestão.</p>
-        </div>
-        <NoxPose pose="tarot" size={88} />
-      </header>
-      <section aria-labelledby="intencao-title">
-        <h2 className="section-title" id="intencao-title">
-          O que você quer fazer?
-        </h2>
-        <ul className="intent-list">
-          {intents.map(({ tool, icon: Icon, title, text }) => (
-            <li key={tool}>
-              <button type="button" className={`intent ${tool === "socorro" ? "is-sos" : ""}`} onClick={() => go("ia", { tool })}>
-                <span className="intent-icon" aria-hidden="true">
-                  <Icon size={20} />
-                </span>
-                <span className="row-main">
+    <div className="page study-hub sh-v4">
+      <div className="sh-main">
+        <header className="page-head with-nox">
+          <div>
+            <h1>Estudar com IA ✦</h1>
+            <p>Seu assistente parte das suas aulas, do cofre do professor e dos seus materiais. O que a IA gera aparece marcado como sugestão.</p>
+          </div>
+          <NoxPose pose="tarot" size={88} />
+        </header>
+
+        <section className="sh-start" aria-labelledby="sh-start-title">
+          <p className="eyebrow">
+            <Sparkles size={13} /> Vamos começar?
+          </p>
+          <h2 id="sh-start-title">
+            O que você quer estudar <em>hoje</em>?
+          </h2>
+          {data.subjects.length > 0 && (
+            <div className="sh-subjects" role="group" aria-label="Disciplina">
+              {data.subjects.map((subject) => (
+                <button key={subject.id} type="button" aria-pressed={subjectId === subject.id} className={subjectId === subject.id ? "on" : ""} style={{ "--subject": subject.color }} onClick={() => setSubjectId(subjectId === subject.id ? "" : subject.id)}>
+                  <i aria-hidden="true" /> {subject.name}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="sh-modes">
+            {modes.map(({ tool, icon: Icon, label }) => (
+              <button key={tool} type="button" className="btn ghost" onClick={() => go("ia", { tool, subject: subjectId })}>
+                <Icon size={16} aria-hidden="true" /> {label}
+              </button>
+            ))}
+          </div>
+          <p className="hint">{subjectId ? `A IA vai usar as aulas e materiais de ${subjectName(subjectId)}.` : "Escolha uma disciplina para a IA usar só as aulas e materiais dela."}</p>
+        </section>
+
+        <section aria-labelledby="sh-method-title">
+          <div className="sh-section-head">
+            <h2 id="sh-method-title" className="section-title">
+              Método de estudo para hoje
+            </h2>
+            <button type="button" className="link-btn" onClick={() => setMethodIndex(methodIndex + 1)}>
+              <RefreshCw size={14} aria-hidden="true" /> Experimentar outro método
+            </button>
+          </div>
+          <article className="sh-method">
+            <div>
+              <h3>{method.name}</h3>
+              <p>{method.text}</p>
+              <span className="sh-pill">
+                <Timer size={13} aria-hidden="true" /> {method.time}
+              </span>
+            </div>
+            <div className="sh-mission">
+              <strong>Sua missão de hoje:</strong>
+              <ol>
+                {method.steps.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+              <button type="button" className="btn primary small" onClick={startMethod}>
+                {method.cta} <ArrowRight size={14} aria-hidden="true" />
+              </button>
+            </div>
+          </article>
+        </section>
+
+        <section aria-labelledby="intencao-title">
+          <h2 className="section-title" id="intencao-title">
+            O que você precisa fazer?
+          </h2>
+          <ul className="sh-intents">
+            {intents.map(({ tool, icon: Icon, title, text }) => (
+              <li key={tool}>
+                <button type="button" className={tool === "socorro" ? "is-sos" : ""} onClick={() => go("ia", { tool })}>
+                  <Icon size={20} aria-hidden="true" />
                   <strong>{title}</strong>
                   <small>{text}</small>
-                </span>
-                <ChevronRight size={17} className="chevron" aria-hidden="true" />
+                  <ArrowRight size={16} className="sh-go" aria-hidden="true" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {lastLesson && (
+          <section aria-labelledby="sh-continue-title">
+            <h2 className="section-title" id="sh-continue-title">
+              Continue de onde parou
+            </h2>
+            <article className="sh-continue">
+              <NotebookText size={20} aria-hidden="true" />
+              <div>
+                <small>Última aula registrada · {formatShort(lastLesson.date)}</small>
+                <strong>{lastLesson.theme || "Aula sem tema"}</strong>
+                <span>{subjectName(lastLesson.subjectId)}</span>
+              </div>
+              <button type="button" className="btn primary small" onClick={() => go("caderno", { lesson: lastLesson.id })}>
+                Abrir o caderno <ArrowRight size={14} aria-hidden="true" />
               </button>
-            </li>
-          ))}
-        </ul>
-      </section>
-      <section aria-labelledby="mais-title">
-        <h2 className="section-title" id="mais-title">
-          Mais para estudar
-        </h2>
-        <ul className="more-tools">
-          {more.map(({ icon: Icon, title, action }) => (
-            <li key={title}>
-              <button type="button" onClick={action}>
-                <Icon size={17} aria-hidden="true" /> {title}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
-      <StudyMusic />
+            </article>
+          </section>
+        )}
+
+        <section aria-labelledby="mais-title">
+          <h2 className="section-title" id="mais-title">
+            Mais para estudar
+          </h2>
+          <ul className="more-tools">
+            {more.map(({ icon: Icon, title, action }) => (
+              <li key={title}>
+                <button type="button" onClick={action}>
+                  <Icon size={17} aria-hidden="true" /> {title}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+        <StudyMusic />
+      </div>
+
+      <aside className="sh-side">
+        <WeekFocus />
+        <section className="sh-card">
+          <header>
+            <h2>Próximas provas</h2>
+            <button type="button" className="link-btn" onClick={() => go("provas")}>
+              Ver todas
+            </button>
+          </header>
+          {exams.length ? (
+            <ul className="sh-exams">
+              {exams.map((exam) => (
+                <li key={exam.id}>
+                  <button type="button" onClick={() => go("ia", { exam: exam.id })}>
+                    <strong>{exam.title}</strong>
+                    <span>
+                      {subjectName(exam.subjectId)} · {countdown(exam.date, today)}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="hint">Nenhuma prova marcada. Cadastre em Provas para a IA montar o roteiro.</p>
+          )}
+        </section>
+        <section className="sh-card sh-ritual">
+          <Hourglass size={20} aria-hidden="true" />
+          <h2>Seu Ritual de Foco</h2>
+          <p>Hora de se concentrar? Coloque sua playlist, ligue o cronômetro e mergulhe nos estudos.</p>
+          <button type="button" className="btn ghost" onClick={() => ritual.setView("open")}>
+            Abrir o Ritual
+          </button>
+        </section>
+      </aside>
     </div>
   );
 }

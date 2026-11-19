@@ -5,6 +5,7 @@ import './redesign.css';
 import './atualizacao.css';
 import './caderno.css';
 import './loja.css';
+import './telas.css';
 import App from './App';
 import { applyAppearance } from './lib/theme.js';
 import { applyMotion } from './lib/motion.js';
