@@ -4,6 +4,7 @@ import './grimiau.css';
 import './redesign.css';
 import './atualizacao.css';
 import './caderno.css';
+import './caderno-livro.css';
 import './loja.css';
 import './telas.css';
 import App from './App';

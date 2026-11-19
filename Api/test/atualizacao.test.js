@@ -20,6 +20,9 @@ test('o limpador de anotações é o mesmo na API e no site e tira tudo que não
   assert.equal(api, web);
   assert.equal(sanitizeHtml('<h2 style="x">Título</h2><p onclick="alert(1)">a <b>b</b></p><script>alert(1)</script><img src=x onerror=alert(1)>'), '<h2>Título</h2><p>a <b>b</b></p>');
   assert.equal(sanitizeHtml('<a href="javascript:alert(1)">link</a> 3 < 4'), 'link 3 &lt; 4');
+  // Carimbos do Caderno: só o tipo da lista passa, sem outros atributos; span comum perde a marcação.
+  assert.equal(sanitizeHtml('<p><span data-stamp="cai" onclick="x" contenteditable="false">Cai</span> <span style="x">a</span></p>'), '<p><span data-stamp="cai">Cai</span> a</p>');
+  assert.equal(sanitizeHtml('<span data-stamp="x">a</span><span data-stamp="duvida">b'), 'a<span data-stamp="duvida">b</span>');
 });
 
 test('disciplina guarda modalidade e aula guarda caderno e "sem material"', async () => {

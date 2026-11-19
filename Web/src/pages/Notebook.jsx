@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertCircle, ArrowLeft, Bold, BookOpen, Cat, Check, Eye, FileQuestion, FlaskConical, Flame, Gem, Heading2, Heading3, Heart, ImagePlus, Italic, Layers, List, ListOrdered, Mic, Moon, Pilcrow, Quote, Redo2, ScrollText, Share2, Sparkles, Star, Trash2, Underline, Undo2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlertCircle, ArrowLeft, Bold, BookOpen, Cat, Check, Eye, FileQuestion, FlaskConical, Flame, Gem, Heading2, Heading3, Heart, ImagePlus, Italic, Layers, List, ListOrdered, Mic, Moon, Pilcrow, Quote, Redo2, ScrollText, Share2, Sparkles, Stamp, Star, Trash2, Underline, Undo2 } from "lucide-react";
 import { useApp } from "../context.js";
-import { formatFull, formatLong } from "../lib/dates.js";
+import { formatFull, formatLong, todayIso, toDate, weekdays } from "../lib/dates.js";
 import { htmlToText, sanitizeHtml } from "../lib/richtext.js";
 import { blobToBase64, hydrateImages, preparePhoto } from "../lib/photo.js";
 import { when } from "../lib/social.js";
 import { Avatar, Empty, FormError, SubjectTag } from "../ui.jsx";
 import { MaterialLinks } from "../components/forms.jsx";
 import { PeoplePicker } from "../components/sala/People.jsx";
+import Janela, { moonInfo } from "../components/caderno/Janela.jsx";
+import { carimbos, figurinhaArt } from "../components/caderno/figurinhas.js";
 
 // Caderno da aula: escrever durante a explicação, com salvamento automático.
 // Enquanto a API não confirma, o texto fica guardado neste aparelho (localStorage), então cair a internet
@@ -76,19 +78,57 @@ export function Sticker({ id }) {
   const sticker = stickers[id];
   if (!sticker) return null;
   if (sticker.stamp) return <span className={`stamp ${sticker.stamp}`}>{sticker.label}</span>;
-  const Icon = sticker.icon;
+  const art = figurinhaArt[id];
+  if (!art) {
+    const Icon = sticker.icon;
+    return (
+      <span className={`sticker tone-${sticker.tone}`} title={sticker.label}>
+        <Icon size={20} aria-hidden="true" />
+        <span className="sr-only">{sticker.label}</span>
+      </span>
+    );
+  }
   return (
-    <span className={`sticker tone-${sticker.tone}`} title={sticker.label}>
-      <Icon size={20} aria-hidden="true" />
+    <span className="figurinha" title={sticker.label}>
+      <svg viewBox="0 0 64 64" aria-hidden="true" dangerouslySetInnerHTML={{ __html: art }} />
       <span className="sr-only">{sticker.label}</span>
     </span>
   );
 }
 
-function Editor({ lesson }) {
+// Carimbos no texto não são editáveis por dentro (apagar com Backspace tira o carimbo inteiro).
+const lockStamps = (root) => {
+  for (const stamp of root?.querySelectorAll("span[data-stamp]") || []) stamp.contentEditable = "false";
+};
+
+// "Para revisar antes da prova": cada trecho com carimbo Cai na prova, Importante ou Revisar, e as dúvidas marcadas.
+export function reviewFromHtml(html) {
+  const result = { review: [], doubts: [], mastered: 0 };
+  if (!html || !html.includes("data-stamp")) return result;
+  const doc = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
+  const seen = new Set();
+  for (const stamp of doc.querySelectorAll("span[data-stamp]")) {
+    const kind = stamp.dataset.stamp;
+    if (kind === "dominei") result.mastered += 1;
+    const block = stamp.closest("li, p, h2, h3, blockquote, div:not(:only-child)") || stamp.parentElement;
+    const copy = block.cloneNode(true);
+    copy.querySelectorAll("span[data-stamp], img").forEach((node) => node.remove());
+    const text = copy.textContent.replace(/\s+/g, " ").trim().slice(0, 140);
+    if (!text) continue;
+    if (kind === "duvida") result.doubts.push(text);
+    else if (["cai", "importante", "revisar"].includes(kind) && !seen.has(text)) {
+      seen.add(text);
+      result.review.push({ kind, text });
+    }
+  }
+  return result;
+}
+
+function Editor({ lesson, onHtml }) {
   const { update, call, session, toast } = useApp();
   const box = useRef(null);
   const fileInput = useRef(null);
+  const [stampsOpen, setStampsOpen] = useState(false);
   const [status, setStatus] = useState("saved");
   const [words, setWords] = useState(0);
   const [uploading, setUploading] = useState(0);
@@ -134,7 +174,9 @@ function Editor({ lesson }) {
     const initial = local && local.html !== (lesson.annotations || "") ? local.html : lesson.annotations || "";
     box.current.innerHTML = sanitizeHtml(initial);
     hydrateImages(box.current, session.token);
+    lockStamps(box.current);
     current.current = sanitizeHtml(initial);
+    onHtml?.(current.current);
     setWords(htmlToText(initial).split(/\s+/).filter(Boolean).length);
     if (local && local.html !== (lesson.annotations || "")) {
       setStatus("pending");
@@ -146,6 +188,7 @@ function Editor({ lesson }) {
   const changed = () => {
     const html = sanitizeHtml(box.current.innerHTML);
     current.current = html;
+    onHtml?.(html);
     writeLocal(lesson.id, { html, at: Date.now() });
     setWords(htmlToText(html).split(/\s+/).filter(Boolean).length);
     setStatus((value) => (value === "saving" ? value : "pending"));
@@ -207,6 +250,21 @@ function Editor({ lesson }) {
     };
   }, [save]);
 
+  const insertStamp = (kind, label) => {
+    setStampsOpen(false);
+    box.current.focus();
+    const range = selection.current;
+    if (range && box.current.contains(range.commonAncestorContainer)) {
+      const chosen = window.getSelection();
+      chosen.removeAllRanges();
+      chosen.addRange(range);
+    }
+    document.execCommand("insertHTML", false, `<span data-stamp="${kind}">${label}</span>&nbsp;`);
+    lockStamps(box.current);
+    rememberCaret();
+    changed();
+  };
+
   return (
     <section className="notebook" aria-label="Caderno da aula">
       <div className="notebook-toolbar" role="toolbar" aria-label="Formatação">
@@ -230,6 +288,21 @@ function Editor({ lesson }) {
         <button type="button" className="btn small soft notebook-photo-btn" onMouseDown={(event) => { event.preventDefault(); rememberCaret(); }} onClick={() => fileInput.current.click()} disabled={uploading > 0}>
           <ImagePlus size={15} /> {uploading ? "Enviando foto…" : "Foto"}
         </button>
+        <div className="stamp-pop">
+          <button type="button" className="btn small soft" aria-expanded={stampsOpen} aria-haspopup="true" onMouseDown={(event) => { event.preventDefault(); rememberCaret(); }} onClick={() => setStampsOpen((open) => !open)}>
+            <Stamp size={15} /> Carimbo
+          </button>
+          {stampsOpen && (
+            <div className="stamp-menu" role="menu" aria-label="Carimbos">
+              <p>Entra onde o cursor estiver. Cai na prova, Importante e Revisar vão para a lista de revisão.</p>
+              {carimbos.map(([kind, label]) => (
+                <button key={kind} type="button" role="menuitem" onMouseDown={(event) => event.preventDefault()} onClick={() => insertStamp(kind, label)}>
+                  <span data-stamp={kind}>{label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <input
           ref={fileInput}
           type="file"
@@ -581,9 +654,121 @@ const panels = [
   ["materiais", "Materiais", "tab-rose"],
 ];
 
+
+// Escuro/Claro do papel do Caderno: escolha deste aparelho, separada do tema do app.
+const paperKey = "grimiau.caderno.papel";
+const ambientKey = "grimiau.caderno.janela";
+const readPref = (key, fallback) => {
+  try {
+    return localStorage.getItem(key) ?? fallback;
+  } catch {
+    return fallback;
+  }
+};
+const writePref = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Sem armazenamento, a escolha vale até fechar a aba.
+  }
+};
+
+const noAccent = (text) => text.normalize("NFD").replace(/[̀-ͯ]/g, "");
+const skipWords = new Set(["fundamentos", "introducao", "da", "de", "do", "das", "dos", "e", "a", "o"]);
+// Sigla da disciplina para a aba lateral: "Fundamentos do Marketing" vira MAR.
+const shortName = (name = "") => {
+  const words = noAccent(name).split(/[^a-z0-9]+/i).filter(Boolean);
+  const word = words.find((item) => !skipWords.has(item.toLowerCase())) || words[0] || "AULA";
+  return word.slice(0, 3).toUpperCase();
+};
+const dayMonth = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+const shortDay = (iso) => `${weekdays[toDate(iso).getUTCDay()].toLowerCase()}, ${dayMonth(iso)}`;
+
+function FocusRow({ lesson }) {
+  const { update } = useApp();
+  const [value, setValue] = useState(lesson.theme || "");
+  const timer = useRef(null);
+  const sent = useRef(lesson.theme || "");
+  const send = (next) => {
+    clearTimeout(timer.current);
+    if (next.trim() === sent.current.trim()) return;
+    const previous = sent.current;
+    sent.current = next;
+    update("lessons", lesson.id, { theme: next.trim() }).catch(() => {
+      sent.current = previous;
+    });
+  };
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return (
+    <label className="caderno-focus">
+      <span>Foco da aula</span>
+      <input
+        type="text"
+        maxLength={160}
+        value={value}
+        placeholder="O que você precisa tirar desta aula?"
+        onChange={(event) => {
+          const next = event.target.value;
+          setValue(next);
+          clearTimeout(timer.current);
+          timer.current = setTimeout(() => send(next), 1200);
+        }}
+        onBlur={() => send(value)}
+      />
+    </label>
+  );
+}
+
+function ReviewBox({ html }) {
+  const { review, doubts, mastered } = useMemo(() => reviewFromHtml(html), [html]);
+  return (
+    <div className="caderno-review">
+      <h3>Para revisar antes da prova</h3>
+      {review.length ? (
+        <ul>
+          {review.slice(0, 5).map((item) => (
+            <li key={item.text} className={`is-${item.kind}`}>
+              <i aria-hidden="true" />
+              <span>{item.text}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>Use o Carimbo "Cai na prova", "Importante" ou "Revisar" num trecho e ele aparece aqui.</p>
+      )}
+      {review.length > 5 && <p>e mais {review.length - 5}</p>}
+      <p className="caderno-review-foot">
+        {doubts.length ? `${doubts.length} ${doubts.length === 1 ? "dúvida marcada" : "dúvidas marcadas"}` : "Nenhuma dúvida marcada"}
+        {mastered > 0 && ` · ${mastered} ${mastered === 1 ? "trecho dominado" : "trechos dominados"}`}
+      </p>
+      {doubts.length > 0 && (
+        <ul className="caderno-doubts">
+          {doubts.slice(0, 3).map((text) => (
+            <li key={text}>{text}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export default function Notebook() {
   const { data, params, go } = useApp();
   const [panel, setPanel] = useState("estudar");
+  const [html, setHtml] = useState("");
+  const [paper, setPaperState] = useState(() => readPref(paperKey, document.documentElement.dataset.theme === "light" ? "claro" : "escuro"));
+  const [ambient, setAmbient] = useState(() => readPref(ambientKey, ""));
+  const tray = useRef(null);
+  const today = todayIso();
+  // Aulas do caderno (abas laterais e seletor): as já dadas, da mais nova para a mais antiga.
+  const recent = useMemo(
+    () =>
+      [...data.lessons]
+        .filter((item) => item.date <= today)
+        .sort((a, b) => (b.date + (b.startTime || "")).localeCompare(a.date + (a.startTime || "")))
+        .slice(0, 40),
+    [data.lessons, today],
+  );
   if (params.shared) return <SharedNotebook lessonId={params.shared} />;
   const lesson = data.lessons.find((item) => item.id === params.lesson);
   const subject = lesson && data.subjects.find((item) => item.id === lesson.subjectId);
@@ -597,39 +782,139 @@ export default function Notebook() {
       </div>
     );
   }
+  const subjectOf = (item) => data.subjects.find((entry) => entry.id === item.subjectId);
   const materials = data.materials.filter((material) => material.lessonId === lesson.id);
+  const hasContent = Boolean(htmlToText(html)) || html.includes("data-img");
+  const listed = recent.some((item) => item.id === lesson.id) ? recent : [lesson, ...recent];
+  const sideTabs = listed.slice(0, 7).some((item) => item.id === lesson.id) ? listed.slice(0, 7) : [lesson, ...listed.slice(0, 6)];
+  const setPaper = (value) => {
+    setPaperState(value);
+    writePref(paperKey, value);
+  };
+  const toggleAmbient = (flag) => {
+    const set = new Set(ambient.split(" ").filter(Boolean));
+    if (set.has(flag)) set.delete(flag);
+    else set.add(flag);
+    const next = [...set].join(" ");
+    setAmbient(next);
+    writePref(ambientKey, next);
+  };
+  const openPanel = (id) => {
+    setPanel(id);
+    // Em tela estreita a bandeja fica embaixo do caderno: rola até ela.
+    if (window.matchMedia("(max-width: 1099px)").matches) setTimeout(() => tray.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  };
+  const moon = moonInfo();
+  const rainy = ambient.includes("chuva");
+  const still = ambient.includes("pausa");
+  const panelTitle = panels.find(([id]) => id === panel)?.[1];
   return (
-    <div className="page notebook-page-wrap">
-      <header className="page-head">
-        <div>
-          <button className="link-btn" onClick={() => go("aulas", { lesson: lesson.id })}>
-            <ArrowLeft size={14} /> Voltar ao registro da aula
-          </button>
-          <h1>Caderno de aula</h1>
-          <p className="notebook-meta">
-            <SubjectTag subject={subject} /> {formatLong(lesson.date)}
-            {lesson.startTime ? `, ${lesson.startTime}` : ""}
-            {lesson.theme ? ` · ${lesson.theme}` : ""}
-          </p>
-        </div>
-        <div className="page-actions">
-          <button className="btn soft" onClick={() => setPanel("compartilhar")}>
-            <Share2 size={16} /> Compartilhar
-          </button>
+    <div className="page notebook-page-wrap caderno-v2" data-paper={paper}>
+      <header className="caderno-head">
+        <nav className="caderno-crumbs" aria-label="Caminho">
+          <button type="button" onClick={() => go("conteudos")}>Grimório</button>
+          <i aria-hidden="true">/</i>
+          <button type="button" onClick={() => go("aulas", { lesson: lesson.id })}>{subject.name}</button>
+          <i aria-hidden="true">/</i>
+          <b>Caderno de aula</b>
+        </nav>
+        <div className="caderno-titlerow">
+          <div>
+            <h1>Caderno de aula</h1>
+            <div className="caderno-meta">
+              <SubjectTag subject={subject} />
+              <span>
+                Aula de {formatLong(lesson.date)}
+                {lesson.startTime ? ` · ${lesson.startTime}` : ""}
+              </span>
+              <span className={`caderno-chip ${hasContent ? "ok" : "warn"}`}>{hasContent ? "Com conteúdo" : "Sem conteúdo"}</span>
+            </div>
+          </div>
+          <div className="caderno-ctl">
+            <label className="caderno-picker">
+              <span>Aula</span>
+              <select value={lesson.id} onChange={(event) => go("caderno", { lesson: event.target.value })}>
+                {listed.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {subjectOf(item)?.name || "Aula"} · {shortDay(item.date)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="caderno-picker">
+              <span id="caderno-papel">Caderno</span>
+              <div className="caderno-seg" role="group" aria-labelledby="caderno-papel">
+                <button type="button" aria-pressed={paper === "escuro"} onClick={() => setPaper("escuro")}>Escuro</button>
+                <button type="button" aria-pressed={paper === "claro"} onClick={() => setPaper("claro")}>Claro</button>
+              </div>
+            </div>
+            <button className="btn soft caderno-share" onClick={() => openPanel("compartilhar")}>
+              <Share2 size={16} /> Compartilhar
+            </button>
+          </div>
         </div>
       </header>
-      <div className="notebook-layout">
-        <Editor lesson={lesson} />
-        <aside className="notebook-side">
-          <div className="caderno-tabs" role="group" aria-label="Painel do caderno">
-            {panels.map(([id, label, tone]) => (
-              <button key={id} type="button" className={`caderno-tab ${tone}`} aria-pressed={panel === id} onClick={() => setPanel(id)}>
-                {label}
-                {id === "materiais" && materials.length > 0 && <span className="count">{materials.length}</span>}
-              </button>
-            ))}
+      <div className="caderno-workspace">
+        <main className="caderno-book">
+          <div className="caderno-bookin">
+            <div className="caderno-cover">
+              <div className="caderno-spread">
+                <section className="caderno-pg left" aria-label="Página de escrever">
+                  <div className="caderno-lhd">
+                    <div className="caderno-pagehead">Conteúdo da aula</div>
+                    <FocusRow key={lesson.id} lesson={lesson} />
+                  </div>
+                  <Editor key={lesson.id} lesson={lesson} onHtml={setHtml} />
+                </section>
+                <section className="caderno-pg right" aria-label="Janela do grimório">
+                  <div className="caderno-pagehead">Janela do grimório</div>
+                  <div className="caderno-scene">
+                    <Janela rainy={rainy} still={still} />
+                    <div className="caderno-ambient">
+                      <span className="caderno-moon">
+                        Hoje: {moon.name} · {Math.round(moon.lit * 100)}% iluminada
+                      </span>
+                      <button type="button" className="btn small soft" aria-pressed={rainy} onClick={() => toggleAmbient("chuva")}>Chuva</button>
+                      <button type="button" className="btn small soft" aria-pressed={still} onClick={() => toggleAmbient("pausa")}>
+                        {still ? "Retomar animações" : "Pausar animações"}
+                      </button>
+                    </div>
+                  </div>
+                  <ReviewBox html={html} />
+                </section>
+              </div>
+              <nav className="caderno-side" aria-label="Outras aulas">
+                {sideTabs.map((item) => {
+                  const itemSubject = subjectOf(item);
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="caderno-stab"
+                      style={{ "--gc": itemSubject?.color || "var(--tab-lilac)" }}
+                      title={`${itemSubject?.name || "Aula"} · ${formatLong(item.date)}`}
+                      aria-current={item.id === lesson.id ? "page" : undefined}
+                      onClick={() => item.id !== lesson.id && go("caderno", { lesson: item.id })}
+                    >
+                      {shortName(itemSubject?.name)} · {dayMonth(item.date)}
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+            <div className="caderno-guides" role="group" aria-label="Painel do caderno">
+              {panels.map(([id, label, tone]) => (
+                <button key={id} type="button" className={`caderno-guide ${tone}`} aria-pressed={panel === id} onClick={() => openPanel(id)}>
+                  {label}
+                  {id === "materiais" && materials.length > 0 && <span className="count">{materials.length}</span>}
+                </button>
+              ))}
+            </div>
           </div>
-          {panel === "estudar" && <StudyFromLesson lesson={lesson} subject={subject} />}
+        </main>
+        <aside className="caderno-tray" ref={tray} aria-label={panelTitle}>
+          <h2>{panelTitle}</h2>
+          {panel === "estudar" && <StudyFromLesson lesson={{ ...lesson, annotations: html || lesson.annotations }} subject={subject} />}
           {panel === "compartilhar" && <SharePanel lesson={lesson} />}
           {panel === "recados" && <Notes lessonId={lesson.id} mine />}
           {panel === "materiais" && (
