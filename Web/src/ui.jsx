@@ -51,7 +51,7 @@ export function Logo({ size = 120, alive = false }) {
 // Foto de perfil, ou as iniciais quando a conta não tem foto.
 export function Avatar({ user, size = 34, className = "" }) {
   const initials = String(user?.name || "?")
-    .split(/s+/)
+    .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part[0])

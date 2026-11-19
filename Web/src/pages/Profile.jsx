@@ -7,6 +7,7 @@ import { formatDuration } from "../lib/ritual.js";
 import { xpRules } from "../lib/progress.js";
 import { Avatar } from "../ui.jsx";
 import { MoonWeek, sparkle } from "../components/Art.jsx";
+import { PublicProfile, ShowcaseCard, ShowcaseEditor } from "../components/Showcase.jsx";
 
 // Medalha de cada relíquia: um símbolo próprio, dourado quando conquistada.
 const relicSymbols = {
@@ -45,7 +46,18 @@ function Relic({ relic }) {
 }
 
 export default function Profile() {
+  const { params, user } = useApp();
+  if (params.pessoa && params.pessoa !== user.id) return <PublicProfile userId={params.pessoa} />;
+  return <MyProfile />;
+}
+
+function MyProfile() {
   const { data, user, go, call, params } = useApp();
+  const [showcase, setShowcase] = useState(null);
+  const [editing, setEditing] = useState(false);
+  useEffect(() => {
+    call("/vitrine").then(setShowcase).catch(() => {});
+  }, [call]);
   const today = todayIso();
   const progress = useMemo(() => progressOf(data, today), [data, today]);
   // Datas guardadas no servidor quando a relíquia foi percebida (para as que os registros não datam).
@@ -68,14 +80,28 @@ export default function Profile() {
 
   return (
     <div className="page profile">
-      <header className="profile-head">
-        <Avatar user={user} size={84} />
-        <div>
-          <h1>{user.name}</h1>
-          <p className="profile-title">{progress.title}</p>
-          {course && <small>{course}</small>}
-        </div>
-      </header>
+      {showcase ? (
+        <ShowcaseCard person={{ ...user, me: true, course }} showcase={showcase} onEdit={() => setEditing(true)} />
+      ) : (
+        <header className="profile-head">
+          <Avatar user={user} size={84} />
+          <div>
+            <h1>{user.name}</h1>
+            {course && <small>{course}</small>}
+          </div>
+        </header>
+      )}
+      <p className="profile-title">{progress.title}</p>
+      {editing && showcase && (
+        <ShowcaseEditor
+          showcase={showcase}
+          onClose={() => setEditing(false)}
+          onSaved={(next) => {
+            setShowcase({ ...showcase, ...next });
+            setEditing(false);
+          }}
+        />
+      )}
 
       <section className="level-card" aria-label="Nível e experiência">
         <div className="level-top">

@@ -89,7 +89,7 @@ export default function Ranking() {
                 {item.position}º
               </span>
               <Avatar user={{ id: item.id, name: item.name, avatarVersion: item.avatarVersion }} size={38} />
-              <span className="row-main">
+              <button type="button" className="row-main row-link" onClick={() => go("perfil", { pessoa: item.id })}>
                 <strong>
                   {item.name}
                   {item.me && <span className="badge">você</span>}
@@ -97,7 +97,7 @@ export default function Ranking() {
                 <small>
                   Nível {item.level} · {item.title}
                 </small>
-              </span>
+              </button>
               <span className="row-end">
                 <strong>{item.xp.toLocaleString("pt-BR")} XP</strong>
                 <small>

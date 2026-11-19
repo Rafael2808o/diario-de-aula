@@ -327,12 +327,12 @@ function Match({ id }) {
                 <li key={player.id} className={`row ${player.me ? "is-me" : ""}`}>
                   <span className="quiz-position">{player.position ? `${player.position}º` : "–"}</span>
                   <Avatar user={player} size={30} />
-                  <span className="row-main">
+                  <button type="button" className="row-main row-link" onClick={() => go("perfil", { pessoa: player.id })}>
                     <strong>{player.me ? "Você" : player.name}</strong>
                     <small>
                       {player.finished ? (player.score !== undefined ? `${player.correct} acertos · ${seconds(player.totalMs)}` : "Terminou") : `Respondeu ${player.progress} de ${match.total}`}
                     </small>
-                  </span>
+                  </button>
                   {player.score !== undefined && <strong>{player.score} pts</strong>}
                 </li>
               ))}

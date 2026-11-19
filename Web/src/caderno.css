@@ -228,3 +228,29 @@
 .quiz-review { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .quiz-review li { display: grid; gap: 6px; }
 .quiz-review p { margin: 0; overflow-wrap: anywhere; }
+
+/* ---------- Apresentação do perfil ---------- */
+.showcase { --showcase-accent: var(--accent); overflow: hidden; border-radius: 22px; border: 1px solid var(--card-line); background: var(--surface); }
+.showcase-cover { position: relative; height: clamp(120px, 22vw, 190px); background-size: cover; background-position: center; background-image: var(--cover-art); }
+.theme-noite { --cover-art: radial-gradient(circle at 20% 30%, rgba(255,255,255,0.5) 0 1px, transparent 2px), radial-gradient(circle at 70% 60%, rgba(255,255,255,0.4) 0 1px, transparent 2px), linear-gradient(135deg, #1d1446, #3b2a85 60%, #7c5cff); }
+.theme-aurora { --cover-art: linear-gradient(120deg, #1b3a4b, #3aa58f 45%, #c084e8); }
+.theme-pergaminho { --cover-art: linear-gradient(135deg, #f3e6c8, #e2c891 60%, #c79f5b); }
+.theme-floresta { --cover-art: linear-gradient(135deg, #12291f, #2f6b4f 55%, #9bc48a); }
+.theme-mar { --cover-art: linear-gradient(135deg, #0f2747, #2d6fa6 55%, #8fd3f0); }
+.showcase-edit { position: absolute; right: 12px; bottom: 12px; }
+.showcase-body { display: grid; gap: 12px; padding: 0 18px 18px; border-top: 4px solid var(--showcase-accent); }
+.showcase-avatar { position: relative; z-index: 1; margin-top: -46px; box-shadow: 0 0 0 4px var(--surface), 0 0 0 7px var(--showcase-accent); border-radius: 50%; }
+.showcase-who h1 { margin: 0; }
+.showcase-headline { margin: 2px 0 4px; color: var(--text-2); }
+.showcase-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 10px; margin: 0; }
+.showcase-facts div { padding: 10px 12px; border-radius: 12px; background: var(--surface-2); min-width: 0; }
+.showcase-facts dt { display: flex; align-items: center; gap: 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--showcase-accent); }
+.showcase-facts dd { margin: 4px 0 0; font-weight: 600; overflow-wrap: anywhere; }
+.showcase-music { display: inline-flex; align-items: center; gap: 8px; justify-self: start; padding: 8px 14px; border-radius: 99px; background: color-mix(in srgb, var(--showcase-accent) 18%, transparent); color: var(--text); text-decoration: none; font-weight: 600; max-width: 100%; overflow-wrap: anywhere; }
+.showcase-music small { color: var(--text-3); font-weight: 400; }
+.showcase-swatch { min-height: 44px; padding: 6px 14px; border-radius: 10px; border: 2px solid transparent; background-image: var(--cover-art); color: #fff; font: inherit; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,0.6); cursor: pointer; }
+.showcase-swatch[aria-checked="true"], .color-dot[aria-checked="true"] { border-color: var(--text); box-shadow: 0 0 0 2px var(--accent-soft); }
+.color-dot { width: 36px; height: 36px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+.form-actions.start { justify-content: flex-start; }
+.showcase-hidden { display: flex; align-items: center; gap: 12px; }
+.showcase-hidden p { margin: 0; }

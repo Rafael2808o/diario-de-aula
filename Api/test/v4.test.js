@@ -312,3 +312,31 @@ test('Perguntados: gabarito escondido, tempo medido no servidor, pontos, vencedo
     setQuestionGenerator(null);
   }
 });
+
+test('Apresentação do perfil: campos validados, mais estudado calculado, capa e opção de esconder', async () => {
+  const bia = await account('Bia Vitrine');
+  const leo = await account('Leo Vitrine');
+  const subject = (await request(app).post('/api/v1/subjects').set(bia.auth).send({ name: 'Semiótica', color: '#7c5cff', schedule: [] }).expect(201)).body;
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+  await request(app).post('/api/v1/study-sessions').set(bia.auth).send({ clientId: 'vitrine-1', subjectId: subject.id, date: today, durationSeconds: 3000, topic: 'Signo e símbolo' }).expect(201);
+  await request(app).put('/api/v1/vitrine').set(bia.auth).send({ musicUrl: 'javascript:alert(1)' }).expect(400);
+  let mine = (await request(app).put('/api/v1/vitrine').set(bia.auth).send({ accent: '#e07fa8', coverTheme: 'aurora', headline: 'Estudante de PP', musicTitle: 'Lo-fi', musicUrl: 'https://open.spotify.com/playlist/abc', readingTitle: 'O Pequeno Príncipe', favoriteSubject: 'Semiótica', accentX: 1 }).expect(200)).body;
+  assert.equal(mine.accent, '#e07fa8');
+  assert.equal(mine.mostStudied.subject.name, 'Semiótica');
+  assert.equal(mine.mostStudied.topic.name, 'Signo e símbolo');
+  await request(app).put('/api/v1/vitrine').set(bia.auth).send({ accent: 'red' }).expect(200).then(r => assert.equal(r.body.accent, ''));
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64').toString('base64');
+  await request(app).put('/api/v1/vitrine/capa').set(bia.auth).send({ mime: 'text/html', data: png }).expect(400);
+  await request(app).put('/api/v1/vitrine/capa').set(bia.auth).send({ mime: 'image/png', data: png }).expect(200);
+  const seen = (await request(app).get(`/api/v1/vitrine/${bia.user.id}`).set(leo.auth).expect(200)).body;
+  assert.equal(seen.readingTitle, 'O Pequeno Príncipe');
+  assert.equal(seen.email, undefined);
+  assert.ok(seen.coverVersion);
+  await request(app).get(`/api/v1/vitrine/capa/${bia.user.id}`).set(leo.auth).expect(200);
+  // Escondida: só nome e foto.
+  await request(app).put('/api/v1/vitrine').set(bia.auth).send({ visible: false }).expect(200);
+  const hidden = (await request(app).get(`/api/v1/vitrine/${bia.user.id}`).set(leo.auth).expect(200)).body;
+  assert.equal(hidden.hidden, true);
+  assert.equal(hidden.readingTitle, undefined);
+  await request(app).get(`/api/v1/vitrine/capa/${bia.user.id}`).set(leo.auth).expect(404);
+});

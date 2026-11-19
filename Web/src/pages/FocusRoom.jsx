@@ -293,7 +293,9 @@ function Room({ roomId }) {
                   <span className="focus-avatar">
                     <Avatar user={person} size={44} />
                   </span>
-                  <strong>{person.me ? "Você" : person.name}</strong>
+                  <button type="button" className="link-btn focus-name" onClick={() => go("perfil", { pessoa: person.id })}>
+                    <strong>{person.me ? "Você" : person.name}</strong>
+                  </button>
                   <small className="focus-state">{stateLabel[person.state]}</small>
                   {person.subject && <small>{person.subject}</small>}
                   {person.since && person.state !== "presente" && <small className="quiet">{minutesSince(person.since, serverNow)}</small>}
