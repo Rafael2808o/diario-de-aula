@@ -71,7 +71,7 @@ async function messagesOf(roomId, after) {
   const since = after && !Number.isNaN(Date.parse(after)) ? new Date(after) : null;
   const rows = pool
     ? (await pool.query(`SELECT * FROM (SELECT g.id, g.user_id AS "userId", g.body, g.system, g.created_at AS "createdAt", u.name, u.avatar_version AS "avatarVersion"
-        FROM focus_room_messages g LEFT JOIN users u ON u.id=g.user_id WHERE g.room_id=$1 AND ($2::timestamptz IS NULL OR g.created_at > $2)
+        FROM focus_room_messages g LEFT JOIN users u ON u.id=g.user_id WHERE g.room_id=$1 AND ($2::timestamptz IS NULL OR date_trunc('milliseconds', g.created_at) > $2)
         ORDER BY g.created_at DESC LIMIT 80) recent ORDER BY "createdAt"`, [roomId, since])).rows
     : memory.focusMessages.filter(item => item.roomId === roomId && (!since || item.createdAt > since)).slice(-80)
       .map(item => ({ ...item, name: memoryUser(item.userId).name, avatarVersion: memoryUser(item.userId).avatar_version }));
