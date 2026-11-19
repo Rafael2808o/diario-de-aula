@@ -46,6 +46,8 @@ import { registerDutyRoutes } from './duties.js';
 import { registerFocusRoutes } from './focus.js';
 import { registerQuizGameRoutes } from './quizgame.js';
 import { registerShowcaseRoutes } from './showcase.js';
+import { registerShopRoutes } from './shop.js';
+import { isSuspended, registerAdminRoutes } from './admin.js';
 
 const app = express();
 const corsOrigins = (process.env.CORS_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean);
@@ -188,6 +190,7 @@ async function requireAuth(req, res, next) {
   try {
     const user = await userFromToken(bearerToken(req));
     if (!user) return res.status(401).json({ error: 'Entre na sua conta para continuar.' });
+    if (await isSuspended(user.id)) return res.status(403).json({ error: 'Esta conta está suspensa. Fale com a administração do Grimiau.', suspended: true });
     req.user = user;
     return next();
   } catch (error) {
@@ -443,7 +446,12 @@ app.post('/api/v1/auth/register', async (req, res, next) => {
 app.post('/api/v1/auth/login', async (req, res, next) => {
   try {
     const session = await loginUser(cleanText(req.body.email, 140), req.body.password || '');
-    return session ? res.json(session) : res.status(401).json({ error: 'E-mail ou senha incorretos.' });
+    if (!session) return res.status(401).json({ error: 'E-mail ou senha incorretos.' });
+    if (await isSuspended(session.user.id)) {
+      await endSession(session.token);
+      return res.status(403).json({ error: 'Esta conta está suspensa. Fale com a administração do Grimiau.', suspended: true });
+    }
+    return res.json(session);
   } catch (error) {
     return next(error);
   }
@@ -694,6 +702,8 @@ registerDutyRoutes(app, requireAuth);
 registerFocusRoutes(app, requireAuth);
 registerQuizGameRoutes(app, requireAuth, aiRateLimit);
 registerShowcaseRoutes(app, requireAuth);
+registerShopRoutes(app, requireAuth);
+registerAdminRoutes(app, requireAuth);
 
 app.get('/api/v1/integrations/spotify/status', (_req, res) =>
   res.json({

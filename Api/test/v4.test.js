@@ -340,3 +340,71 @@ test('Apresentação do perfil: campos validados, mais estudado calculado, capa 
   assert.equal(hidden.readingTitle, undefined);
   await request(app).get(`/api/v1/vitrine/capa/${bia.user.id}`).set(leo.auth).expect(404);
 });
+
+test('Loja da Madrugada: pozinho separado do XP, compra trava o saldo, só equipa o que comprou', async () => {
+  const bia = await account('Bia Loja');
+  const outra = await account('Outra Loja');
+  const start = (await request(app).get('/api/v1/loja').set(bia.auth).expect(200)).body;
+  assert.equal(start.wallet.balance, 200, 'conta nova começa com 200 de boas-vindas');
+  assert.ok(start.items.some(item => item.id === 'moldura-lua'));
+  const poor = await request(app).post('/api/v1/loja/moldura-lua/comprar').set(bia.auth).expect(400);
+  assert.match(poor.body.error, /Faltam 300/);
+  // 20 aulas registradas = 400 XP novo = 400 de pozinho.
+  const subject = (await request(app).post('/api/v1/subjects').set(bia.auth).send({ name: 'Loja', color: '#7c5cff', schedule: [] })).body;
+  for (let day = 1; day <= 20; day += 1) {
+    await request(app).post('/api/v1/lessons').set(bia.auth).send({ subjectId: subject.id, date: `2026-10-${String(day).padStart(2, '0')}`, status: 'presente', theme: `Aula ${day}`, annotations: '<p>Conteúdo</p>' }).expect(201);
+  }
+  const rich = (await request(app).get('/api/v1/loja').set(bia.auth)).body.wallet;
+  assert.equal(rich.balance, 600);
+  const bought = await request(app).post('/api/v1/loja/moldura-lua/comprar').set(bia.auth).expect(201);
+  assert.equal(bought.body.wallet.balance, 100);
+  assert.deepEqual(bought.body.wallet.owned, ['moldura-lua']);
+  assert.equal((await request(app).get('/api/v1/progress').set(bia.auth)).body.xp, 400, 'comprar não tira XP');
+  await request(app).post('/api/v1/loja/moldura-lua/comprar').set(bia.auth).expect(409);
+  await request(app).put('/api/v1/loja/equipar').set(bia.auth).send({ frame: 'moldura-sol' }).expect(403);
+  await request(app).put('/api/v1/loja/equipar').set(bia.auth).send({ appColor: 'brasa' }).expect(403);
+  await request(app).put('/api/v1/loja/equipar').set(bia.auth).send({ frame: 'moldura-lua' }).expect(200);
+  const frames = (await request(app).get(`/api/v1/loja/molduras?ids=${bia.user.id},${outra.user.id}`).set(outra.auth).expect(200)).body;
+  assert.deepEqual(frames, { [bia.user.id]: 'lua' });
+});
+
+test('Administração: só admin entra, relato vira triagem, suspensão bloqueia e fica no registro', async () => {
+  const admin = await account('Ada Painel');
+  const aluno = await account('Aluno Painel');
+  await request(app).get('/api/v1/admin/resumo').set(admin.auth).expect(403);
+  process.env.ADMIN_EMAILS = admin.user.email;
+  try {
+    await request(app).get('/api/v1/admin/resumo').set(aluno.auth).expect(403);
+    await request(app).post('/api/v1/relatos').set(aluno.auth).send({ title: 'ok' }).expect(400);
+    const report = await request(app).post('/api/v1/relatos').set(aluno.auth).send({ title: 'Foto do caderno não aparece', description: 'Colei e sumiu', page: 'caderno' }).expect(201);
+    const summary = (await request(app).get('/api/v1/admin/resumo').set(admin.auth).expect(200)).body;
+    assert.ok(summary.people >= 2);
+    assert.ok(summary.reports.open >= 1);
+    await request(app).patch(`/api/v1/admin/relatos/${report.body.id}`).set(admin.auth).send({ severity: 'alta', status: 'em-andamento' }).expect(200);
+    const list = (await request(app).get('/api/v1/admin/relatos').set(admin.auth)).body;
+    assert.equal(list.find(item => item.id === report.body.id).severity, 'alta');
+    const users = (await request(app).get('/api/v1/admin/usuarios?q=Aluno Painel').set(admin.auth).expect(200)).body;
+    assert.equal(users[0].email, aluno.user.email);
+    await request(app).post(`/api/v1/admin/usuarios/${admin.user.id}/suspensao`).set(admin.auth).send({ suspend: true, reason: 'x' }).expect(400);
+    await request(app).post(`/api/v1/admin/usuarios/${aluno.user.id}/suspensao`).set(admin.auth).send({ suspend: true }).expect(400);
+    await request(app).post(`/api/v1/admin/usuarios/${aluno.user.id}/suspensao`).set(admin.auth).send({ suspend: true, reason: 'Spam no Feed' }).expect(200);
+    await request(app).get('/api/v1/progress').set(aluno.auth).expect(401);
+    const login = await request(app).post('/api/v1/auth/login').send({ email: aluno.user.email, password: 'senha-segura-123' }).expect(403);
+    assert.equal(login.body.suspended, true);
+    await request(app).post(`/api/v1/admin/usuarios/${aluno.user.id}/suspensao`).set(admin.auth).send({ suspend: false }).expect(200);
+    const back = await request(app).post('/api/v1/auth/login').send({ email: aluno.user.email, password: 'senha-segura-123' }).expect(200);
+    aluno.auth = { Authorization: `Bearer ${back.body.token}` };
+    await request(app).patch('/api/v1/admin/loja/moldura-sol').set(admin.auth).send({ price: 10 }).expect(400);
+    await request(app).patch('/api/v1/admin/loja/moldura-sol').set(admin.auth).send({ price: 750, published: false }).expect(200);
+    const shop = (await request(app).get('/api/v1/loja').set(aluno.auth)).body.items;
+    assert.ok(!shop.some(item => item.id === 'moldura-sol'), 'item em rascunho some da loja');
+    await request(app).patch('/api/v1/admin/loja/moldura-sol').set(admin.auth).send({ price: 800, published: true }).expect(200);
+    const log = (await request(app).get('/api/v1/admin/auditoria').set(admin.auth)).body;
+    assert.ok(log.some(item => item.action === 'suspendeu conta' && item.detail === 'Spam no Feed'));
+    // E-mail nunca aparece em rota pública.
+    const ranking = JSON.stringify((await request(app).get('/api/v1/ranking').set(admin.auth)).body);
+    assert.ok(!ranking.includes(aluno.user.email));
+  } finally {
+    delete process.env.ADMIN_EMAILS;
+  }
+});

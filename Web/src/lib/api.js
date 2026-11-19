@@ -25,9 +25,10 @@ export function storeSession(session) {
 }
 
 export class ApiError extends Error {
-  constructor(message, status) {
+  constructor(message, status, suspended = false) {
     super(message);
     this.status = status;
+    this.suspended = suspended;
   }
 }
 
@@ -47,7 +48,7 @@ export async function request(path, { token, method = "GET", body } = {}) {
   });
   if (response.status === 204) return null;
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new ApiError(payload.error || "Não foi possível concluir a ação.", response.status);
+  if (!response.ok) throw new ApiError(payload.error || "Não foi possível concluir a ação.", response.status, payload.suspended === true);
   return payload;
 }
 
@@ -85,7 +86,8 @@ export function useAcademicData(session, onExpired) {
       try {
         return await request(path, { token, ...options });
       } catch (error) {
-        if (error.status === 401) onExpired();
+        // Conta suspensa pela administração sai na hora, como sessão vencida.
+        if (error.status === 401 || error.suspended) onExpired();
         throw error;
       }
     },

@@ -27,6 +27,8 @@
       // Aplica o tema salvo antes da primeira pintura. O padrão é o escuro (Noite Mística).
       try {
         if ((localStorage.getItem("grimiau.theme") || localStorage.getItem("lumina.theme")) === "claro") document.documentElement.dataset.theme = "light";
+        var cor = localStorage.getItem("grimiau.cor");
+        if (/^(aurora|alvorada|brasa|musgo)$/.test(cor || "")) document.documentElement.dataset.accent = cor;
       } catch (error) {}
     </script>
   </head>

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from "react";
 import { Check, X } from "lucide-react";
+import { useFrame } from "./lib/shop.js";
 
 // Nox, o gatinho preto da Grimiau: um só desenho em todas as telas, em cores chapadas.
 // Só a expressão muda (calm, happy, sleepy, focused). Com "alive", pisca e mexe a cauda (respeita movimento reduzido).
@@ -49,7 +50,7 @@ export function Logo({ size = 120, alive = false }) {
 }
 
 // Foto de perfil, ou as iniciais quando a conta não tem foto.
-export function Avatar({ user, size = 34, className = "" }) {
+export function Avatar({ user, size = 34, className = "", framed = true }) {
   const initials = String(user?.name || "?")
     .split(/\s+/)
     .filter(Boolean)
@@ -59,9 +60,17 @@ export function Avatar({ user, size = 34, className = "" }) {
     .toUpperCase();
   const [broken, setBroken] = useState(false);
   const version = user?.avatarVersion;
-  return (
-    <span className={`avatar-img ${className}`} style={{ width: size, height: size, fontSize: Math.round(size * 0.38) }} aria-hidden="true">
+  // Moldura da Loja da Madrugada: aparece em toda foto da pessoa, em qualquer tela.
+  const frame = useFrame(framed ? user?.id : null);
+  const photo = (
+    <span className={`avatar-img ${frame ? "" : className}`} style={{ width: size, height: size, fontSize: Math.round(size * 0.38) }} aria-hidden="true">
       {version && !broken ? <img src={`${avatarUrl(user.id, version)}`} alt="" width={size} height={size} onError={() => setBroken(true)} /> : initials}
+    </span>
+  );
+  if (!frame) return photo;
+  return (
+    <span className={`avatar-frame frame-${frame} ${className}`} style={{ width: size, height: size, "--s": `${size}px` }} aria-hidden="true">
+      {photo}
     </span>
   );
 }

@@ -10,6 +10,7 @@ import { AnnouncementHistory } from "../components/Announcements.jsx";
 import { disableNotifications, enableNotifications, notificationsEnabled, notificationsSupported } from "../lib/notify.js";
 import { lessonStatus, subjectById } from "../lib/domain.js";
 import { useRole } from "../lib/social.js";
+import { appColorChoices, applyAppColor } from "../lib/shop.js";
 import { formatFull, formatShort, nationalHolidays, todayIso } from "../lib/dates.js";
 import { Empty, FormError, Modal, Segmented, useSubmit } from "../ui.jsx";
 import AcademicIdentity from "../components/AcademicIdentity.jsx";
@@ -275,6 +276,74 @@ function RankingPrivacy() {
   );
 }
 
+// Cores do Pacote Aurora (Loja da Madrugada). Sem o pacote, mostra só o atalho para a loja.
+function AppColorPicker() {
+  const { call, go } = useApp();
+  const [wallet, setWallet] = useState(null);
+  useEffect(() => {
+    call("/loja").then((result) => setWallet(result.wallet)).catch(() => {});
+  }, [call]);
+  if (!wallet) return null;
+  const owned = wallet.owned.includes("cores-aurora");
+  return (
+    <fieldset>
+      <legend>Cor do app</legend>
+      {owned ? (
+        <Segmented
+          label="Cor do app"
+          value={wallet.appColor || ""}
+          options={appColorChoices.map(([id, name]) => [id, name])}
+          onChange={async (value) => {
+            const result = await call("/loja/equipar", { method: "PUT", body: { appColor: value } }).catch(() => null);
+            if (!result) return;
+            setWallet(result.wallet);
+            applyAppColor(result.wallet.appColor);
+          }}
+        />
+      ) : (
+        <p className="hint">
+          Mais cores chegam com o Pacote Aurora.{" "}
+          <button type="button" className="link-btn" onClick={() => go("loja")}>Ver na Loja da Madrugada</button>
+        </p>
+      )}
+    </fieldset>
+  );
+}
+
+// Relato de erro: vai para a Central de erros da administração, com a tela e o aparelho para ajudar a reproduzir.
+function ReportProblem() {
+  const { call, toast } = useApp();
+  const [draft, setDraft] = useState({ title: "", description: "", page: "" });
+  const { submit, busy, error } = useSubmit(
+    async () => {
+      await call("/relatos", { method: "POST", body: { ...draft, device: `${navigator.userAgent.slice(0, 120)} · ${window.innerWidth}×${window.innerHeight}` } });
+      setDraft({ title: "", description: "", page: "" });
+    },
+    { success: "Relato enviado. Obrigado por avisar!" },
+  );
+  return (
+    <form className="group form-group form" onSubmit={(event) => { event.preventDefault(); submit(); }}>
+      <label>
+        O que aconteceu?
+        <input value={draft.title} required minLength={4} maxLength={120} placeholder="Ex.: a foto do caderno some depois de salvar" onChange={(event) => setDraft({ ...draft, title: event.target.value })} />
+      </label>
+      <label>
+        Em qual tela?
+        <input value={draft.page} maxLength={80} placeholder="Ex.: Caderno, Agenda, Perguntados" onChange={(event) => setDraft({ ...draft, page: event.target.value })} />
+      </label>
+      <label>
+        Detalhes (opcional)
+        <textarea rows={3} value={draft.description} maxLength={2000} placeholder="O que você fez antes e o que esperava que acontecesse." onChange={(event) => setDraft({ ...draft, description: event.target.value })} />
+      </label>
+      <p className="hint">Vai junto o modelo do aparelho e o tamanho da tela, para a equipe conseguir repetir o erro. Nada do seu conteúdo é enviado.</p>
+      <FormError>{error}</FormError>
+      <div className="form-actions">
+        <button className="btn primary" disabled={busy}>{busy ? "Enviando..." : "Enviar relato"}</button>
+      </div>
+    </form>
+  );
+}
+
 export default function Settings() {
   const { user, data, setUser, call, signOut, toast, go } = useApp();
   const role = useRole();
@@ -351,6 +420,7 @@ export default function Settings() {
           ["permissoes", "Permissões"],
           ["gravacao", "Gravação"],
           ["ia-config", "IA"],
+          ["relatar", "Relatar um problema"],
           ["sobre", "Sobre o Grimiau"],
         ].map(([id, label]) => (
           <a key={id} className="chip" href={`#${id}`}>
@@ -459,6 +529,7 @@ export default function Settings() {
                 }}
               />
             </fieldset>
+            <AppColorPicker />
             <p className="hint">A aparência vale para este aparelho. “Discretas” tira estrelas, partículas e brilhos; se o sistema pede menos movimento, eles já ficam desligados.</p>
           </div>
         </section>
@@ -562,6 +633,11 @@ export default function Settings() {
               Gravar uma aula
             </button>
           </div>
+        </section>
+
+        <section id="relatar">
+          <h2 className="section-title">Relatar um problema</h2>
+          <ReportProblem />
         </section>
 
         <section id="sobre">

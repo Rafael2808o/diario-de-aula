@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BookOpen, Camera, CalendarDays, Hourglass, Swords, ChartColumn, GraduationCap, Heart, Home as HomeIcon, Layers, LibraryBig, Megaphone, MessagesSquare, Moon as MoonIcon, NotebookPen, NotebookText, ScrollText, Settings as SettingsIcon, Sparkles, Trophy, UserRound, Users, X } from "lucide-react";
+import { BookOpen, Camera, CalendarDays, Hourglass, Swords, ChartColumn, GraduationCap, Heart, Home as HomeIcon, Layers, LibraryBig, Megaphone, MessagesSquare, Moon as MoonIcon, NotebookPen, NotebookText, ScrollText, Settings as SettingsIcon, ShieldCheck, Sparkles, Store, Trophy, UserRound, Users, X } from "lucide-react";
 import { AppContext, useApp } from "./context.js";
 import { readSession, request, storeSession, useAcademicData } from "./lib/api.js";
 import { useLocalNotifications } from "./lib/notify.js";
@@ -46,6 +46,9 @@ import StudyAI from "./pages/StudyAI.jsx";
 import Subjects from "./pages/Subjects.jsx";
 import FocusRoom from "./pages/FocusRoom.jsx";
 import Quizgame from "./pages/Quizgame.jsx";
+import Shop from "./pages/Shop.jsx";
+import Admin from "./pages/Admin.jsx";
+import { applyAppColor, dust, setOwnFrame } from "./lib/shop.js";
 
 // Seis seções fixas em todas as telas. Cada seção reúne as páginas que abre (group), para o menu marcar a certa.
 const nav = [
@@ -54,7 +57,7 @@ const nav = [
   { id: "ia", label: "Estudar", title: "Estudar", icon: Sparkles, page: StudyAI, group: ["ia", "cartoes", "ranking", "lua", "compartilhadas", "foco", "perguntados"] },
   { id: "comunidade", label: "Comunidade", short: "Social", title: "Comunidade", icon: Heart, page: CommunityHub, group: ["comunidade", "conselho", "batepapo", "comunicados", "resumos", "migles"] },
   { id: "calendario", label: "Agenda", title: "Agenda", icon: CalendarDays, page: Calendar, group: ["calendario"] },
-  { id: "perfil", label: "Perfil", title: "Perfil", icon: UserRound, page: Profile, group: ["perfil", "configuracoes", "historico", "historico-xp", "relatorio"] },
+  { id: "perfil", label: "Perfil", title: "Perfil", icon: UserRound, page: Profile, group: ["perfil", "configuracoes", "historico", "historico-xp", "relatorio", "loja", "admin"] },
 ];
 // Páginas abertas a partir das seções. Os endereços antigos (?abrir=aulas, provas, cartoes...) continuam valendo.
 const extraPages = [
@@ -76,9 +79,11 @@ const extraPages = [
   { id: "caderno", label: "Cadernos", title: "Caderno de aula", icon: NotebookText, page: Notebook },
   { id: "foco", label: "Ritual em grupo", title: "Ritual em grupo", icon: Hourglass, page: FocusRoom },
   { id: "perguntados", label: "Perguntados", title: "Perguntados", icon: Swords, page: Quizgame },
+  { id: "loja", label: "Loja da Madrugada", title: "Loja da Madrugada", icon: Store, page: Shop },
+  { id: "admin", label: "Administração", title: "Administração", icon: ShieldCheck, page: Admin },
 ];
 const allPages = [...nav, ...extraPages];
-const shortcuts = ["aulas", "caderno", "provas", "cartoes", "lua", "compartilhadas", "foco", "perguntados", "migles", "ranking", "configuracoes"];
+const shortcuts = ["aulas", "caderno", "provas", "cartoes", "lua", "compartilhadas", "foco", "perguntados", "migles", "ranking", "loja", "configuracoes"];
 const sectionOf = (page) => nav.find((item) => item.group.includes(page))?.id;
 // Endereços das versões anteriores continuam funcionando.
 const legacyPages = { central: "inicio", diario: "aulas", prova: "ia", estudos: "calendario", biblioteca: "conteudos", desempenho: "perfil" };
@@ -209,6 +214,31 @@ function Shell({ session, setSession }) {
     return () => window.removeEventListener("popstate", sync);
   }, []);
 
+  // Loja: aplica a cor comprada e a própria moldura, e mostra o pozinho na barra de cima (atualiza quando o XP muda).
+  const [dustBalance, setDustBalance] = useState(null);
+  const [role, setRole] = useState("");
+  useEffect(() => {
+    if (xp === null) return undefined;
+    const timeout = window.setTimeout(() => {
+      request("/loja", { token: session.token })
+        .then(({ wallet }) => {
+          setDustBalance(wallet.balance);
+          setOwnFrame(session.user.id, wallet.frame);
+          applyAppColor(wallet.appColor);
+        })
+        .catch(() => {});
+    }, 600);
+    return () => window.clearTimeout(timeout);
+  }, [xp, session.token, session.user.id]);
+  useEffect(() => {
+    const update = (event) => setDustBalance(event.detail);
+    window.addEventListener("grimiau:pozinho", update);
+    return () => window.removeEventListener("grimiau:pozinho", update);
+  }, []);
+  useEffect(() => {
+    request("/me/role", { token: session.token }).then((result) => setRole(result?.role || "")).catch(() => {});
+  }, [session.token]);
+
   const current = allPages.find((item) => item.id === location.page);
   useLocalNotifications(academic.data, session.user);
   useEffect(() => {
@@ -278,7 +308,7 @@ function Shell({ session, setSession }) {
           </nav>
           <nav className="sidebar-shortcuts" aria-label="Atalhos">
             <p>Atalhos</p>
-            {shortcuts.map((id) => {
+            {(role === "admin" ? [...shortcuts, "admin"] : shortcuts).map((id) => {
               const { label, icon: Icon } = extraPages.find((item) => item.id === id);
               return (
                 <button key={id} className={location.page === id ? "current" : ""} aria-current={location.page === id ? "page" : undefined} onClick={() => go(id)}>
@@ -298,6 +328,11 @@ function Shell({ session, setSession }) {
             <RecordingBar />
             <TranscriptionChip />
             {ready && <RitualButton />}
+            {dustBalance !== null && (
+              <button className="dust-chip" onClick={() => go("loja")} aria-label={`${dust(dustBalance)} de Pozinho Mágico. Abrir a Loja da Madrugada`}>
+                <i className="dust-coin" aria-hidden="true" /> {dust(dustBalance)}
+              </button>
+            )}
             <NotificationBell />
             <button className="avatar" onClick={() => go("perfil")} aria-label="Abrir seu perfil">
               <Avatar user={session.user} size={34} />
