@@ -170,8 +170,16 @@ em `Downloads/`, recebidos em 18/11/2026. O Caderno de Aulas é o padrão visual
   tempo de cada resposta. Pontos próprios no jogo; no ranking geral entra no máximo +30 XP por partida.
 
 ## Andamento
-- [ ] Etapa 1 — Ritual, nome/RA, contraste das cartas, fonte do Caderno
-- [ ] Etapa 2 — Demandas da aula, tarefas com vários responsáveis, imagens no Caderno, lembretes, Cartas do Saber
+- [x] Etapa 1 — Ritual, nome/RA, contraste das cartas, fonte do Caderno
+- [x] Etapa 2 — Demandas da aula, tarefas com vários responsáveis, imagens no Caderno, lembretes, Cartas do Saber
   organizadas, Caderno como fonte da IA
-- [ ] Etapa 3 — Foco compartilhado, compartilhar caderno com recados, Perguntados
-- [ ] Etapa 4 — Perfil personalizado, papéis de carta
+- [x] Etapa 3 — Foco compartilhado (Ritual em grupo), compartilhar caderno com recados, Perguntados
+- [x] Etapa 4 — Perfil personalizado (apresentação), papéis de carta gratuitos (pergaminho, lavanda, noite)
+- [ ] Fora desta versão — Loja da Madrugada (depende da regra da moeda), painel de Administração, redesenho
+  completo de Comunidade, Estudar, Provas e Registro de aulas pelas referências
+
+## Tabelas novas da 4.0 (todas só acréscimo, nada apagado)
+study_task_assignees, class_duties, class_rounds, class_round_items, notebook_images, notebook_shares,
+notebook_notes, focus_rooms, focus_room_members, focus_room_messages, quiz_matches, quiz_players, quiz_answers,
+profile_showcases. Colunas novas: academic_profiles.name_confirmed, chat_letters.paper, flashcards.lesson_id e
+flashcards.deck.
