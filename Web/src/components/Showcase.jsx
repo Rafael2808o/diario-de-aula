@@ -32,48 +32,151 @@ function useCover(userId, version) {
   return url;
 }
 
-export function ShowcaseCard({ person, showcase, onEdit }) {
+// Céu da capa quando a pessoa não colocou foto (referência "Perfil do Grimiau", 18/11/2026).
+// As cores mudam com o tema da capa (caderno.css: .theme-*). Estrelas em posições fixas para não "pular".
+const skyStars = Array.from({ length: 38 }, (_, index) => {
+  const x = (index * 97.3) % 1000;
+  const y = (index * 53.7) % 150;
+  return { x, y, r: index % 5 === 0 ? 1.6 : 0.9, d: (index % 7) * 0.6 };
+});
+function CoverSky() {
+  return (
+    <svg className="showcase-sky" viewBox="0 0 1000 240" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <defs>
+        <linearGradient id="sc-sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="var(--sky-a)" />
+          <stop offset="1" stopColor="var(--sky-b)" />
+        </linearGradient>
+        <radialGradient id="sc-glow">
+          <stop offset="0" stopColor="var(--moon)" stopOpacity="0.55" />
+          <stop offset="1" stopColor="var(--moon)" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <rect width="1000" height="240" fill="url(#sc-sky)" />
+      {skyStars.map((star, index) => (
+        <circle key={index} className="sc-star" cx={star.x} cy={star.y} r={star.r} style={{ animationDelay: `-${star.d}s` }} />
+      ))}
+      <circle cx="790" cy="70" r="95" fill="url(#sc-glow)" />
+      <circle cx="790" cy="70" r="42" fill="var(--moon)" />
+      <path d="M0 190 Q160 150 320 178 T640 170 T1000 176 V240 H0Z" fill="var(--hill-a)" />
+      <path d="M0 214 Q220 186 440 206 T1000 200 V240 H0Z" fill="var(--hill-b)" />
+    </svg>
+  );
+}
+
+export function ShowcaseCard({ person, showcase, onEdit, title }) {
   const cover = useCover(person.id, showcase.coverVersion);
   const studied = showcase.mostStudied;
-  const facts = [
-    showcase.favoriteSubject && { icon: Star, label: "Matéria favorita", value: showcase.favoriteSubject },
-    studied?.subject && { icon: Flame, label: "Mais estudado (30 dias)", value: `${studied.subject.name}${studied.topic ? ` · ${studied.topic.name}` : ""}` },
-    showcase.readingTitle && { icon: BookMarked, label: "Lendo agora", value: `${showcase.readingTitle}${showcase.readingAuthor ? `, de ${showcase.readingAuthor}` : ""}` },
-  ].filter(Boolean);
+  const mine = Boolean(onEdit);
+  const hasNote = showcase.headline || showcase.favoriteSubject || studied?.subject;
   return (
     <section className={`showcase theme-${showcase.coverTheme || "noite"}`} style={showcase.accent ? { "--showcase-accent": showcase.accent } : undefined} aria-label="Apresentação">
       <div className="showcase-cover" style={cover ? { backgroundImage: `url(${cover})` } : undefined}>
-        {onEdit && (
+        {!cover && <CoverSky />}
+        {mine && (
           <button type="button" className="btn small soft showcase-edit" onClick={onEdit}>
-            <Pencil size={14} /> Personalizar
+            <Camera size={14} /> Trocar capa
           </button>
         )}
       </div>
       <div className="showcase-body">
-        <Avatar user={person} size={84} className="showcase-avatar" />
+        <Avatar user={person} size={112} className="showcase-avatar" />
         <div className="showcase-who">
           <h1>{person.name}</h1>
-          {showcase.headline && <p className="showcase-headline">{showcase.headline}</p>}
-          {person.course && <small>{person.course}</small>}
+          <div className="showcase-tags">
+            {title && (
+              <span className="showcase-title">
+                <Star size={12} aria-hidden="true" /> {title}
+              </span>
+            )}
+            {person.course && <small>{person.course}</small>}
+          </div>
         </div>
-        {facts.length > 0 && (
-          <dl className="showcase-facts">
-            {facts.map(({ icon: Icon, label, value }) => (
-              <div key={label}>
-                <dt>
-                  <Icon size={14} aria-hidden="true" /> {label}
-                </dt>
-                <dd>{value}</dd>
-              </div>
-            ))}
-          </dl>
-        )}
-        {showcase.musicUrl && (
-          <a className="showcase-music" href={showcase.musicUrl} target="_blank" rel="noopener noreferrer">
-            <Music size={16} aria-hidden="true" /> {showcase.musicTitle || "Música do perfil"} <small>abre em outro app</small>
-          </a>
+        {mine && (
+          <button type="button" className="btn primary showcase-edit-main" onClick={onEdit}>
+            <Pencil size={15} /> Editar perfil
+          </button>
         )}
       </div>
+      {(hasNote || showcase.musicUrl || showcase.musicTitle || showcase.readingTitle || mine) && (
+        <div className="showcase-cards">
+          {hasNote ? (
+            <article className="showcase-note">
+              <span className="showcase-tape" aria-hidden="true" />
+              <p className="showcase-note-label">sobre mim</p>
+              {showcase.headline && <p className="showcase-note-text">{showcase.headline}</p>}
+              <div className="showcase-note-tags">
+                {showcase.favoriteSubject && (
+                  <span>
+                    <i aria-hidden="true" /> matéria favorita · <b>{showcase.favoriteSubject}</b>
+                  </span>
+                )}
+                {studied?.subject && (
+                  <span>
+                    <Flame size={12} aria-hidden="true" /> mais estudado em 30 dias · <b>{studied.subject.name}{studied.topic ? ` · ${studied.topic.name}` : ""}</b>
+                  </span>
+                )}
+              </div>
+            </article>
+          ) : (
+            mine && (
+              <button type="button" className="showcase-note is-empty" onClick={onEdit}>
+                <span className="showcase-tape" aria-hidden="true" />
+                <p className="showcase-note-label">sobre mim</p>
+                <p className="showcase-note-text">Escreva uma frase sobre você e escolha sua matéria favorita.</p>
+              </button>
+            )
+          )}
+          {showcase.musicUrl || showcase.musicTitle ? (
+            <article className="showcase-tile showcase-now">
+              <span className="showcase-vinyl" aria-hidden="true"><i /></span>
+              <div>
+                <p className="showcase-kicker">
+                  <Music size={12} aria-hidden="true" /> Meu momento
+                </p>
+                <strong>{showcase.musicTitle || "Música do perfil"}</strong>
+                {showcase.musicUrl && (
+                  <a className="showcase-listen" href={showcase.musicUrl} target="_blank" rel="noopener noreferrer">
+                    Ouvir <small>abre em outro app</small>
+                  </a>
+                )}
+              </div>
+            </article>
+          ) : (
+            mine && (
+              <button type="button" className="showcase-tile showcase-now is-empty" onClick={onEdit}>
+                <span className="showcase-vinyl" aria-hidden="true"><i /></span>
+                <div>
+                  <p className="showcase-kicker">Meu momento</p>
+                  <strong>Escolha uma música</strong>
+                </div>
+              </button>
+            )
+          )}
+          {showcase.readingTitle ? (
+            <article className="showcase-tile showcase-reading">
+              <span className="showcase-book" aria-hidden="true"><span>{showcase.readingTitle}</span></span>
+              <div>
+                <p className="showcase-kicker">
+                  <BookMarked size={12} aria-hidden="true" /> Lendo agora
+                </p>
+                <strong>{showcase.readingTitle}</strong>
+                {showcase.readingAuthor && <small>{showcase.readingAuthor}</small>}
+              </div>
+            </article>
+          ) : (
+            mine && (
+              <button type="button" className="showcase-tile showcase-reading is-empty" onClick={onEdit}>
+                <span className="showcase-book" aria-hidden="true" />
+                <div>
+                  <p className="showcase-kicker">Lendo agora</p>
+                  <strong>Conte o que está lendo</strong>
+                </div>
+              </button>
+            )
+          )}
+        </div>
+      )}
     </section>
   );
 }

@@ -81,7 +81,7 @@ function MyProfile() {
   return (
     <div className="page profile">
       {showcase ? (
-        <ShowcaseCard person={{ ...user, me: true, course }} showcase={showcase} onEdit={() => setEditing(true)} />
+        <ShowcaseCard person={{ ...user, me: true, course }} showcase={showcase} title={progress.title} onEdit={() => setEditing(true)} />
       ) : (
         <header className="profile-head">
           <Avatar user={user} size={84} />
@@ -91,7 +91,7 @@ function MyProfile() {
           </div>
         </header>
       )}
-      <p className="profile-title">{progress.title}</p>
+      {!showcase && <p className="profile-title">{progress.title}</p>}
       {editing && showcase && (
         <ShowcaseEditor
           showcase={showcase}
