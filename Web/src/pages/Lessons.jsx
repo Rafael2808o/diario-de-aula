@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { BookOpen, ChevronLeft, ChevronRight, Plus, PlusCircle } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, Plus, PlusCircle, Sparkles } from "lucide-react";
 import { useApp } from "../context.js";
 import { addDays, addMonths, classOccurrences, endOfMonth, formatLong, formatMonth, formatShort, range, startOfMonth, startOfWeek, todayIso, weekdays } from "../lib/dates.js";
 import { lessonStatus } from "../lib/domain.js";
 import { Empty, FormError, Modal } from "../ui.jsx";
 import { SubjectSelect } from "../components/forms.jsx";
 import { LessonForm } from "../components/LessonForm.jsx";
+import { reviewFromHtml } from "./Notebook.jsx";
 
 export default function Lessons() {
-  const { data, user, params } = useApp();
+  const { data, user, params, go } = useApp();
   const today = todayIso();
   const [cursor, setCursor] = useState(/^\d{4}-\d{2}-\d{2}$/.test(params.date || "") ? params.date : today);
   const [selected, setSelected] = useState(cursor);
@@ -48,6 +49,20 @@ export default function Lessons() {
   const doneCount = countable.filter(written).length;
   // Páginas em branco: dias recentes com aula ainda sem registro (ou só rascunho), do mais recente para o mais antigo.
   const blankDays = [...recent.reduce((map, item) => map.set(item.date, (map.get(item.date) || 0) + 1), new Map())];
+  // Oráculo da revisão: dúvidas e trechos "Cai na prova" marcados com carimbo nos cadernos.
+  const oracle = useMemo(() => {
+    const doubts = [];
+    const exam = [];
+    for (const lesson of data.lessons) {
+      if (!String(lesson.annotations || "").includes("data-stamp")) continue;
+      const found = reviewFromHtml(lesson.annotations);
+      if (found.doubts.length) doubts.push({ lesson, count: found.doubts.length });
+      const marked = found.review.filter((item) => item.kind === "cai").length;
+      if (marked) exam.push({ lesson, count: marked });
+    }
+    const newest = (list) => list.sort((a, b) => b.lesson.date.localeCompare(a.lesson.date))[0]?.lesson;
+    return { doubts: doubts.reduce((sum, item) => sum + item.count, 0), doubtLesson: newest(doubts), exam: exam.length, examLesson: newest(exam) };
+  }, [data.lessons]);
   const pick = (day) => {
     setCursor(day);
     setSelected(day);
@@ -134,6 +149,26 @@ export default function Lessons() {
                 <p className="hint">Tudo em dia. Nenhuma aula das últimas três semanas está sem registro.</p>
               )}
             </section>
+
+            {(oracle.doubts > 0 || oracle.exam > 0) && (
+              <section className="lr-card lr-oracle">
+                <h2>
+                  <Sparkles size={16} aria-hidden="true" /> Oráculo da revisão
+                </h2>
+                {oracle.doubts > 0 && (
+                  <button type="button" onClick={() => go("caderno", { lesson: oracle.doubtLesson.id })}>
+                    <span data-stamp="duvida">?</span>
+                    Você marcou {oracle.doubts} {oracle.doubts === 1 ? "trecho" : "trechos"} como Dúvida. Que tal tirar a dúvida?
+                  </button>
+                )}
+                {oracle.exam > 0 && (
+                  <button type="button" onClick={() => go("caderno", { lesson: oracle.examLesson.id })}>
+                    <span data-stamp="cai">!</span>
+                    {oracle.exam === 1 ? "Existe 1 aula" : `Existem ${oracle.exam} aulas`} com conteúdo marcado como Cai na prova.
+                  </button>
+                )}
+              </section>
+            )}
           </div>
 
           <section className="lr-day" aria-labelledby="lr-day-title">

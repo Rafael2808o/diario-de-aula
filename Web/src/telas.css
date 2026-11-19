@@ -247,3 +247,10 @@
   .lr-lesson-head { grid-template-columns: auto minmax(0, 1fr); }
   .lr-chip { grid-column: 2; }
 }
+
+/* Oráculo da revisão (Registro de aulas): sai dos carimbos do Caderno. */
+.lr-oracle h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-family: var(--font-title); font-size: 18px; }
+.lr-oracle h2 svg { color: var(--gold); }
+.lr-oracle button { display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; padding: 4px 0; border: 0; background: none; color: var(--text-2); font: inherit; font-size: 13.5px; line-height: 1.45; text-align: left; cursor: pointer; }
+.lr-oracle button:hover { color: var(--text); }
+.lr-oracle [data-stamp] { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; font-size: 13px; font-weight: 800; }
