@@ -200,3 +200,31 @@
 .focus-chat-end { min-height: 1px; }
 .focus-send { display: flex; gap: 6px; grid-template-columns: none; }
 .focus-send input { flex: 1; min-width: 0; }
+
+/* ---------- Perguntados ---------- */
+.quiz-page { display: grid; gap: 16px; }
+.quiz-play { display: grid; gap: 14px; max-width: 760px; }
+.quiz-play-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.quiz-timer { height: 8px; border-radius: 99px; background: var(--fill); overflow: hidden; }
+.quiz-timer span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--success), var(--gold, #e8b64c)); transition: width 0.2s linear; }
+.quiz-question { margin: 0; font-family: var(--font-title); font-size: clamp(19px, 3.6vw, 24px); line-height: 1.35; overflow-wrap: anywhere; }
+.quiz-options { display: grid; gap: 8px; }
+.quiz-option { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 10px 14px; border: 1px solid var(--card-line); border-radius: 12px; background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.quiz-option:hover:not(:disabled) { border-color: var(--accent); }
+.quiz-option svg { margin-left: auto; flex: none; }
+.quiz-option.is-right { border-color: var(--success); background: color-mix(in srgb, var(--success) 16%, var(--surface)); }
+.quiz-option.is-wrong { border-color: var(--danger, #d1495b); background: color-mix(in srgb, var(--danger, #d1495b) 14%, var(--surface)); }
+.quiz-option.is-dim { opacity: 0.55; }
+.quiz-letter { display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 8px; background: var(--fill); font-weight: 700; }
+.quiz-feedback { display: grid; gap: 8px; justify-items: start; }
+.quiz-feedback p { margin: 0; }
+.quiz-right { color: var(--success); font-weight: 600; }
+.quiz-wrong { color: var(--danger, #d1495b); font-weight: 600; }
+.quiz-start { display: grid; gap: 10px; }
+.quiz-start p { margin: 0; }
+.quiz-winner { display: flex; align-items: center; gap: 8px; margin: 0; font-family: var(--font-title); font-size: 22px; color: var(--gold, #e8b64c); }
+.quiz-position { min-width: 28px; font-weight: 700; color: var(--text-2); }
+.row.is-me { box-shadow: inset 3px 0 0 var(--accent); }
+.quiz-review { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.quiz-review li { display: grid; gap: 6px; }
+.quiz-review p { margin: 0; overflow-wrap: anywhere; }

@@ -1,4 +1,4 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { generateQuestions } from './ai.js';
 import { notify } from './notifications.js';
 import { publicName } from './social.js';
@@ -61,22 +61,15 @@ export function initQuizGame() {
 
 const memoryUser = id => memory.users.find(user => user.id === id) || {};
 
-// Embaralha as alternativas para a correta não cair sempre na mesma posição.
+// Mantém a ordem da IA: as explicações citam as letras (A, B, C, D) e o prompt já varia a posição da correta.
 function prepare(questions) {
-  return questions.map(question => {
-    const order = [0, 1, 2, 3];
-    for (let i = 3; i > 0; i -= 1) {
-      const j = randomInt(i + 1);
-      [order[i], order[j]] = [order[j], order[i]];
-    }
-    return {
-      question: oneLine(question.question, 600),
-      options: order.map(index => oneLine(question.options[index], 300)),
-      correctIndex: order.indexOf(question.correctIndex),
-      explanation: String(question.explanation || '').trim().slice(0, 1200),
-      difficulty: oneLine(question.difficulty, 20)
-    };
-  });
+  return questions.map(question => ({
+    question: oneLine(question.question, 600),
+    options: question.options.map(option => oneLine(option, 300)),
+    correctIndex: question.correctIndex,
+    explanation: String(question.explanation || '').trim().slice(0, 1200),
+    difficulty: oneLine(question.difficulty, 20)
+  }));
 }
 
 async function matchRow(id) {
