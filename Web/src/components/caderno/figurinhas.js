@@ -13,6 +13,36 @@ export const figurinhaArt = {
   coracao: '<path d="M32 56C10 42 6 28 10 19C14 10 26 10 32 20C38 10 50 10 54 19C58 28 54 42 32 56Z" fill="#ff7a9c" stroke="#c43c63" stroke-width="2.5" stroke-linejoin="round"/><path d="M17 22c2-4 6-5 9-3" stroke="#ffd3df" stroke-width="3" stroke-linecap="round" fill="none"/>',
 };
 
+// Figurinhas soltas da página (mesma lista da API em notebook.js: pageStickers).
+const stampArt = (text, bg, fg, length) =>
+  `<rect x="2" y="2" width="136" height="40" rx="12" fill="${bg}"/><rect x="7" y="7" width="126" height="30" rx="8" fill="none" stroke="${fg}" stroke-opacity=".45" stroke-dasharray="3 3"/><text x="70" y="27.5" text-anchor="middle" font-family="Lexend,system-ui,sans-serif" font-weight="800" font-size="15" fill="${fg}" textLength="${length}" lengthAdjust="spacingAndGlyphs">${text}</text>`;
+const round = (fill, path) => `<circle cx="32" cy="32" r="28" fill="${fill}"/>${path}`;
+export const pageStickerArt = {
+  lua: { group: "Místicas", label: "Lua", size: 76, body: figurinhaArt.lua },
+  estrela: { group: "Místicas", label: "Estrela", size: 70, body: figurinhaArt.estrela },
+  constelacao: { group: "Místicas", label: "Constelação", size: 80, body: figurinhaArt.constelacao },
+  gato: { group: "Místicas", label: "Gato do Grimiau", size: 84, body: figurinhaArt.gato },
+  livro: { group: "Místicas", label: "Livro mágico", size: 80, body: figurinhaArt.livro },
+  pocao: { group: "Místicas", label: "Poção", size: 76, body: figurinhaArt.pocao },
+  vela: { group: "Místicas", label: "Vela", size: 72, body: figurinhaArt.vela },
+  olho: { group: "Místicas", label: "Olho místico", size: 80, body: figurinhaArt.olho },
+  cristal: { group: "Místicas", label: "Cristal", size: 70, body: figurinhaArt.cristal },
+  importante: { group: "Carimbos", label: "Importante", size: 132, wide: true, body: stampArt("IMPORTANTE", "#ff7a9c", "#3a0a1c", 100) },
+  cai: { group: "Carimbos", label: "Cai na prova", size: 132, wide: true, body: stampArt("CAI NA PROVA", "#f6c85f", "#3a2a00", 108) },
+  revisar: { group: "Carimbos", label: "Revisar", size: 120, wide: true, body: stampArt("REVISAR", "#a891f0", "#1c0f45", 70) },
+  duvida: { group: "Carimbos", label: "Dúvida", size: 120, wide: true, body: stampArt("DÚVIDA", "#6fd0e0", "#06303a", 66) },
+  dominei: { group: "Carimbos", label: "Dominei", size: 120, wide: true, body: stampArt("DOMINEI", "#5fd3a5", "#05341f", 72) },
+  exemplo: { group: "Carimbos", label: "Exemplo", size: 120, wide: true, body: stampArt("EXEMPLO", "#ffa36b", "#3d1700", 74) },
+  definicao: { group: "Carimbos", label: "Definição", size: 128, wide: true, body: stampArt("DEFINIÇÃO", "#e9e1ff", "#2b1a63", 92) },
+  check: { group: "Marcadores", label: "Check", size: 56, body: round("#5fd3a5", '<path d="M19 33l9 9 18-20" stroke="#05341f" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>') },
+  exclamacao: { group: "Marcadores", label: "Exclamação", size: 56, body: round("#ff7a9c", '<path d="M32 16v20" stroke="#3a0a1c" stroke-width="7" stroke-linecap="round"/><circle cx="32" cy="47" r="4" fill="#3a0a1c"/>') },
+  interrogacao: { group: "Marcadores", label: "Interrogação", size: 56, body: round("#6fd0e0", '<path d="M23 26c0-6 4-9 9-9s9 3 9 8c0 6-8 7-9 13" stroke="#06303a" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="32" cy="49" r="4" fill="#06303a"/>') },
+  ampulheta: { group: "Marcadores", label: "Ampulheta", size: 56, body: '<path d="M16 6H48M16 58H48" stroke="#6b4fbf" stroke-width="5" stroke-linecap="round"/><path d="M20 10H44C44 24 36 28 32 32C36 36 44 40 44 54H20C20 40 28 36 32 32C28 28 20 24 20 10Z" fill="#efe7ff" stroke="#6b4fbf" stroke-width="2.5" stroke-linejoin="round"/><path d="M25 14H39C38 22 34 25 32 27C30 25 26 22 25 14Z" fill="#f6c85f"/><path d="M26 54C27 46 30 42 32 40C34 42 37 46 38 54Z" fill="#f6c85f"/>' },
+  coracao: { group: "Marcadores", label: "Coração", size: 56, body: figurinhaArt.coracao },
+  seta: { group: "Marcadores", label: "Seta", size: 56, body: round("#a891f0", '<path d="M16 32H46M35 20L47 32L35 44" stroke="#1c0f45" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>') },
+};
+export const stickerGroups = ["Místicas", "Carimbos", "Marcadores"];
+
 // Carimbos que entram no texto do Caderno (<span data-stamp="...">). A ordem é a da barra de ferramentas.
 export const carimbos = [
   ["cai", "Cai na prova"],

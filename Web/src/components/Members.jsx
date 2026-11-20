@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useApp } from "../context.js";
 import { lastSeenLabel } from "../lib/presence.js";
 import { Avatar } from "../ui.jsx";
+import { VibeChip, VibePicker } from "./Vibe.jsx";
 
 // Membros online e ativos recentemente, só no início da Comunidade. Atualiza sozinho a cada 45 s com a aba visível.
 export default function Members() {
@@ -48,6 +49,12 @@ export default function Members() {
               </span>
               <strong>{member.me ? `${member.name} (você)` : member.name}</strong>
               <small>{lastSeenLabel(member, now)}</small>
+              {member.me ? (
+                <VibePicker compact value={member.vibe} onChange={(vibe) => setState((current) => ({ ...current, items: current.items.map((item) => (item.me ? { ...item, vibe } : item)) }))} />
+              ) : (
+                <VibeChip vibe={member.vibe} />
+              )}
+              {member.available && !member.me && <span className="members-available">Topa estudar junto</span>}
             </li>
           ))}
         </ul>

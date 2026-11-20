@@ -3,6 +3,7 @@ import { BookMarked, Camera, Flame, Music, Pencil, Star, Trash2 } from "lucide-r
 import { useApp } from "../context.js";
 import { apiBase } from "../lib/api.js";
 import { blobToBase64, preparePhoto } from "../lib/photo.js";
+import { VibeChip, VibePicker } from "./Vibe.jsx";
 import { Avatar, FormError, Modal } from "../ui.jsx";
 
 // Apresentação do perfil (versão 4.0): capa, cor, frase, música, leitura atual, matéria favorita e o que a pessoa
@@ -64,7 +65,7 @@ function CoverSky() {
   );
 }
 
-export function ShowcaseCard({ person, showcase, onEdit, title }) {
+export function ShowcaseCard({ person, showcase, onEdit, onVibe, title }) {
   const cover = useCover(person.id, showcase.coverVersion);
   const studied = showcase.mostStudied;
   const mine = Boolean(onEdit);
@@ -90,6 +91,14 @@ export function ShowcaseCard({ person, showcase, onEdit, title }) {
               </span>
             )}
             {person.course && <small>{person.course}</small>}
+          </div>
+          <div className="showcase-status">
+            {showcase.available && (
+              <span className="vibe-chip is-available">
+                <i aria-hidden="true" /> Disponível para estudar junto
+              </span>
+            )}
+            {onVibe ? <VibePicker value={showcase.vibe} onChange={onVibe} /> : <VibeChip vibe={showcase.vibe} />}
           </div>
         </div>
         {mine && (
@@ -193,6 +202,7 @@ export function ShowcaseEditor({ showcase, onClose, onSaved }) {
     readingAuthor: showcase.readingAuthor,
     favoriteSubject: showcase.favoriteSubject,
     visible: showcase.visible,
+    available: showcase.available === true,
   });
   const [coverVersion, setCoverVersion] = useState(showcase.coverVersion);
   const [busy, setBusy] = useState("");
@@ -298,6 +308,9 @@ export function ShowcaseEditor({ showcase, onClose, onSaved }) {
             <input type="url" value={form.musicUrl} maxLength={300} onChange={set("musicUrl")} placeholder="https://open.spotify.com/…" />
           </label>
         </div>
+        <label className="check">
+          <input type="checkbox" checked={form.available} onChange={(event) => setForm({ ...form, available: event.target.checked })} /> Mostrar “Disponível para estudar junto” no meu perfil e em Bruxinhos por aqui
+        </label>
         <label className="check">
           <input type="checkbox" checked={form.visible} onChange={(event) => setForm({ ...form, visible: event.target.checked })} /> Mostrar minha apresentação para quem está no Grimiau
         </label>

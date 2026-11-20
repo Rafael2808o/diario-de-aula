@@ -148,3 +148,49 @@ export default function Auth({ onAuthenticated }) {
     </main>
   );
 }
+
+// Entrada da Administração (?abrir=admin sem sessão): mesmo login de sempre, com a cara da área restrita.
+// Quem entrar sem papel de administração vê "Entrada restrita" dentro do painel (a API confere em cada pedido).
+export function AdminLogin({ onAuthenticated }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    document.title = "Administração — Grimiau";
+  }, []);
+  const submit = async (event) => {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(event.currentTarget));
+    setError("");
+    setBusy(true);
+    try {
+      onAuthenticated(await request("/auth/login", { method: "POST", body: { email: values.email, password: values.password } }));
+    } catch (failure) {
+      setError(failure.message);
+      setBusy(false);
+    }
+  };
+  return (
+    <main className="admin-login">
+      <form className="admin-login-card" onSubmit={submit}>
+        <Logo />
+        <h1>Entrada restrita</h1>
+        <p className="lead">Somente pessoas autorizadas pela equipe do Grimiau.</p>
+        <label>
+          E-mail
+          <input name="email" type="email" autoComplete="email" required />
+        </label>
+        <label>
+          Senha
+          <input name="password" type="password" autoComplete="current-password" required />
+        </label>
+        <FormError>{error}</FormError>
+        <button className="btn primary" disabled={busy}>
+          {busy ? "Conferindo..." : "Entrar"}
+        </button>
+        <a className="admin-login-back" href="/">
+          Voltar ao Grimiau
+        </a>
+      </form>
+    </main>
+  );
+}

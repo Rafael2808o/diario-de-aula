@@ -206,3 +206,14 @@
   .adm-shop article { grid-template-columns: 56px 1fr; }
   .adm-shop-actions { grid-column: 1 / -1; }
 }
+
+/* Entrada da Administração (versão 4.2) */
+.admin-login { min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px; background: radial-gradient(70% 60% at 50% 0%, color-mix(in srgb, var(--accent) 28%, transparent) 0%, transparent 70%), var(--bg); }
+.admin-login-card { display: grid; gap: 16px; width: 100%; max-width: 420px; padding: 34px 28px; border: 1px solid var(--card-line); border-radius: 20px; background: var(--surface); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45); }
+.admin-login-card > :first-child { justify-self: center; }
+.admin-login-card h1 { margin: 0; font-family: var(--font-title); font-size: 28px; text-align: center; }
+.admin-login-card .lead { margin: -8px 0 4px; text-align: center; color: var(--text-2); }
+.admin-login-card label { display: grid; gap: 6px; font-size: 14px; font-weight: 600; }
+.admin-login-card input { min-height: 46px; padding: 10px 12px; border: 1px solid var(--card-line); border-radius: 12px; background: var(--bg); color: var(--text); font: inherit; }
+.admin-login-card .btn { min-height: 46px; }
+.admin-login-back { justify-self: center; font-size: 14px; color: var(--text-2); }

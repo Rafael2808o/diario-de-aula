@@ -19,7 +19,7 @@ import Sky from "./components/Sky.jsx";
 import Celebrations, { useCelebrations } from "./components/Celebrate.jsx";
 import Presentation, { presentationVersion } from "./components/Presentation.jsx";
 import Tour, { TourInvite } from "./components/Tour.jsx";
-import Auth from "./pages/Auth.jsx";
+import Auth, { AdminLogin } from "./pages/Auth.jsx";
 import Calendar from "./pages/Calendar.jsx";
 import Cards from "./pages/Cards.jsx";
 import Community from "./pages/Community.jsx";
@@ -393,6 +393,13 @@ export default function App() {
     <ToastProvider>
       {session ? (
         <Shell session={session} setSession={setSession} />
+      ) : new URLSearchParams(window.location.search).get("abrir") === "admin" ? (
+        <AdminLogin
+          onAuthenticated={(next) => {
+            storeSession(next);
+            setSession(next);
+          }}
+        />
       ) : (
         <Auth
           onAuthenticated={(next) => {

@@ -22,7 +22,7 @@ test('membros: online com sinal recente, visto por último ao sair e nada técni
   assert.equal(anaRow.online, true);
   // O apelido das Fases da Lua não aparece aqui: só o nome público, como no resto do Conselho.
   assert.equal(anaRow.name, 'Ana S.');
-  assert.deepEqual(Object.keys(anaRow).sort(), ['avatarVersion', 'id', 'lastSeenAt', 'me', 'name', 'online']);
+  assert.deepEqual(Object.keys(anaRow).sort(), ['available', 'avatarVersion', 'id', 'lastSeenAt', 'me', 'name', 'online', 'vibe']);
   assert.equal(list.items.find(item => item.id === bia.user.id).me, true);
 
   await request(app).post('/api/v1/presence/leave').set(ana.auth).expect(204);

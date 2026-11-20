@@ -10,6 +10,7 @@ import { MaterialLinks } from "../components/forms.jsx";
 import { PeoplePicker } from "../components/sala/People.jsx";
 import Janela, { moonInfo } from "../components/caderno/Janela.jsx";
 import { carimbos, figurinhaArt } from "../components/caderno/figurinhas.js";
+import { ExtrasList, LessonCards, StickerLayer, StickerPill, StickerTray, makeSticker, useExtras } from "../components/caderno/Secoes.jsx";
 
 // Caderno da aula: escrever durante a explicação, com salvamento automático.
 // Enquanto a API não confirma, o texto fica guardado neste aparelho (localStorage), então cair a internet
@@ -565,10 +566,23 @@ function SharedNotebook({ lessonId }) {
       </header>
       <div className="notebook-layout">
         <section className="notebook" aria-label="Caderno compartilhado">
-          <div className="notebook-sheet">
+          <div className="notebook-sheet shared-sheet">
             <div ref={page} className="notebook-page is-readonly" aria-label="Anotações da aula" />
+            {notebook.extras && <StickerLayer stickers={notebook.extras.stickers} page="L" section="conteudo" readOnly onSelect={() => {}} onMove={() => {}} />}
           </div>
           {!htmlToText(notebook.annotations) && !notebook.annotations.includes("data-img") && <p className="hint">Este caderno ainda está em branco.</p>}
+          {notebook.extras?.topics.length > 0 && (
+            <div className="shared-extras">
+              <h2>Tópicos importantes</h2>
+              <ExtrasList kind="topics" items={notebook.extras.topics} readOnly onChange={() => {}} />
+            </div>
+          )}
+          {notebook.extras?.doubts.length > 0 && (
+            <div className="shared-extras">
+              <h2>Dúvidas</h2>
+              <ExtrasList kind="doubts" items={notebook.extras.doubts} readOnly onChange={() => {}} />
+            </div>
+          )}
         </section>
         <aside className="notebook-side">
           <p className="paper-label">Recados</p>
@@ -719,8 +733,13 @@ function FocusRow({ lesson }) {
   );
 }
 
-function ReviewBox({ html }) {
-  const { review, doubts, mastered } = useMemo(() => reviewFromHtml(html), [html]);
+// "Para revisar antes da prova": trechos carimbados no texto + tópicos marcados "Cai na prova" ainda não revisados,
+// e as dúvidas (carimbo Dúvida no texto + lista de Dúvidas ainda abertas).
+function ReviewBox({ html, extras, onOpen }) {
+  const fromText = useMemo(() => reviewFromHtml(html), [html]);
+  const topics = extras.topics.filter((item) => item.f && !item.d).map((item) => ({ kind: "cai", text: item.t }));
+  const review = [...fromText.review, ...topics.filter((item) => !fromText.review.some((entry) => entry.text === item.text))];
+  const doubts = [...fromText.doubts, ...extras.doubts.filter((item) => !item.d).map((item) => item.t)];
   return (
     <div className="caderno-review">
       <h3>Para revisar antes da prova</h3>
@@ -734,31 +753,33 @@ function ReviewBox({ html }) {
           ))}
         </ul>
       ) : (
-        <p>Use o Carimbo "Cai na prova", "Importante" ou "Revisar" num trecho e ele aparece aqui.</p>
+        <p>Marque "Cai na prova" num tópico ou use o Carimbo no texto, e o trecho aparece aqui.</p>
       )}
       {review.length > 5 && <p>e mais {review.length - 5}</p>}
       <p className="caderno-review-foot">
-        {doubts.length ? `${doubts.length} ${doubts.length === 1 ? "dúvida marcada" : "dúvidas marcadas"}` : "Nenhuma dúvida marcada"}
-        {mastered > 0 && ` · ${mastered} ${mastered === 1 ? "trecho dominado" : "trechos dominados"}`}
+        {doubts.length ? (
+          <button type="button" className="link-btn" onClick={() => onOpen("duvidas")}>
+            {doubts.length} {doubts.length === 1 ? "dúvida aberta" : "dúvidas abertas"}
+          </button>
+        ) : (
+          "Nenhuma dúvida aberta"
+        )}
+        {fromText.mastered > 0 && ` · ${fromText.mastered} ${fromText.mastered === 1 ? "trecho dominado" : "trechos dominados"}`}
       </p>
-      {doubts.length > 0 && (
-        <ul className="caderno-doubts">
-          {doubts.slice(0, 3).map((text) => (
-            <li key={text}>{text}</li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }
 
+const sectionsList = [
+  ["conteudo", "Conteúdo", "Conteúdo da aula", "tab-rose"],
+  ["topicos", "Tópicos", "Tópicos importantes", "tab-gold"],
+  ["duvidas", "Dúvidas", "Dúvidas", "tab-mint"],
+  ["cartas", "Cartas", "Cartas rápidas", "tab-lilac"],
+];
+const trayPanels = [["figurinhas", "Figurinhas"], ...panels.map(([id, label]) => [id, label])];
+
 export default function Notebook() {
   const { data, params, go } = useApp();
-  const [panel, setPanel] = useState("estudar");
-  const [html, setHtml] = useState("");
-  const [paper, setPaperState] = useState(() => readPref(paperKey, document.documentElement.dataset.theme === "light" ? "claro" : "escuro"));
-  const [ambient, setAmbient] = useState(() => readPref(ambientKey, ""));
-  const tray = useRef(null);
   const today = todayIso();
   // Aulas do caderno (abas laterais e seletor): as já dadas, da mais nova para a mais antiga.
   const recent = useMemo(
@@ -782,11 +803,28 @@ export default function Notebook() {
       </div>
     );
   }
+  return <LessonNotebook key={lesson.id} lesson={lesson} subject={subject} recent={recent} />;
+}
+
+function LessonNotebook({ lesson, subject, recent }) {
+  const { data, go } = useApp();
+  const [panel, setPanel] = useState("figurinhas");
+  const [section, setSection] = useState("conteudo");
+  const [html, setHtml] = useState("");
+  const [selected, setSelected] = useState("");
+  const [paper, setPaperState] = useState(() => readPref(paperKey, document.documentElement.dataset.theme === "light" ? "claro" : "escuro"));
+  const [ambient, setAmbient] = useState(() => readPref(ambientKey, ""));
+  const tray = useRef(null);
+  const leftPage = useRef(null);
+  const { extras, change, flush } = useExtras(lesson.id);
   const subjectOf = (item) => data.subjects.find((entry) => entry.id === item.subjectId);
   const materials = data.materials.filter((material) => material.lessonId === lesson.id);
+  const cardsCount = data.flashcards.filter((card) => card.lessonId === lesson.id).length;
   const hasContent = Boolean(htmlToText(html)) || html.includes("data-img");
   const listed = recent.some((item) => item.id === lesson.id) ? recent : [lesson, ...recent];
   const sideTabs = listed.slice(0, 7).some((item) => item.id === lesson.id) ? listed.slice(0, 7) : [lesson, ...listed.slice(0, 6)];
+  const counts = { topicos: extras.topics.length, duvidas: extras.doubts.filter((item) => !item.d).length, cartas: cardsCount };
+  const sticker = extras.stickers.find((item) => item.id === selected);
   const setPaper = (value) => {
     setPaperState(value);
     writePref(paperKey, value);
@@ -804,10 +842,42 @@ export default function Notebook() {
     // Em tela estreita a bandeja fica embaixo do caderno: rola até ela.
     if (window.matchMedia("(max-width: 1099px)").matches) setTimeout(() => tray.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   };
+  const openSection = (id) => {
+    setSelected("");
+    setSection(id);
+  };
+  // Figurinhas: mudanças durante o arraste ficam só na tela; ao soltar, salvam.
+  const moveSticker = (id, patch, commit) => {
+    change("stickers", (list) => list.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+    if (commit) flush();
+  };
+  const addSticker = (kind) => {
+    // Cola na altura da página que está à vista.
+    const rect = leftPage.current?.getBoundingClientRect();
+    const y = rect ? Math.max(40, Math.min(rect.height - 120, -rect.top + 140)) : 60;
+    const item = makeSticker(kind, "L", section, extras.stickers, y);
+    change("stickers", (list) => [...list, item].slice(-60));
+    setSelected(item.id);
+    if (window.matchMedia("(max-width: 1099px)").matches) leftPage.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  useEffect(() => {
+    if (!selected) return undefined;
+    const onKey = (event) => {
+      if (event.target.closest?.("input, textarea, [contenteditable='true']")) return;
+      if (event.key === "Escape") setSelected("");
+      if (event.key === "Delete" || event.key === "Backspace") {
+        change("stickers", (list) => list.filter((item) => item.id !== selected));
+        setSelected("");
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [selected, change]);
   const moon = moonInfo();
   const rainy = ambient.includes("chuva");
   const still = ambient.includes("pausa");
-  const panelTitle = panels.find(([id]) => id === panel)?.[1];
+  const panelTitle = trayPanels.find(([id]) => id === panel)?.[1];
+  const sectionInfo = sectionsList.find(([id]) => id === section);
   return (
     <div className="page notebook-page-wrap caderno-v2" data-paper={paper}>
       <header className="caderno-head">
@@ -858,13 +928,19 @@ export default function Notebook() {
         <main className="caderno-book">
           <div className="caderno-bookin">
             <div className="caderno-cover">
-              <div className="caderno-spread">
-                <section className="caderno-pg left" aria-label="Página de escrever">
+              <div className="caderno-spread" onPointerDown={(event) => !event.target.closest(".page-sticker, .sticker-pill") && setSelected("")}>
+                <section className="caderno-pg left" aria-label="Página de escrever" ref={leftPage}>
                   <div className="caderno-lhd">
-                    <div className="caderno-pagehead">Conteúdo da aula</div>
+                    <div className="caderno-pagehead">{sectionInfo[2]}</div>
                     <FocusRow key={lesson.id} lesson={lesson} />
                   </div>
-                  <Editor key={lesson.id} lesson={lesson} onHtml={setHtml} />
+                  <div hidden={section !== "conteudo"}>
+                    <Editor key={lesson.id} lesson={lesson} onHtml={setHtml} />
+                  </div>
+                  {section === "topicos" && <ExtrasList kind="topics" items={extras.topics} onChange={(next) => change("topics", next)} />}
+                  {section === "duvidas" && <ExtrasList kind="doubts" items={extras.doubts} onChange={(next) => change("doubts", next)} />}
+                  {section === "cartas" && <LessonCards lesson={lesson} />}
+                  <StickerLayer stickers={extras.stickers} page="L" section={section} selected={selected} onSelect={setSelected} onMove={moveSticker} />
                 </section>
                 <section className="caderno-pg right" aria-label="Janela do grimório">
                   <div className="caderno-pagehead">Janela do grimório</div>
@@ -880,7 +956,8 @@ export default function Notebook() {
                       </button>
                     </div>
                   </div>
-                  <ReviewBox html={html} />
+                  <ReviewBox html={html} extras={extras} onOpen={openSection} />
+                  <StickerLayer stickers={extras.stickers} page="R" section={section} selected={selected} onSelect={setSelected} onMove={moveSticker} />
                 </section>
               </div>
               <nav className="caderno-side" aria-label="Outras aulas">
@@ -902,18 +979,43 @@ export default function Notebook() {
                 })}
               </nav>
             </div>
-            <div className="caderno-guides" role="group" aria-label="Painel do caderno">
-              {panels.map(([id, label, tone]) => (
-                <button key={id} type="button" className={`caderno-guide ${tone}`} aria-pressed={panel === id} onClick={() => openPanel(id)}>
-                  {label}
-                  {id === "materiais" && materials.length > 0 && <span className="count">{materials.length}</span>}
+            <div className="caderno-guides">
+              <div className="caderno-guide-set" role="tablist" aria-label="Seções do caderno">
+                {sectionsList.map(([id, label, , tone]) => (
+                  <button key={id} type="button" role="tab" className={`caderno-guide ${tone}`} aria-selected={section === id} aria-pressed={section === id} onClick={() => openSection(id)}>
+                    {label}
+                    {counts[id] > 0 && <span className="count">{counts[id]}</span>}
+                  </button>
+                ))}
+              </div>
+              <div className="caderno-guide-set">
+                <button type="button" className="caderno-guide tab-sun" aria-pressed={panel === "figurinhas"} onClick={() => openPanel("figurinhas")}>
+                  Figurinhas
                 </button>
-              ))}
+              </div>
             </div>
           </div>
         </main>
         <aside className="caderno-tray" ref={tray} aria-label={panelTitle}>
+          <div className="caderno-tabs caderno-tray-tabs" role="group" aria-label="Painel do caderno">
+            {trayPanels.map(([id, label]) => (
+              <button key={id} type="button" className={`caderno-tab ${id === "figurinhas" ? "tab-gold" : panels.find(([key]) => key === id)?.[2]}`} aria-pressed={panel === id} onClick={() => setPanel(id)}>
+                {label}
+                {id === "materiais" && materials.length > 0 && <span className="count">{materials.length}</span>}
+              </button>
+            ))}
+          </div>
           <h2>{panelTitle}</h2>
+          {panel === "figurinhas" && (
+            <StickerTray
+              onAdd={addSticker}
+              count={extras.stickers.length}
+              onClear={() => {
+                change("stickers", []);
+                setSelected("");
+              }}
+            />
+          )}
           {panel === "estudar" && <StudyFromLesson lesson={{ ...lesson, annotations: html || lesson.annotations }} subject={subject} />}
           {panel === "compartilhar" && <SharePanel lesson={lesson} />}
           {panel === "recados" && <Notes lessonId={lesson.id} mine />}
@@ -936,6 +1038,23 @@ export default function Notebook() {
           )}
         </aside>
       </div>
+      {sticker && (
+        <StickerPill
+          sticker={sticker}
+          onChange={(patch) => moveSticker(sticker.id, patch, true)}
+          onDuplicate={() => {
+            const copy = { ...makeSticker(sticker.k, sticker.p, sticker.sec, extras.stickers, sticker.y + 30), s: sticker.s, r: sticker.r, sh: sticker.sh, x: Math.min(1, sticker.x + 0.06) };
+            change("stickers", (list) => [...list, copy].slice(-60));
+            setSelected(copy.id);
+          }}
+          onFront={() => moveSticker(sticker.id, { z: extras.stickers.reduce((max, item) => Math.max(max, item.z), 0) + 1 }, true)}
+          onDelete={() => {
+            change("stickers", (list) => list.filter((item) => item.id !== sticker.id));
+            setSelected("");
+          }}
+          onDone={() => setSelected("")}
+        />
+      )}
     </div>
   );
 }

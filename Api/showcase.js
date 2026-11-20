@@ -12,6 +12,9 @@ export const coverMaxBytes = 680 * 1024;
 const coverTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 export const accentColors = ['#7c5cff', '#c084e8', '#e07fa8', '#e59a6b', '#e8b64c', '#58b39a', '#5aa9d6', '#6f8cf6'];
 export const coverThemes = ['noite', 'aurora', 'pergaminho', 'floresta', 'mar'];
+// Vibe do momento (versão 4.2): vale por 24 horas e aparece no perfil e em "Bruxinhos por aqui".
+export const vibes = ['focada', 'tranquila', 'animada', 'inspirada', 'cansada', 'estressada'];
+export const vibeTtlMs = 24 * 3600_000;
 const oneLine = (value, max) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 
 // Só links de música conhecidos (abre fora do Grimiau; nada é incorporado na página).
@@ -45,20 +48,28 @@ export function initShowcase() {
         cover BYTEA, cover_mime TEXT, cover_version TEXT NOT NULL DEFAULT '',
         headline TEXT NOT NULL DEFAULT '', music_title TEXT NOT NULL DEFAULT '', music_url TEXT NOT NULL DEFAULT '',
         reading_title TEXT NOT NULL DEFAULT '', reading_author TEXT NOT NULL DEFAULT '', favorite_subject TEXT NOT NULL DEFAULT '',
-        updated_at TIMESTAMPTZ DEFAULT NOW());`);
+        updated_at TIMESTAMPTZ DEFAULT NOW());
+      ALTER TABLE profile_showcases ADD COLUMN IF NOT EXISTS available BOOLEAN NOT NULL DEFAULT FALSE;
+      ALTER TABLE profile_showcases ADD COLUMN IF NOT EXISTS vibe TEXT NOT NULL DEFAULT '';
+      ALTER TABLE profile_showcases ADD COLUMN IF NOT EXISTS vibe_at TIMESTAMPTZ;`);
   })();
   return ready;
 }
 
-const empty = { visible: true, accent: '', coverTheme: 'noite', coverVersion: '', headline: '', musicTitle: '', musicUrl: '', readingTitle: '', readingAuthor: '', favoriteSubject: '' };
+const empty = { visible: true, accent: '', coverTheme: 'noite', coverVersion: '', headline: '', musicTitle: '', musicUrl: '', readingTitle: '', readingAuthor: '', favoriteSubject: '', available: false, vibe: '' };
 
 async function showcaseOf(userId) {
   const row = pool
     ? (await pool.query(`SELECT visible, accent, cover_theme AS "coverTheme", cover_version AS "coverVersion", headline, music_title AS "musicTitle", music_url AS "musicUrl",
-        reading_title AS "readingTitle", reading_author AS "readingAuthor", favorite_subject AS "favoriteSubject" FROM profile_showcases WHERE user_id=$1`, [userId])).rows[0]
+        reading_title AS "readingTitle", reading_author AS "readingAuthor", favorite_subject AS "favoriteSubject",
+        available, vibe, vibe_at AS "vibeAt" FROM profile_showcases WHERE user_id=$1`, [userId])).rows[0]
     : memory.showcases.find(item => item.userId === userId);
-  return { ...empty, ...(row || {}), userId: undefined, cover: undefined, coverMime: undefined };
+  const result = { ...empty, ...(row || {}), userId: undefined, cover: undefined, coverMime: undefined, vibeAt: undefined };
+  result.vibe = currentVibe(row);
+  return result;
 }
+
+export const currentVibe = row => (row?.vibe && vibes.includes(row.vibe) && row.vibeAt && Date.now() - new Date(row.vibeAt).getTime() < vibeTtlMs ? row.vibe : '');
 
 // Disciplina e conteúdo com mais tempo de Ritual nos últimos 30 dias.
 async function mostStudied(userId) {
@@ -87,7 +98,7 @@ export function registerShowcaseRoutes(app, requireAuth) {
     }
   };
 
-  app.get('/api/v1/vitrine', requireAuth, route(async (req, res) => res.json({ ...(await showcaseOf(req.user.id)), mostStudied: await mostStudied(req.user.id), accents: accentColors, themes: coverThemes })));
+  app.get('/api/v1/vitrine', requireAuth, route(async (req, res) => res.json({ ...(await showcaseOf(req.user.id)), mostStudied: await mostStudied(req.user.id), accents: accentColors, themes: coverThemes, vibes })));
 
   app.put('/api/v1/vitrine', requireAuth, route(async (req, res) => {
     const current = await showcaseOf(req.user.id);
@@ -100,19 +111,35 @@ export function registerShowcaseRoutes(app, requireAuth) {
       accent: body.accent !== undefined ? (accentColors.includes(body.accent) ? body.accent : '') : current.accent,
       coverTheme: body.coverTheme !== undefined ? (coverThemes.includes(body.coverTheme) ? body.coverTheme : 'noite') : current.coverTheme,
       headline: pick('headline', 120), musicTitle: pick('musicTitle', 100), musicUrl,
-      readingTitle: pick('readingTitle', 120), readingAuthor: pick('readingAuthor', 80), favoriteSubject: pick('favoriteSubject', 80)
+      readingTitle: pick('readingTitle', 120), readingAuthor: pick('readingAuthor', 80), favoriteSubject: pick('favoriteSubject', 80),
+      available: body.available !== undefined ? body.available === true : current.available
     };
     if (pool) {
-      await pool.query(`INSERT INTO profile_showcases (user_id, visible, accent, cover_theme, headline, music_title, music_url, reading_title, reading_author, favorite_subject, updated_at)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW()) ON CONFLICT (user_id) DO UPDATE SET visible=$2, accent=$3, cover_theme=$4, headline=$5, music_title=$6, music_url=$7,
-        reading_title=$8, reading_author=$9, favorite_subject=$10, updated_at=NOW()`,
-      [req.user.id, next.visible, next.accent, next.coverTheme, next.headline, next.musicTitle, next.musicUrl, next.readingTitle, next.readingAuthor, next.favoriteSubject]);
+      await pool.query(`INSERT INTO profile_showcases (user_id, visible, accent, cover_theme, headline, music_title, music_url, reading_title, reading_author, favorite_subject, available, updated_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW()) ON CONFLICT (user_id) DO UPDATE SET visible=$2, accent=$3, cover_theme=$4, headline=$5, music_title=$6, music_url=$7,
+        reading_title=$8, reading_author=$9, favorite_subject=$10, available=$11, updated_at=NOW()`,
+      [req.user.id, next.visible, next.accent, next.coverTheme, next.headline, next.musicTitle, next.musicUrl, next.readingTitle, next.readingAuthor, next.favoriteSubject, next.available]);
     } else {
       const found = memory.showcases.find(item => item.userId === req.user.id);
       if (found) Object.assign(found, next);
       else memory.showcases.push({ userId: req.user.id, coverVersion: '', ...next });
     }
-    return res.json({ ...(await showcaseOf(req.user.id)), mostStudied: await mostStudied(req.user.id), accents: accentColors, themes: coverThemes });
+    return res.json({ ...(await showcaseOf(req.user.id)), mostStudied: await mostStudied(req.user.id), accents: accentColors, themes: coverThemes, vibes });
+  }));
+
+  // Vibe do momento: um toque na Comunidade ou no perfil. Vazio tira a vibe.
+  app.put('/api/v1/vitrine/vibe', requireAuth, route(async (req, res) => {
+    const vibe = vibes.includes(req.body?.vibe) ? req.body.vibe : '';
+    const at = vibe ? new Date() : null;
+    if (pool) {
+      await pool.query(`INSERT INTO profile_showcases (user_id, vibe, vibe_at, updated_at) VALUES ($1,$2,$3,NOW())
+        ON CONFLICT (user_id) DO UPDATE SET vibe=$2, vibe_at=$3, updated_at=NOW()`, [req.user.id, vibe, at]);
+    } else {
+      const found = memory.showcases.find(item => item.userId === req.user.id);
+      if (found) Object.assign(found, { vibe, vibeAt: at });
+      else memory.showcases.push({ ...empty, userId: req.user.id, coverVersion: '', vibe, vibeAt: at });
+    }
+    return res.json({ vibe, vibes });
   }));
 
   // Capa: imagem reduzida no aparelho (até 680 KB). data vazio remove a capa.

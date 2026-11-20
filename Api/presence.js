@@ -1,5 +1,6 @@
 import { publicName } from './social.js';
 import { initStore, memory, pool } from './store.js';
+import { currentVibe, initShowcase } from './showcase.js';
 
 // Presença na Comunidade: "Online agora" e "Visto por último".
 // O navegador manda um sinal (heartbeat) só enquanto a aba está visível e a pessoa mexeu no app há pouco;
@@ -67,13 +68,18 @@ export const isOnline = ({ lastSeenAt, leftAt }, now = Date.now()) => now - last
 
 async function members(viewerId) {
   await initPresence();
+  await initShowcase();
   let rows;
   if (pool) {
-    rows = (await pool.query(`SELECT u.id, u.name, u.avatar_version, u.preferences, p.last_seen_at AS "lastSeenAt", p.left_at AS "leftAt"
-      FROM user_presence p JOIN users u ON u.id=p.user_id ORDER BY p.last_seen_at DESC LIMIT 200`)).rows
+    rows = (await pool.query(`SELECT u.id, u.name, u.avatar_version, u.preferences, p.last_seen_at AS "lastSeenAt", p.left_at AS "leftAt",
+        ps.vibe, ps.vibe_at AS "vibeAt", COALESCE(ps.available AND ps.visible, FALSE) AS available
+      FROM user_presence p JOIN users u ON u.id=p.user_id LEFT JOIN profile_showcases ps ON ps.user_id=u.id ORDER BY p.last_seen_at DESC LIMIT 200`)).rows
       .map(row => ({ ...row, lastSeenAt: new Date(row.lastSeenAt).getTime(), leftAt: row.leftAt ? new Date(row.leftAt).getTime() : null }));
   } else {
-    rows = [...memoryPresence()].map(([id, item]) => ({ ...memory.users.find(user => user.id === id), ...item }))
+    rows = [...memoryPresence()].map(([id, item]) => {
+      const showcase = (memory.showcases || []).find(entry => entry.userId === id) || {};
+      return { ...memory.users.find(user => user.id === id), ...item, vibe: showcase.vibe, vibeAt: showcase.vibeAt, available: Boolean(showcase.available && showcase.visible !== false) };
+    })
       .filter(row => row.id)
       .sort((a, b) => b.lastSeenAt - a.lastSeenAt);
   }
@@ -88,7 +94,9 @@ async function members(viewerId) {
       avatarVersion: row.avatar_version || '',
       online: isOnline(row, now),
       lastSeenAt: new Date(row.lastSeenAt).toISOString(),
-      me: row.id === viewerId
+      me: row.id === viewerId,
+      vibe: currentVibe(row),
+      available: row.available === true
     }))
     .sort((a, b) => Number(b.online) - Number(a.online) || b.lastSeenAt.localeCompare(a.lastSeenAt));
 }

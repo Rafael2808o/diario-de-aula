@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Camera, ChevronRight, LibraryBig, Megaphone, MessagesSquare, PenLine, ScrollText, Star } from "lucide-react";
+import { CalendarPlus, Camera, ChevronRight, LibraryBig, Megaphone, MessagesSquare, PenLine, ScrollText, Star } from "lucide-react";
 import { useApp } from "../context.js";
 import { apiBase } from "../lib/api.js";
 import Members from "../components/Members.jsx";
+import EventsCard from "../components/Eventos.jsx";
 import { Avatar, Nox } from "../ui.jsx";
 
 // Comunidade 💜: bruxinhos online, as cinco áreas sociais com ponto de novidade e, embaixo, o que aconteceu
@@ -110,6 +111,7 @@ export default function CommunityHub() {
   const { go, params } = useApp();
   const news = useCommunityNews();
   const activity = useActivity();
+  const [creatingEvent, setCreatingEvent] = useState(false);
   // Avisos antigos apontavam para "comunidade" com o id da publicação do Conselho.
   useEffect(() => {
     if (params.id) go("conselho", { id: params.id });
@@ -165,6 +167,9 @@ export default function CommunityHub() {
               <button type="button" className="btn ghost small" onClick={() => go("resumos")}>
                 <LibraryBig size={14} /> Resumo
               </button>
+              <button type="button" className="btn ghost small" onClick={() => setCreatingEvent(true)}>
+                <CalendarPlus size={14} /> Evento de estudo
+              </button>
             </div>
           </div>
           <h2 id="hub-feed-title" className="section-title">Agora na comunidade</h2>
@@ -177,6 +182,7 @@ export default function CommunityHub() {
           )}
         </section>
         <aside className="hub-side">
+          <EventsCard creating={creatingEvent} onCreating={setCreatingEvent} />
           <section className="hub-card">
             <header>
               <h2>Comunicados</h2>

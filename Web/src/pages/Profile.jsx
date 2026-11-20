@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChartLine, ChevronRight, Flame, Lock, Moon as MoonIcon, ScrollText, Settings as SettingsIcon, Trophy } from "lucide-react";
+import { ChartLine, ChevronRight, Flame, Lock, Moon as MoonIcon, ScrollText, Settings as SettingsIcon, Star, Trophy } from "lucide-react";
 import { useApp } from "../context.js";
 import { formatFull, todayIso } from "../lib/dates.js";
 import { progressOf } from "../lib/domain.js";
 import { formatDuration } from "../lib/ritual.js";
-import { xpRules } from "../lib/progress.js";
+import { titles, xpRules } from "../lib/progress.js";
 import { Avatar } from "../ui.jsx";
-import { MoonWeek, sparkle } from "../components/Art.jsx";
+import { sparkle } from "../components/Art.jsx";
 import { PublicProfile, ShowcaseCard, ShowcaseEditor } from "../components/Showcase.jsx";
 
 // Medalha de cada relíquia: um símbolo próprio, dourado quando conquistada.
@@ -76,12 +76,17 @@ function MyProfile() {
   const span = progress.levelTo - progress.levelFrom;
   const inLevel = progress.xp - progress.levelFrom;
   const totalSeconds = data["study-sessions"].reduce((sum, session) => sum + session.durationSeconds, 0);
+  const percent = span > 0 ? Math.max(0, Math.min(100, Math.round((inLevel / span) * 100))) : 0;
+  const nextTitle = titles.find(([from]) => from > progress.level);
+  const weekFocus = progress.week.map((day) => ({ ...day, seconds: data["study-sessions"].filter((session) => session.date === day.date).reduce((sum, session) => sum + session.durationSeconds, 0) }));
+  const weekSeconds = weekFocus.reduce((sum, day) => sum + day.seconds, 0);
+  const weekMax = Math.max(1, ...weekFocus.map((day) => day.seconds));
   const course = [user.course, user.semester && (/semestre/i.test(user.semester) ? user.semester : `${user.semester}º semestre`), user.institution].filter(Boolean).join(" · ");
 
   return (
     <div className="page profile">
       {showcase ? (
-        <ShowcaseCard person={{ ...user, me: true, course }} showcase={showcase} title={progress.title} onEdit={() => setEditing(true)} />
+        <ShowcaseCard person={{ ...user, me: true, course }} showcase={showcase} title={progress.title} onEdit={() => setEditing(true)} onVibe={(vibe) => setShowcase({ ...showcase, vibe })} />
       ) : (
         <header className="profile-head">
           <Avatar user={user} size={84} />
@@ -103,43 +108,87 @@ function MyProfile() {
         />
       )}
 
-      <section className="level-card" aria-label="Nível e experiência">
-        <div className="level-top">
-          <strong>Nível {progress.level}</strong>
-          <span>
-            {progress.xp.toLocaleString("pt-BR")} / {progress.levelTo.toLocaleString("pt-BR")} XP
-          </span>
-        </div>
-        <div className="xp-track" role="progressbar" aria-label="Experiência até o próximo nível" aria-valuemin={0} aria-valuemax={span} aria-valuenow={inLevel}>
-          <span style={{ width: `${(inLevel / span) * 100}%` }} />
-        </div>
-        <dl className="level-stats">
-          <div>
-            <dt>Sequência</dt>
-            <dd>
-              <Flame size={15} aria-hidden="true" /> {progress.streak} {progress.streak === 1 ? "dia" : "dias"}
-            </dd>
+      <div className="profile-stats">
+        <section className="level-card mystic" aria-label="Nível e título">
+          <div className="mystic-top">
+            <div className="mystic-ring" role="progressbar" aria-label="Experiência até o próximo nível" aria-valuemin={0} aria-valuemax={span} aria-valuenow={inLevel}>
+              <svg viewBox="0 0 118 118" aria-hidden="true">
+                <circle cx="59" cy="59" r="46" className="track" />
+                <circle cx="59" cy="59" r="46" className="fill" style={{ strokeDashoffset: (289 - (289 * percent) / 100).toFixed(1) }} />
+              </svg>
+              <div>
+                <b>{percent}%</b>
+                <span>Nível {progress.level}</span>
+              </div>
+            </div>
+            <div className="mystic-text">
+              <small>Título místico</small>
+              <h2>{progress.title}</h2>
+              <p>
+                {(progress.levelTo - progress.xp).toLocaleString("pt-BR")} XP para o nível {progress.level + 1}
+                {nextTitle ? ` · ${nextTitle[1]} no nível ${nextTitle[0]}` : ""}
+              </p>
+              <div className="mystic-ladder" aria-label={`Títulos: ${titles.filter(([from]) => progress.level >= from).length} de ${titles.length}`}>
+                {titles.map(([from, name]) => (
+                  <i key={name} className={progress.level >= from ? "on" : ""} title={`${name} (nível ${from})`}>
+                    <Star size={16} aria-hidden="true" />
+                  </i>
+                ))}
+              </div>
+            </div>
           </div>
-          <div>
-            <dt>Relíquias</dt>
-            <dd>
-              {relics.filter((relic) => relic.unlocked).length} de {relics.length}
-            </dd>
+          <dl className="mystic-stats">
+            <div>
+              <dd>{progress.xp.toLocaleString("pt-BR")}</dd>
+              <dt>XP</dt>
+            </div>
+            <div>
+              <dd>
+                <Flame size={15} aria-hidden="true" /> {progress.streak}
+              </dd>
+              <dt>{progress.streak === 1 ? "dia seguido" : "dias seguidos"}</dt>
+            </div>
+            <div>
+              <dd>
+                {relics.filter((relic) => relic.unlocked).length}/{relics.length}
+              </dd>
+              <dt>relíquias</dt>
+            </div>
+            <div>
+              <dd>{progress.counts.lessons}</dd>
+              <dt>aulas</dt>
+            </div>
+          </dl>
+          <button type="button" className="link-btn level-history" onClick={() => go("historico-xp")}>
+            <ScrollText size={14} /> Ver de onde veio cada XP
+          </button>
+        </section>
+        <section className="level-card focus-time" aria-label="Tempo de foco acumulado">
+          <svg className="hourglass" viewBox="0 0 66 92" aria-hidden="true">
+            <path d="M8 4h50M8 88h50" stroke="#e3bf62" strokeWidth="5" strokeLinecap="round" />
+            <path d="M12 8h42c0 22-14 28-14 38s14 16 14 38H12c0-22 14-28 14-38S12 30 12 8z" fill="rgba(160,130,230,.12)" stroke="#cbb8ff" strokeWidth="2.5" strokeLinejoin="round" />
+            <path className="sand1" d="M17 12h32c-2 10-10 14-14 22h-4c-4-8-12-12-14-22z" fill="#f0c36d" />
+            <rect className="drop" x="32" y="40" width="2" height="38" fill="#f0c36d" />
+            <path className="sand2" d="M18 84c0-10 7-16 15-16s15 6 15 16z" fill="#f0c36d" />
+          </svg>
+          <div className="focus-time-text">
+            <small>Tempo de foco acumulado</small>
+            <strong>{totalSeconds ? formatDuration(totalSeconds) : "0 min"}</strong>
+            <p>Nesta semana: {weekSeconds ? formatDuration(weekSeconds) : "nada ainda"}</p>
           </div>
-          <div>
-            <dt>Tempo de foco</dt>
-            <dd>{totalSeconds ? formatDuration(totalSeconds) : "0 min"}</dd>
-          </div>
-          <div>
-            <dt>Aulas registradas</dt>
-            <dd>{progress.counts.lessons}</dd>
-          </div>
-        </dl>
-        <MoonWeek days={progress.week} />
-        <button type="button" className="link-btn level-history" onClick={() => go("historico-xp")}>
-          <ScrollText size={14} /> Ver de onde veio cada XP
-        </button>
-      </section>
+          <ol className="focus-week" aria-label="Minutos de foco nos últimos sete dias">
+            {weekFocus.map((day) => (
+              <li key={day.date} title={`${day.label}: ${Math.round(day.seconds / 60)} min`}>
+                <i style={{ height: `${Math.max(4, Math.round((day.seconds / weekMax) * 52))}px` }} className={day.seconds ? "on" : ""} />
+                <span aria-hidden="true">{day.short}</span>
+                <span className="sr-only">
+                  {day.label}: {Math.round(day.seconds / 60)} minutos
+                </span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      </div>
 
       <section aria-labelledby="reliquias-title" ref={relicsRef}>
         <div className="section-head">

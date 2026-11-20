@@ -194,3 +194,13 @@ notebook_notes, focus_rooms, focus_room_members, focus_room_messages, quiz_match
 profile_showcases; na 4.1: shop_wallets, shop_purchases, shop_item_settings, problem_reports, admin_audit
 (e users.suspended_at, users.suspended_reason). Colunas novas da 4.0: academic_profiles.name_confirmed, chat_letters.paper, flashcards.lesson_id e
 flashcards.deck.
+
+## Versão 4.2 (19/11/2026): o que faltava das telas de referência
+
+Tudo só acréscimo no banco (CREATE TABLE / ADD COLUMN IF NOT EXISTS). Backup antes: branch Neon `backup-pre-v42-20261119` e JSON em `D:\Codes\_backups_grimiau\neon-pre-v42-20261119.json`.
+
+- `notebook_extras` (lesson_id, user_id, topics, doubts, stickers em JSONB): seções Tópicos e Dúvidas do Caderno e figurinhas soltas por cima das páginas. Rotas `GET/PUT /api/v1/lessons/:id/extras` (só o dono); o caderno compartilhado devolve `extras` só para leitura. A seção Cartas usa as Cartas do Saber normais, ligadas à aula.
+- `profile_showcases` ganhou `available`, `vibe`, `vibe_at`. Vibe vale 24 horas (`PUT /api/v1/vitrine/vibe`) e aparece no perfil e em Bruxinhos por aqui; "Disponível para estudar junto" some se a apresentação estiver escondida.
+- `community_events` e `community_event_rsvps`: Eventos da Comunidade (criar, confirmar presença, cancelar). Até 5 eventos futuros por pessoa; somem da lista 6 horas depois do horário. Quem cria recebe aviso quando alguém confirma.
+- Perfil: cartão "Título místico" (anel de %, estrelas dos títulos) e "Tempo de foco acumulado" com barras da semana.
+- Administração: `?abrir=admin` sem sessão mostra "Entrada restrita" com o login normal; sem papel de admin, a tela de acesso negado. A API continua conferindo o papel em cada pedido.

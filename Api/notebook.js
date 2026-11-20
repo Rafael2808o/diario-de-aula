@@ -42,7 +42,12 @@ export function initNotebook() {
         id TEXT PRIMARY KEY, lesson_id TEXT NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
         user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         body TEXT NOT NULL DEFAULT '', sticker TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ DEFAULT NOW());
-      CREATE INDEX IF NOT EXISTS notebook_notes_lesson_idx ON notebook_notes(lesson_id)`);
+      CREATE INDEX IF NOT EXISTS notebook_notes_lesson_idx ON notebook_notes(lesson_id);
+      CREATE TABLE IF NOT EXISTS notebook_extras (
+        lesson_id TEXT PRIMARY KEY REFERENCES lessons(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        topics JSONB NOT NULL DEFAULT '[]', doubts JSONB NOT NULL DEFAULT '[]', stickers JSONB NOT NULL DEFAULT '[]',
+        updated_at TIMESTAMPTZ DEFAULT NOW())`);
   })().catch(error => {
     ready = null;
     throw error;
@@ -54,6 +59,7 @@ const mem = () => {
   memory.notebookImages ||= [];
   memory.notebookShares ||= [];
   memory.notebookNotes ||= [];
+  memory.notebookExtras ||= new Map();
   return memory;
 };
 const memLessons = () => ((memory.entities ||= {}).lessons ||= []);
@@ -116,6 +122,39 @@ async function pruneImages(lessonId, html) {
   } else memory.notebookImages = mem().notebookImages.filter(item => item.lessonId !== lessonId || item.createdAt >= cutoff || used.has(item.id));
 }
 
+// ---------- Extras do Caderno (versão 4.2): tópicos, dúvidas e figurinhas soltas ----------
+// Tópicos: { id, t, f (cai na prova), d (revisado) }. Dúvidas: { id, t, d (resolvida) }.
+// Figurinhas: { id, k (desenho), p ('L' página de escrever, 'R' janela), sec (seção da esquerda), x (0 a 1 da largura),
+// y (px do topo), s (tamanho), r (giro), z (ordem), sh (brilho) }. Só os desenhos da lista entram.
+export const pageStickers = ['lua', 'estrela', 'constelacao', 'gato', 'livro', 'pocao', 'vela', 'olho', 'cristal',
+  'importante', 'cai', 'revisar', 'duvida', 'dominei', 'exemplo', 'definicao', 'check', 'exclamacao', 'interrogacao', 'ampulheta', 'coracao', 'seta'];
+const sections = ['conteudo', 'topicos', 'duvidas', 'cartas'];
+const num = (value, min, max, fallback = min) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback;
+};
+const itemId = value => (typeof value === 'string' && /^[a-z0-9-]{1,40}$/i.test(value) ? value : randomUUID().slice(0, 12));
+export function cleanExtras(body = {}) {
+  const list = (value, max) => (Array.isArray(value) ? value.slice(0, max) : []);
+  return {
+    topics: list(body.topics, 100).map(item => ({ id: itemId(item?.id), t: clean(item?.t, 300), f: item?.f === true, d: item?.d === true })).filter(item => item.t),
+    doubts: list(body.doubts, 100).map(item => ({ id: itemId(item?.id), t: clean(item?.t, 300), d: item?.d === true })).filter(item => item.t),
+    stickers: list(body.stickers, 60).filter(item => pageStickers.includes(item?.k)).map(item => ({
+      id: itemId(item.id), k: item.k, p: item.p === 'R' ? 'R' : 'L', sec: sections.includes(item.sec) ? item.sec : 'conteudo',
+      x: Math.round(num(item.x, 0, 1) * 1000) / 1000, y: Math.round(num(item.y, 0, 4000)), s: Math.round(num(item.s, 24, 220, 70)),
+      r: Math.round(num(item.r, -45, 45, 0)), z: Math.round(num(item.z, 0, 999, 1)), sh: item.sh === true
+    }))
+  };
+}
+const emptyExtras = () => ({ topics: [], doubts: [], stickers: [] });
+async function extrasOf(lessonId) {
+  if (pool) {
+    const row = (await pool.query('SELECT topics, doubts, stickers FROM notebook_extras WHERE lesson_id=$1', [lessonId])).rows[0];
+    return row ? { topics: row.topics || [], doubts: row.doubts || [], stickers: row.stickers || [] } : emptyExtras();
+  }
+  return mem().notebookExtras.get(lessonId) || emptyExtras();
+}
+
 export function registerNotebookRoutes(app, requireAuth) {
   const handle = action => async (req, res, next) => {
     try {
@@ -157,6 +196,28 @@ export function registerNotebookRoutes(app, requireAuth) {
     res.set('Cache-Control', 'private, max-age=86400');
     res.set('X-Content-Type-Options', 'nosniff');
     return res.send(image.data);
+  }));
+
+  // ---------- Tópicos, dúvidas e figurinhas da página ----------
+  app.get('/api/v1/lessons/:id/extras', requireAuth, handle(async (req, res) => {
+    const found = await access(req.params.id, req.user.id);
+    if (!found?.owner) return res.status(404).json({ error: 'Aula não encontrada.' });
+    return res.json(await extrasOf(found.lesson.id));
+  }));
+
+  app.put('/api/v1/lessons/:id/extras', express.json({ limit: '200kb' }), requireAuth, handle(async (req, res) => {
+    const found = await access(req.params.id, req.user.id);
+    if (!found?.owner) return res.status(404).json({ error: 'Aula não encontrada.' });
+    const current = await extrasOf(found.lesson.id);
+    const given = cleanExtras(req.body || {});
+    // Só troca o que veio no pedido (a tela manda uma parte por vez).
+    const next = Object.fromEntries(['topics', 'doubts', 'stickers'].map(key => [key, Array.isArray(req.body?.[key]) ? given[key] : current[key]]));
+    if (pool) {
+      await pool.query(`INSERT INTO notebook_extras (lesson_id, user_id, topics, doubts, stickers, updated_at) VALUES ($1,$2,$3,$4,$5,NOW())
+        ON CONFLICT (lesson_id) DO UPDATE SET topics=$3, doubts=$4, stickers=$5, updated_at=NOW()`,
+      [found.lesson.id, req.user.id, JSON.stringify(next.topics), JSON.stringify(next.doubts), JSON.stringify(next.stickers)]);
+    } else mem().notebookExtras.set(found.lesson.id, next);
+    return res.json(next);
   }));
 
   // ---------- Compartilhar o caderno ----------
@@ -210,7 +271,7 @@ export function registerNotebookRoutes(app, requireAuth) {
     return res.json({
       id: lesson.id, date: lesson.date, startTime: lesson.startTime || '', theme: lesson.theme || '', subjectName: lesson.subjectName || '', subjectColor: lesson.subjectColor || '',
       annotations: sanitizeHtml(lesson.annotations || ''), owner: author(lesson.ownerId, lesson.ownerName, lesson.ownerAvatar), mine: found.owner,
-      notes: await notesOf(lesson.id, req.user.id, lesson.ownerId), stickers: freeStickers
+      notes: await notesOf(lesson.id, req.user.id, lesson.ownerId), stickers: freeStickers, extras: await extrasOf(lesson.id)
     });
   }));
 

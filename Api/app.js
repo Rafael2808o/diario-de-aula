@@ -47,6 +47,7 @@ import { registerFocusRoutes } from './focus.js';
 import { registerQuizGameRoutes } from './quizgame.js';
 import { registerShowcaseRoutes } from './showcase.js';
 import { registerShopRoutes } from './shop.js';
+import { registerEventRoutes } from './events.js';
 import { isSuspended, registerAdminRoutes } from './admin.js';
 
 const app = express();
@@ -703,6 +704,7 @@ registerFocusRoutes(app, requireAuth);
 registerQuizGameRoutes(app, requireAuth, aiRateLimit);
 registerShowcaseRoutes(app, requireAuth);
 registerShopRoutes(app, requireAuth);
+registerEventRoutes(app, requireAuth);
 registerAdminRoutes(app, requireAuth);
 
 app.get('/api/v1/integrations/spotify/status', (_req, res) =>
