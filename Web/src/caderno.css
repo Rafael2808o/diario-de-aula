@@ -42,12 +42,12 @@
 
 /* Carimbo (IMPORTANTE, CAI NA PROVA...). */
 .stamp { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border: 1.5px dashed currentColor; border-radius: 7px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; background: color-mix(in srgb, currentColor 12%, transparent); }
-.stamp.rose { color: #c2365c; } .stamp.gold { color: #9a6a00; } .stamp.mint { color: #17674a; } .stamp.lilac { color: #6a49c4; } .stamp.sky { color: #1f6f8f; }
+.stamp.rose { color: #c2365c; } .stamp.gold { color: #9a6a00; } .stamp.mint { color: #17674a; } .stamp.lilac { color: #6a49c4; } .stamp.tone-sky { color: #1f6f8f; }
 :root:not([data-theme="light"]) .stamp.rose { color: #ff9ab4; }
 :root:not([data-theme="light"]) .stamp.gold { color: #f6c46b; }
 :root:not([data-theme="light"]) .stamp.mint { color: #6fe0b6; }
 :root:not([data-theme="light"]) .stamp.lilac { color: #c9b8ff; }
-:root:not([data-theme="light"]) .stamp.sky { color: #8fd3f0; }
+:root:not([data-theme="light"]) .stamp.tone-sky { color: #8fd3f0; }
 
 /* ---------- Ritual: tempo fora ---------- */
 .ritual-away { display: grid; gap: 8px; width: 100%; }

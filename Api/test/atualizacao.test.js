@@ -218,15 +218,16 @@ test('arquivo excluído vai para a lixeira, some dos links e pode voltar', async
 });
 
 test('sugestões de disciplinas: só nomes usados por duas ou mais contas do mesmo curso', async () => {
-  const profile = { course: 'Publicidade e Propaganda', institution: 'Faculdade Sugestão' };
+  const school = `Faculdade Sugestão ${Math.random().toString(36).slice(2, 7)}`;
+  const profile = { course: 'Publicidade e Propaganda', institution: school };
   const a = await account('Sug A', profile);
   const b = await account('Sug B', profile);
-  const outside = await account('Sug C', { course: 'Direito', institution: 'Faculdade Sugestão' });
+  const outside = await account('Sug C', { course: 'Direito', institution: school });
   await subject(a.auth, 'Fundamentos do Marketing');
   await subject(b.auth, 'fundamentos do marketing');
   await subject(a.auth, 'Só da Ana');
   await subject(outside.auth, 'Fundamentos do Marketing');
-  const me = await account('Sug Nova', { course: 'publicidade e propaganda', institution: 'faculdade sugestao' });
+  const me = await account('Sug Nova', { course: 'publicidade e propaganda', institution: school.toLowerCase().replace('ã', 'a') });
   const list = await request(app).get('/api/v1/subjects/suggestions').set(me.auth);
   assert.deepEqual(list.body.items.map(item => item.name), ['Fundamentos do Marketing']);
   const noProfile = await account('Sem Curso');

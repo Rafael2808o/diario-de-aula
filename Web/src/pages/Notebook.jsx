@@ -71,7 +71,7 @@ export const stickers = {
   importante: { label: "Importante", stamp: "rose" },
   "cai-na-prova": { label: "Cai na prova", stamp: "gold" },
   revisar: { label: "Revisar", stamp: "lilac" },
-  duvida: { label: "Dúvida", stamp: "sky" },
+  duvida: { label: "Dúvida", stamp: "tone-sky" },
   dominei: { label: "Dominei", stamp: "mint" },
 };
 
@@ -854,7 +854,10 @@ function LessonNotebook({ lesson, subject, recent }) {
   const addSticker = (kind) => {
     // Cola na altura da página que está à vista.
     const rect = leftPage.current?.getBoundingClientRect();
-    const y = rect ? Math.max(40, Math.min(rect.height - 120, -rect.top + 140)) : 60;
+    // Nunca embaixo da barra do editor (ela fica por cima ao rolar).
+    const bar = leftPage.current?.querySelector(".notebook-toolbar")?.getBoundingClientRect();
+    const minY = rect && bar ? bar.bottom - rect.top + 12 : 40;
+    const y = rect ? Math.max(minY, Math.min(rect.height - 120, -rect.top + 140)) : 60;
     const item = makeSticker(kind, "L", section, extras.stickers, y);
     change("stickers", (list) => [...list, item].slice(-60));
     setSelected(item.id);

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import app from '../app.js';
-import { account } from './v4.test.js';
+import { account } from './helpers.js';
 import { stillShown } from '../events.js';
 
 // Versão 4.2: tópicos, dúvidas e figurinhas do Caderno; vibe e "disponível" do perfil; Eventos da Comunidade.

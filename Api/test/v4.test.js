@@ -5,13 +5,8 @@ import app from '../app.js';
 import { memory, pool } from '../store.js';
 
 // Versão 4.0: pedidos do Conselho dos Bruxinhos.
-export const account = async (name, extra = {}) => {
-  const email = `${name.replace(/\W/g, '').toLowerCase()}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@grimiau.local`;
-  const response = await request(app).post('/api/v1/auth/register').send({ name, email, password: 'senha-segura-123' });
-  const auth = { Authorization: `Bearer ${response.body.token}` };
-  if (Object.keys(extra).length) await request(app).patch('/api/v1/me').set(auth).send(extra);
-  return { user: response.body.user, auth };
-};
+import { account } from './helpers.js';
+export { account };
 
 test('Cartas: papel escolhido volta na lista e papel desconhecido vira pergaminho', async () => {
   const ana = await account('Ana Papel');
@@ -370,7 +365,8 @@ test('Loja da Madrugada: pozinho separado do XP, compra trava o saldo, só equip
 
 test('Administração: só admin entra, relato vira triagem, suspensão bloqueia e fica no registro', async () => {
   const admin = await account('Ada Painel');
-  const aluno = await account('Aluno Painel');
+  const tag = Math.random().toString(36).slice(2, 7);
+  const aluno = await account(`Aluno Painel ${tag}`);
   await request(app).get('/api/v1/admin/resumo').set(admin.auth).expect(403);
   process.env.ADMIN_EMAILS = admin.user.email;
   try {
@@ -383,7 +379,7 @@ test('Administração: só admin entra, relato vira triagem, suspensão bloqueia
     await request(app).patch(`/api/v1/admin/relatos/${report.body.id}`).set(admin.auth).send({ severity: 'alta', status: 'em-andamento' }).expect(200);
     const list = (await request(app).get('/api/v1/admin/relatos').set(admin.auth)).body;
     assert.equal(list.find(item => item.id === report.body.id).severity, 'alta');
-    const users = (await request(app).get('/api/v1/admin/usuarios?q=Aluno Painel').set(admin.auth).expect(200)).body;
+    const users = (await request(app).get(`/api/v1/admin/usuarios?q=Aluno Painel ${tag}`).set(admin.auth).expect(200)).body;
     assert.equal(users[0].email, aluno.user.email);
     await request(app).post(`/api/v1/admin/usuarios/${admin.user.id}/suspensao`).set(admin.auth).send({ suspend: true, reason: 'x' }).expect(400);
     await request(app).post(`/api/v1/admin/usuarios/${aluno.user.id}/suspensao`).set(admin.auth).send({ suspend: true }).expect(400);
